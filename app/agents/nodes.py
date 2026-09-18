@@ -196,7 +196,7 @@ async def plan(deps: AgentDeps, state: dict[str, Any]) -> dict[str, Any]:
 
 async def analyse(
     deps: AgentDeps, finding: Finding
-) -> tuple[FindingAnalysis, str, list[RetrievedChunk]]:
+) -> tuple[FindingAnalysis, str, list[RetrievedChunk], float]:
     sources = traced_search(deps.retrieval, deps.adapter.retrieval_query(finding), deps.retrieval_k)
     prior = deps.adapter.fallback_analysis(finding, sources)
     facts = finding.model_dump(mode="json", exclude={"evidence"}) | {
@@ -218,7 +218,7 @@ async def analyse(
     )
     # a model may lower confidence freely but not talk itself far past the calibrated prior
     analysis.confidence = round(min(analysis.confidence, prior.confidence + 0.15, 0.95), 2)
-    return analysis, by, sources
+    return analysis, by, sources, prior.confidence
 
 
 def specialist(role: str) -> Any:
@@ -234,9 +234,10 @@ def specialist(role: str) -> Any:
                     "finding": f.model_dump(mode="json"),
                     "analysis": a.model_dump(mode="json"),
                     "analysis_by": by,
+                    "prior_confidence": prior,
                     "sources": [SourceRef(**s.model_dump()).model_dump() for s in src],
                 }
-                for f, (a, by, src) in zip(findings, analysed, strict=True)
+                for f, (a, by, src, prior) in zip(findings, analysed, strict=True)
             ]
         }
 
@@ -274,10 +275,10 @@ async def report(deps: AgentDeps, state: dict[str, Any]) -> dict[str, Any]:
         reasons = []
         if f.severity == "S1":
             reasons.append("S1 findings always get a human sign-off")
-        if a.confidence < deps.review_threshold:
-            reasons.append(
-                f"root-cause confidence {a.confidence:.2f} is below {deps.review_threshold}"
-            )
+        # a model can push a finding into review but never talk it out of one
+        gate = min(a.confidence, item.get("prior_confidence", a.confidence))
+        if gate < deps.review_threshold:
+            reasons.append(f"root-cause confidence {gate:.2f} is below {deps.review_threshold}")
         reports.append(
             IncidentReport(
                 id=uuid.uuid4(),

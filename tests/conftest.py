@@ -76,3 +76,23 @@ def migrated_engine(db_url: str) -> Iterator[Engine]:
     command.upgrade(cfg, "head")
     yield engine
     engine.dispose()
+
+
+@pytest.fixture(scope="module")
+def loaded_engine(db_url: str) -> Iterator[Engine]:
+    """Migrated and loaded with the committed sample, once per test module."""
+    from alembic import command
+    from alembic.config import Config
+
+    from app.pipeline.loader import load_pipeline
+
+    engine = create_engine(db_url)
+    with engine.begin() as conn:
+        conn.execute(text("drop schema public cascade"))
+        conn.execute(text("create schema public"))
+    cfg = Config(str(ROOT / "alembic.ini"))
+    cfg.attributes["url"] = db_url
+    command.upgrade(cfg, "head")
+    load_pipeline(engine, ROOT / "data" / "sample")
+    yield engine
+    engine.dispose()
