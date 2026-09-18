@@ -14,8 +14,11 @@ bootstrap: ## install python + node deps, git hooks, and a local .env
 	cd frontend && npm ci
 	uv run pre-commit install
 	@test -f .env || (cp .env.example .env && echo "created .env from .env.example")
+	@test -f frontend/.env.local || ( \
+		printf 'AUTH_SECRET=%s\nNEXT_PUBLIC_API_URL=http://localhost:8000\n' "$$(openssl rand -base64 32)" > frontend/.env.local \
+		&& echo "created frontend/.env.local with a fresh AUTH_SECRET")
 
-dev: ## run api and web together (ctrl-c stops both)
+dev: db seed ## postgres, migrations and sample data, then api and web together (ctrl-c stops both)
 	@trap 'kill 0' EXIT; \
 	$(MAKE) --no-print-directory api & \
 	$(MAKE) --no-print-directory web & \
@@ -28,7 +31,7 @@ web: ## run the next.js dev server
 	cd frontend && NEXT_PUBLIC_API_URL=http://localhost:$(API_PORT) npm run dev -- --port $(WEB_PORT)
 
 db: ## start postgres and apply migrations
-	docker compose up -d postgres
+	docker compose up -d --wait postgres
 	uv run alembic upgrade head
 
 seed: ## load the committed synthetic sample into DATABASE_URL

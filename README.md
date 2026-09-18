@@ -222,12 +222,13 @@ You need Python 3.12 with [uv](https://docs.astral.sh/uv/), Node 20+, and Docker
 
 ```bash
 git clone https://github.com/rahulramachandran-labs/reconmind && cd reconmind
-make bootstrap    # uv sync, npm ci, git hooks, .env from .env.example
-make db seed      # postgres in docker, migrations, load the synthetic sample
-make dev          # api on :8000, web on :3000
+make bootstrap    # uv sync, npm ci, git hooks, .env and frontend/.env.local
+make dev          # postgres in docker, migrations, synthetic sample, then api on :8000 and web on :3000
 ```
 
-Or run everything, including Ollama, in containers:
+Port 5432 already taken? Set `POSTGRES_PORT` and the port in `DATABASE_URL` in `.env`.
+
+Or run everything in containers, including the MCP servers over HTTP, Ollama and a self-hosted LangFuse (UI on :3001, sign in as `admin@reconmind.local` / `reconmind-local`):
 
 ```bash
 docker compose --profile full up --build

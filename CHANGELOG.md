@@ -4,6 +4,17 @@ All notable changes, grouped by build phase. Dates are UTC.
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-09-18
+
+### Fixed
+- `make dev` starts Postgres, applies migrations and loads the sample itself, so `make bootstrap && make dev` works from a clean clone.
+- `make bootstrap` writes `frontend/.env.local` with a fresh `AUTH_SECRET`; without it Auth.js refused to sign anyone in locally.
+- MinIO for the LangFuse stack now comes from quay.io; the Docker Hub image is gone.
+
+### Changed
+- Demo GIF re-recorded with the final dashboard.
+- Checked the LangFuse mirror against a real self-hosted LangFuse 3: every node, tool call, retrieval and generation from a run arrives with prompt version and token usage, 15 of 15 steps.
+
 ## [1.0.0] - 2026-09-18
 
 ### Added

@@ -142,7 +142,7 @@ services:
     command: ["redis-server", "--requirepass", "${REDIS_AUTH:-local-dev}"]
 
   minio:
-    image: minio/minio:latest
+    image: quay.io/minio/minio:latest  # MinIO no longer publishes to Docker Hub
     profiles: ["full"]
     entrypoint: ["sh", "-c", "mkdir -p /data/langfuse && minio server /data"]
     environment:
