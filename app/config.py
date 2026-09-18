@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     embeddings_model: str = "sentence-transformers/all-MiniLM-L6-v2"
     openai_embeddings_model: str = "text-embedding-3-small"
     retriever: Literal["hybrid", "dense", "bm25"] = "hybrid"
+    reranker: Literal["cross-encoder", "none"] = "cross-encoder"
+    reranker_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+    rerank_candidates: int = 10
     retrieval_k: int = 5
     vector_store: Literal["faiss", "pinecone"] = "faiss"
     pinecone_api_key: SecretStr | None = None
@@ -45,6 +48,8 @@ class Settings(BaseSettings):
     # agents
     agents_enabled: bool = True
     domain_adapter: str = "retail_recon"
+    # stdio: servers as subprocesses; inprocess: same process, for one small container
+    mcp_transport: Literal["stdio", "inprocess"] = "stdio"
     warehouse_mcp_url: str | None = None
     orchestration_mcp_url: str | None = None
     planner_confidence_threshold: float = 0.5

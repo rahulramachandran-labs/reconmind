@@ -1,7 +1,8 @@
 # Minimum mean score per metric over the golden set. CI fails below these.
-# Phase B starting point; raised in Phase D once the agent answers are in.
+# Started at 0.75 for every metric; raised once reranking was in and the numbers
+# had settled (hybrid + rerank scored 0.911 / 0.862 / 0.830 / 0.922).
 min:
-  faithfulness: 0.75
-  answer_relevancy: 0.75
-  context_precision: 0.75
-  context_recall: 0.75
+  faithfulness: 0.85
+  answer_relevancy: 0.80
+  context_precision: 0.80
+  context_recall: 0.85

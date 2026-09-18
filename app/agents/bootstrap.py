@@ -29,6 +29,14 @@ def mcp_targets(settings: Settings) -> dict[str, Any]:
         "warehouse-metadata": settings.warehouse_mcp_url,
         "orchestration-metadata": settings.orchestration_mcp_url,
     }
+    if settings.mcp_transport == "inprocess":
+        from app.db.session import get_engine
+        from mcp_servers.orchestration_metadata.server import build_server as orchestration
+        from mcp_servers.warehouse_metadata.server import build_server as warehouse
+
+        engine = get_engine(settings.database_url) if settings.database_url else None
+        local = {"warehouse-metadata": warehouse(engine), "orchestration-metadata": orchestration()}
+        return {name: urls[name] or local[name] for name in SERVERS}
     return {name: urls[name] or stdio_params(module, env) for name, module in SERVERS.items()}
 
 

@@ -257,7 +257,7 @@ uv run python scripts/generate_synthetic_pipeline.py --seed 7 --out /tmp/p --onl
 
 ## Retrieval and evaluation
 
-Documents are chunked by markdown section, then by size, with the title and section carried into every chunk ([ADR 0001](docs/adr/0001-chunk-by-markdown-section.md)). BM25 (`rank_bm25`, with an identifier-aware tokenizer) and dense search (MiniLM on FAISS, or Pinecone behind `VECTOR_STORE=pinecone`) each return 20 candidates. Reciprocal rank fusion merges them, with at most two chunks per document.
+Documents are chunked by markdown section, then by size, with the title and section carried into every chunk ([ADR 0001](docs/adr/0001-chunk-by-markdown-section.md)). BM25 (`rank_bm25`, with an identifier-aware tokenizer) and dense search (MiniLM on FAISS, or Pinecone behind `VECTOR_STORE=pinecone`) each return 20 candidates. Reciprocal rank fusion merges them, and a MiniLM MS MARCO cross-encoder reranks the fused top 10 (same weights on onnxruntime in the container).
 
 [`evals/golden_set.jsonl`](evals/golden_set.jsonl) has 46 question, answer and context triples covering every anomaly type and every screen. [`evals/run_ragas.py`](evals/run_ragas.py) scores faithfulness, answer relevancy, context precision and context recall. CI fails if any metric drops below [`evals/thresholds.yaml`](evals/thresholds.yaml), and results are appended to `evals/history.csv`. Without an API key the context metrics come from RAGAS's non-LLM implementations, and faithfulness and relevancy come from cross-encoder judges. With `OPENAI_API_KEY` set, the LLM-judged RAGAS metrics run instead.
 
@@ -271,9 +271,12 @@ Latest scores (offline judge, extractive answers, k=5):
 | Retriever | Faithfulness | Answer relevancy | Context precision | Context recall |
 |---|---|---|---|---|
 | Dense only | 0.920 | 0.863 | 0.661 | 0.844 |
-| **Hybrid (default)** | **0.917** | **0.864** | **0.756** | **0.911** |
+| Hybrid (BM25 + dense, RRF) | 0.917 | 0.864 | 0.756 | 0.911 |
+| **Hybrid + cross-encoder rerank (default)** | **0.911** | **0.862** | **0.830** | **0.922** |
 
-Quality bar: RAGAS ≥ 0.75 on every metric, every planted anomaly caught, test coverage ≥ 80%, an investigation in under 30 s in demo mode, and zero untraced LLM calls.
+The relevancy judge for the last row is the 12-layer MS MARCO cross-encoder, so the reranker (6-layer) isn't grading its own output.
+
+Quality bar: RAGAS faithfulness ≥ 0.85, answer relevancy ≥ 0.80, context precision ≥ 0.80, context recall ≥ 0.85, every planted anomaly caught, test coverage ≥ 80%, an investigation in under 30 s in demo mode, and zero untraced LLM calls.
 
 ## API
 

@@ -18,6 +18,7 @@ def settings(tmp_path: Path) -> Settings:
         dbt_models_dir=ROOT / "dbt" / "models",
         index_dir=tmp_path / "index",
         embeddings_backend="hashing",
+        reranker="none",
         llm_providers=[],
         database_url=None,
         agents_enabled=False,

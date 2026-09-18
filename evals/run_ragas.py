@@ -62,7 +62,8 @@ from app.retrieval.service import RetrievalService
 EVALS = ROOT / "evals"
 METRICS = ("faithfulness", "answer_relevancy", "context_precision", "context_recall")
 NLI_MODEL = "cross-encoder/nli-MiniLM2-L6-H768"
-RELEVANCE_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+# a bigger sibling of the reranker, so the model that ranks passages isn't grading answers
+RELEVANCE_MODEL = "cross-encoder/ms-marco-MiniLM-L-12-v2"
 _CITATION = re.compile(r"\s*\[\d+\]")
 
 

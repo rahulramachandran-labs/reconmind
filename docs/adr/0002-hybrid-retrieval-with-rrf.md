@@ -29,7 +29,11 @@ Things that were tried and dropped:
 - **Weighting dense above BM25, or the reverse.** Within noise on this set, so both lists get equal weight.
 - **Boosting section headings in BM25.** Also within noise.
 
+## Addendum: reranking
+
+A cross-encoder (`cross-encoder/ms-marco-MiniLM-L-6-v2`) now reranks the fused top 10. On the same golden set, context precision went from 0.756 to 0.830 and recall from 0.911 to 0.922. Reranking the top 20 was no better than the top 10. Blending the reranker's rank with the fusion rank was worse than letting the reranker decide. The container runs the same weights through fastembed's ONNX cross-encoder, and `RERANKER=none` turns it off.
+
 ## Consequences
 
 - One more index to build at startup. BM25 over ~90 chunks is instant.
-- Precision is still the weaker number. A cross-encoder reranker over the fused top 20 is the obvious next step if it needs to go up.
+- Reranking adds roughly 100 ms per query on CPU, which is noise next to a model call.

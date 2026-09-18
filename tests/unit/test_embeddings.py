@@ -75,3 +75,35 @@ def test_fastembed_loads_lazily() -> None:
 
     emb._model = FakeModel()
     assert emb.embed_query("x") == [1.0, 0.0]
+
+
+def test_reranker_orders_by_score_and_renumbers() -> None:
+    from app.retrieval.rerank import CrossEncoderReranker, build_reranker
+    from app.retrieval.types import RetrievedChunk
+
+    hits = [
+        RetrievedChunk(
+            chunk_id=f"c{i}",
+            doc_id="d",
+            title="t",
+            path="p",
+            section="s",
+            doc_type="runbook",
+            text=f"text {i}",
+            score=0.0,
+            rank=i + 1,
+        )
+        for i in range(4)
+    ]
+
+    class Fake(CrossEncoderReranker):
+        def _scores(self, query: str, texts: list[str]) -> list[float]:
+            return [0.0, 3.0, -1.0, 1.0]
+
+    out = Fake("m").rerank("q", hits, 3)
+    assert [h.chunk_id for h in out] == ["c1", "c3", "c0"]
+    assert [h.rank for h in out] == [1, 2, 3] and 0.9 < out[0].score < 1
+    assert Fake("m").rerank("q", [], 3) == []
+    assert build_reranker("none", "sentence-transformers", "m") is None
+    fe = build_reranker("cross-encoder", "fastembed", "cross-encoder/ms-marco-MiniLM-L-6-v2")
+    assert fe is not None and fe.model_name == "Xenova/ms-marco-MiniLM-L-6-v2"  # type: ignore[attr-defined]

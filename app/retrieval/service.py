@@ -11,6 +11,7 @@ from app.retrieval.corpus import SourceDoc, load_corpus, load_dbt_models
 from app.retrieval.dense import DenseRetriever, fingerprint
 from app.retrieval.embeddings import build_embeddings
 from app.retrieval.hybrid import HybridRetriever, Searcher
+from app.retrieval.rerank import Reranker, build_reranker
 from app.retrieval.types import RetrievedChunk
 
 log = logging.getLogger(__name__)
@@ -23,6 +24,8 @@ class RetrievalService:
     dense: Searcher
     bm25: BM25Retriever
     mode: str = "hybrid"
+    reranker: Reranker | None = None
+    rerank_candidates: int = 10
     hybrid: HybridRetriever = field(init=False)
 
     def __post_init__(self) -> None:
@@ -67,6 +70,10 @@ class RetrievalService:
             dense=dense,
             bm25=BM25Retriever(chunks),
             mode=settings.retriever,
+            reranker=build_reranker(
+                settings.reranker, settings.embeddings_backend, settings.reranker_model
+            ),
+            rerank_candidates=settings.rerank_candidates,
         )
 
     def search(self, query: str, k: int = 5, mode: str | None = None) -> list[RetrievedChunk]:
@@ -75,7 +82,10 @@ class RetrievalService:
             return self.dense.search(query, k)
         if mode == "bm25":
             return self.bm25.search(query, k)
-        return self.hybrid.search(query, k)
+        if self.reranker is None:
+            return self.hybrid.search(query, k)
+        candidates = self.hybrid.search(query, max(k, self.rerank_candidates))
+        return self.reranker.rerank(query, candidates, k)
 
     def document(self, doc_id: str) -> SourceDoc | None:
         return next((d for d in self.docs if d.doc_id == doc_id), None)
