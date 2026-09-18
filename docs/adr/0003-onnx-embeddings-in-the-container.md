@@ -11,6 +11,16 @@ The API is meant to run on a 512 MB instance. With sentence-transformers the Pha
 
 Keep `sentence-transformers/all-MiniLM-L6-v2` everywhere, but run it through `fastembed` (onnxruntime) inside the container. torch, transformers and sentence-transformers move into a `local-models` dependency group that is installed by default for development and CI, and left out of the image. `EMBEDDINGS_BACKEND=fastembed` is set in the Dockerfile.
 
+## Measurements (512 MB limit, `docker run --memory=512m`)
+
+| Image | Idle | After first query | Under load |
+|---|---|---|---|
+| Phase A, sentence-transformers + torch | 361 MB | 448 MB | n/a |
+| fastembed, no reranker, agents and MCP in-process | 155 MB | 300 MB | 308 MB after 5 searches, 2 full scans, the dashboard and a streamed chat |
+| same, with the ONNX cross-encoder reranker | 156 MB | 511 MB | 632 MB after a few searches (OOM-killed at 512 MB) |
+
+So the free tier runs with `RERANKER=none` and plain hybrid retrieval (context precision 0.756, not 0.830). Any instance with 1 GB can turn it back on.
+
 ## Consequences
 
 - The image drops torch entirely. Both backends load the same weights, so vectors agree to within float noise and nothing downstream changes.

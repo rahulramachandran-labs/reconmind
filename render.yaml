@@ -23,6 +23,9 @@ services:
         value: inprocess
       - key: SCAN_INTERVAL_MINUTES
         value: "360"
+      # the ONNX reranker adds ~220 MB and grows with use; 512 MB can't carry it (ADR 0003)
+      - key: RERANKER
+        value: none
       # no Ollama on the free tier; with no keys set, write-ups come from templates
       - key: OLLAMA_BASE_URL
         value: ""
