@@ -4,7 +4,7 @@ SHELL := /bin/bash
 API_PORT ?= 8000
 WEB_PORT ?= 3000
 
-.PHONY: help bootstrap dev api web test test-fast lint fmt eval index deck sync deploy clean
+.PHONY: help bootstrap dev api web test test-fast lint fmt eval index deck sync deploy clean db seed
 
 help: ## list targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
@@ -27,6 +27,13 @@ api: ## run the api with reload
 web: ## run the next.js dev server
 	cd frontend && NEXT_PUBLIC_API_URL=http://localhost:$(API_PORT) npm run dev -- --port $(WEB_PORT)
 
+db: ## start postgres and apply migrations
+	docker compose up -d postgres
+	uv run alembic upgrade head
+
+seed: ## load the committed synthetic sample into DATABASE_URL
+	uv run python -m app.pipeline.seed
+
 test: ## full test suite with coverage gate
 	uv run pytest --cov --cov-report=term
 
@@ -42,6 +49,9 @@ lint: ## ruff, black --check, mypy, eslint
 fmt: ## format python
 	uv run ruff check . --fix
 	uv run black .
+
+eval: ## RAGAS gate on the golden set; appends a row to evals/history.csv
+	uv run --group eval python evals/run_ragas.py --gate --record
 
 index: ## build the dense index into .index/
 	uv run python -c "from app.config import Settings; from app.retrieval.service import RetrievalService; s = RetrievalService.from_settings(Settings()); print(len(s.chunks), 'chunks indexed')"

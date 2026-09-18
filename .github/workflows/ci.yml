@@ -32,6 +32,19 @@ jobs:
   test:
     name: pytest
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: reconmind
+          POSTGRES_PASSWORD: reconmind
+          POSTGRES_DB: reconmind
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U reconmind"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      TEST_DATABASE_URL: postgresql://reconmind:reconmind@localhost:5432/reconmind_test
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v10.1.0
