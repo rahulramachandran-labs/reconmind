@@ -10,3 +10,7 @@ One file per decision that would be expensive to reverse, or that someone will a
 | [0004](0004-append-only-ledger-in-postgres.md) | Postgres, with an append-only audit ledger enforced by a trigger | accepted |
 | [0005](0005-provider-fallback-chain.md) | LLM provider fallback chain, with an extractive floor | accepted |
 | [0006](0006-offline-eval-judges.md) | RAGAS gate with offline judges in CI | accepted |
+| [0007](0007-langgraph-over-crewai.md) | LangGraph over CrewAI for orchestration | accepted |
+| [0008](0008-mcp-over-direct-clients.md) | Agents reach the pipeline through MCP, not direct clients | accepted |
+| [0009](0009-tracing-langfuse-and-postgres.md) | Trace every step to Postgres, mirror to LangFuse | accepted |
+| [0010](0010-facts-from-checks-language-from-models.md) | Facts come from checks; models only write the words | accepted |

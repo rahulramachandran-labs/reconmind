@@ -4,6 +4,21 @@ All notable changes, grouped by build phase. Dates are UTC.
 
 ## [Unreleased]
 
+## [phase-c] - 2026-09-18
+
+### Added
+- Two read-only MCP servers: `warehouse-metadata` (tables, schema, dbt manifest, per-day stats, named reconciliation checks) and `orchestration-metadata` (DAG runs, task logs, timing history, failed tasks). stdio by default, streamable HTTP in Compose, Pydantic-validated inputs, no SQL tool.
+- `DomainAdapter` protocol with the retail adapter holding every business rule, and a support-triage stub that boots the same graph.
+- LangGraph investigation graph: Planner, Reconciliation and Data-Quality running concurrently, Reporter, plus human review via `interrupt()` with a Postgres checkpointer.
+- Structured model output with a two-retry re-prompt loop and adapter templates as the fallback; confidence bounded by a calibrated prior; the review gate can't be talked out of.
+- Per-run tracing to `agent_steps`, mirrored to LangFuse when keys are set; `TracedLLM` refuses untraced calls.
+- Incident reports and review decisions in Postgres, with ledger entries for every finding and decision.
+- API: streaming chat over the graph (SSE), background scans, incidents, review queue actions, runs and traces.
+- Screens: incident feed, review queue, streaming Ask ReconMind, traces list and run detail.
+- Tests: MCP servers, full scans with review approve and reject, concurrency, every LLM call traced, domain-agnostic boot, and prompt injection against a model that obeys planted instructions.
+- Compose: MCP servers as HTTP services and self-hosted LangFuse v3.
+- ADRs 0007-0010.
+
 ## [phase-b] - 2026-09-18
 
 ### Added

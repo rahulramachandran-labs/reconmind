@@ -144,6 +144,8 @@ The Reporter's output follows a change-request format rather than a raw agent du
 
 ## Reusability and future work
 
+Every retail rule lives in [`app/domain/retail_recon`](app/domain/retail_recon): the dedup key, the key-drift pair, schema-drift tolerance, the volume window, the severity rubric and the write-up wording. It sits behind a `DomainAdapter` protocol, and the agents import only the protocol. [`app/domain/example_support_triage`](app/domain/example_support_triage) is a second, deliberately small domain with different specialists and finding types, and a test boots the same graph on it in every CI run.
+
 Swap the data generator and the two MCP servers, and the retrieval layer, the agent graph, the tracing and the UI shell stay exactly as they are:
 
 - **Claims Copilot** (healthcare): claims-vs-EOB matching; coding and billing drift.
@@ -277,11 +279,18 @@ Quality bar: RAGAS ≥ 0.75 on every metric, every planted anomaly caught, test 
 
 | Method | Path | What it does |
 |---|---|---|
-| `GET` | `/healthz` | Status, chunk count, retriever, provider chain, database |
-| `POST` | `/ask` | `{question, session_id?, k?}` returns an answer with sources, provider, tokens, cost and fallbacks |
-| `GET` | `/sessions/{id}/messages` | Conversation history |
+| `POST` | `/chat/stream` | `{question, session_id?}`: runs the agent graph and streams server-sent events (`session`, `run`, `plan`, `node`, `finding`, `report`, `summary`, `answer`, `paused`, `done`) |
+| `POST` | `/scan` | Starts a full scan in the background, returns the run id |
+| `GET` | `/incidents`, `/incidents/{id}` | Incident reports, filterable by `status` and `severity` |
+| `GET` | `/review` | Reports and plans waiting for a person |
+| `POST` | `/review/reports/{id}` | `{decision: approve\|reject\|annotate, note?}`; the run resumes once every paused report in it has a decision |
+| `POST` | `/review/runs/{id}` | Approve or reject a plan the Planner was unsure about |
+| `GET` | `/runs`, `/runs/{id}` | Agent runs with cost and latency, and every traced step |
+| `POST` | `/ask` | Retrieval and answer only, without the agents |
 | `GET` | `/search?q=&mode=hybrid\|dense\|bm25` | Retrieval only, with dense and BM25 ranks per hit |
 | `GET` | `/corpus`, `/corpus/{doc_id}` | The ingested documents |
+| `GET` | `/sessions/{id}/messages` | Conversation history |
+| `GET` | `/healthz` | Status, retriever, provider chain, database |
 
 Interactive API docs are served at `/docs` on the API host.
 
@@ -304,19 +313,25 @@ Everything comes from environment variables (see [`.env.example`](.env.example))
 
 ```
 app/
-  api/            FastAPI routes
+  agents/         LangGraph graph, planner / specialist / reporter nodes, tracing LLM wrapper,
+                  structured-output loop, run store and the service behind the API
+  domain/         DomainAdapter protocol, retail_recon (every business rule) and the
+                  example_support_triage stub
+  tools/          MCP tool box the agents call through
+  observability/  per-run tracer: Postgres steps, mirrored to LangFuse
+  api/            FastAPI routes, including SSE chat and review
   db/             SQLAlchemy models, engine
   pipeline/       synthetic generator, dbt project, loader, seed
   retrieval/      corpus loaders, chunking, embeddings, BM25, FAISS, Pinecone, hybrid RRF
   llm.py          provider fallback chain
-  rag.py          answer path with session history and extractive fallback
+mcp_servers/      warehouse-metadata and orchestration-metadata (read-only, stdio or HTTP)
 corpus/           runbooks, schema docs, past incident write-ups (synthetic)
 data/             seeded sample and data dictionary
 dbt/              model YAML and the manifest the warehouse pretends to have
 evals/            golden set, RAGAS runner, thresholds, history
 frontend/         Next.js App Router + shadcn/ui
 migrations/       Alembic, including the append-only ledger trigger
-tests/            unit, integration (Postgres) and model-backed retrieval tests
+tests/            unit, integration (Postgres, MCP, agents), prompt injection, domain-agnostic proof
 docs/             ADRs and the project deck
 ```
 
