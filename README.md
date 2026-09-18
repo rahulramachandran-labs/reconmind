@@ -264,6 +264,13 @@ make eval                                                         # hybrid, gate
 uv run --group eval python evals/run_ragas.py --retriever dense   # dense-only baseline
 ```
 
+Latest scores (offline judge, extractive answers, k=5):
+
+| Retriever | Faithfulness | Answer relevancy | Context precision | Context recall |
+|---|---|---|---|---|
+| Dense only | 0.920 | 0.863 | 0.661 | 0.844 |
+| **Hybrid (default)** | **0.917** | **0.864** | **0.756** | **0.911** |
+
 Quality bar: RAGAS ≥ 0.75 on every metric, every planted anomaly caught, test coverage ≥ 80%, an investigation in under 30 s in demo mode, and zero untraced LLM calls.
 
 ## API
