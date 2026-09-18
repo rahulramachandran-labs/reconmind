@@ -21,6 +21,7 @@ COPY pyproject.toml uv.lock README.md ./
 RUN uv sync --frozen --no-default-groups --group onnx --no-install-project
 
 COPY app ./app
+COPY mcp_servers ./mcp_servers
 COPY corpus ./corpus
 COPY dbt ./dbt
 COPY data ./data

@@ -52,7 +52,7 @@ def build_graph(
 ) -> CompiledStateGraph[Any, Any, Any, Any]:
     roles = [s.role for s in deps.adapter.specialists]
 
-    def traced(name: str, fn: NodeFn) -> Callable[[InvestigationState], Awaitable[dict[str, Any]]]:
+    def traced(name: str, fn: NodeFn) -> Any:
         async def node(state: InvestigationState) -> dict[str, Any]:
             tracer = tracer_for(state["run_id"])
             async with tracer.node(name, {"keys": sorted(state)}) as step:

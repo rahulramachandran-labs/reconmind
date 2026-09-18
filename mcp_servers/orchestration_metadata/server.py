@@ -92,7 +92,7 @@ def build_server(runs_path: Path | None = None) -> MCPServer:
         path = runs_path or Path(
             os.environ.get("DAG_RUNS_PATH", ROOT / "data" / "sample" / "airflow" / "dag_runs.json")
         )
-        return json.loads(path.read_text())  # type: ignore[no-any-return]
+        return json.loads(path.read_text())
 
     def runs_for(dag_id: str) -> list[dict[str, Any]]:
         data = load()

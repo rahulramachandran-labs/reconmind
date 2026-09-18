@@ -7,6 +7,7 @@ import uuid
 from collections.abc import AsyncIterator
 from typing import Any
 
+from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.types import Command
 
@@ -95,22 +96,26 @@ class InvestigationService:
         session_id: uuid.UUID | None = None,
         run_id: uuid.UUID | None = None,
     ) -> AsyncIterator[Event]:
-        run_id = run_id or await asyncio.to_thread(self.new_run, trigger, question, session_id)
-        tracer = self._tracer_for(str(run_id))
+        rid: uuid.UUID = (
+            run_id
+            if run_id is not None
+            else await asyncio.to_thread(self.new_run, trigger, question, session_id)
+        )
+        tracer = self._tracer_for(str(rid))
         yield {
             "type": "run",
-            "run_id": str(run_id),
+            "run_id": str(rid),
             "trace_id": tracer.trace_id,
             "trace_url": tracer.trace_url,
         }
         state = {
-            "run_id": str(run_id),
+            "run_id": str(rid),
             "trigger": trigger,
             "question": question,
             "history": history or [],
             "findings": [],
         }
-        async for event in self._drive(run_id, state):
+        async for event in self._drive(rid, state):
             yield event
 
     async def resume(self, run_id: uuid.UUID, value: Any) -> AsyncIterator[Event]:
@@ -122,7 +127,7 @@ class InvestigationService:
         return [e async for e in events]
 
     async def _drive(self, run_id: uuid.UUID, payload: Any) -> AsyncIterator[Event]:
-        config = {"configurable": {"thread_id": str(run_id)}}
+        config: RunnableConfig = {"configurable": {"thread_id": str(run_id)}}
         tracer = self._tracer_for(str(run_id))
         start = time.perf_counter()
         pause: dict[str, Any] | None = None

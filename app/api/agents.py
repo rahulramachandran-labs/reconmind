@@ -23,7 +23,7 @@ def get_service(request: Request) -> InvestigationService:
     service = getattr(request.app.state, "investigations", None)
     if service is None:
         raise HTTPException(503, "agents are not enabled on this deployment")
-    return service  # type: ignore[no-any-return]
+    return service
 
 
 Service = Annotated[InvestigationService, Depends(get_service)]
@@ -102,7 +102,7 @@ async def scan(service: Service) -> dict[str, str]:
 
 @router.get("/runs")
 def runs(service: Service, limit: Annotated[int, Query(ge=1, le=200)] = 50) -> list[dict[str, Any]]:
-    return service.store.list_runs(limit)  # type: ignore[no-any-return]
+    return service.store.list_runs(limit)
 
 
 @router.get("/runs/{run_id}")
@@ -110,7 +110,7 @@ def run_detail(run_id: uuid.UUID, service: Service) -> dict[str, Any]:
     run = service.store.get_run(run_id)
     if run is None:
         raise HTTPException(404, "unknown run")
-    return run  # type: ignore[no-any-return]
+    return run
 
 
 @router.get("/incidents")
@@ -119,7 +119,7 @@ def incidents(
     status: Literal["pending_review", "published", "rejected"] | None = None,
     severity: Literal["S1", "S2", "S3", "S4"] | None = None,
 ) -> list[dict[str, Any]]:
-    return service.store.list_incidents(status, severity)  # type: ignore[no-any-return]
+    return service.store.list_incidents(status, severity)
 
 
 @router.get("/incidents/{report_id}")
@@ -127,7 +127,7 @@ def incident(report_id: uuid.UUID, service: Service) -> dict[str, Any]:
     r = service.store.get_incident(report_id)
     if r is None:
         raise HTTPException(404, "unknown incident")
-    return r  # type: ignore[no-any-return]
+    return r
 
 
 @router.get("/review")
@@ -151,7 +151,9 @@ async def review_report(
     if remaining:
         return {"status": "recorded", "remaining": remaining}
     events = await service.run_to_end(service.resume(run_id, decided))
-    outcome = next((e["outcome"] for e in events if e["type"] == "review_applied"), [])
+    outcome: list[dict[str, Any]] = next(
+        (e["outcome"] for e in events if e["type"] == "review_applied"), []
+    )
     return {"status": "resumed", "run_id": str(run_id), "outcome": outcome}
 
 

@@ -205,13 +205,14 @@ class SqlRunStore:
 
     def list_runs(self, limit: int = 50) -> list[dict[str, Any]]:
         with session_scope(self.engine) as s:
-            counts = dict(
-                s.execute(
+            counts: dict[uuid.UUID, int] = {
+                run_id: n
+                for run_id, n in s.execute(
                     select(AgentStep.run_id, func.count())
                     .where(AgentStep.kind == "llm")
                     .group_by(AgentStep.run_id)
                 ).all()
-            )
+            }
             runs = s.scalars(
                 select(AgentRun).order_by(AgentRun.started_at.desc()).limit(limit)
             ).all()

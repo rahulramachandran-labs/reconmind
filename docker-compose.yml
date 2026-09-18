@@ -1,5 +1,27 @@
-# Full local stack. `make up` starts everything; `make dev` only needs postgres.
+# Local stack.
+#   docker compose up -d postgres            what `make dev` needs
+#   docker compose --profile full up --build  API, web, MCP servers over HTTP, Ollama, LangFuse
 name: reconmind
+
+x-langfuse-env: &langfuse-env
+  DATABASE_URL: postgresql://reconmind:reconmind@postgres:5432/langfuse
+  SALT: ${LANGFUSE_SALT:-local-dev-salt}
+  ENCRYPTION_KEY: ${LANGFUSE_ENCRYPTION_KEY:-0000000000000000000000000000000000000000000000000000000000000000}
+  TELEMETRY_ENABLED: "false"
+  CLICKHOUSE_MIGRATION_URL: clickhouse://clickhouse:9000
+  CLICKHOUSE_URL: http://clickhouse:8123
+  CLICKHOUSE_USER: clickhouse
+  CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-clickhouse}
+  CLICKHOUSE_CLUSTER_ENABLED: "false"
+  REDIS_HOST: redis
+  REDIS_PORT: "6379"
+  REDIS_AUTH: ${REDIS_AUTH:-local-dev}
+  LANGFUSE_S3_EVENT_UPLOAD_BUCKET: langfuse
+  LANGFUSE_S3_EVENT_UPLOAD_REGION: auto
+  LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://minio:9000
+  LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: minio
+  LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-local-dev-minio}
+  LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
 
 services:
   postgres:
@@ -12,20 +34,27 @@ services:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+      - ./docker/postgres-init.sql:/docker-entrypoint-initdb.d/10-langfuse.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U reconmind"]
       interval: 5s
       timeout: 3s
       retries: 20
 
-  ollama:
-    image: ollama/ollama:latest
+  warehouse-mcp:
+    build: .
     profiles: ["full"]
-    entrypoint: ["/bin/sh", "-c", "ollama serve & sleep 3 && ollama pull ${OLLAMA_MODEL:-qwen2.5:1.5b} && wait"]
-    ports:
-      - "${OLLAMA_PORT:-11434}:11434"
-    volumes:
-      - ollama:/root/.ollama
+    command: ["python", "-m", "mcp_servers.warehouse_metadata", "--transport", "streamable-http", "--port", "8101"]
+    environment:
+      DATABASE_URL: postgresql://reconmind:reconmind@postgres:5432/reconmind
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  orchestration-mcp:
+    build: .
+    profiles: ["full"]
+    command: ["python", "-m", "mcp_servers.orchestration_metadata", "--transport", "streamable-http", "--port", "8102"]
 
   api:
     build: .
@@ -33,12 +62,21 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      warehouse-mcp:
+        condition: service_started
+      orchestration-mcp:
+        condition: service_started
     environment:
       DATABASE_URL: postgresql://reconmind:reconmind@postgres:5432/reconmind
       DEMO_MODE: "true"
       OLLAMA_BASE_URL: http://ollama:11434
       OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:1.5b}
       SEED_SAMPLE: "true"
+      WAREHOUSE_MCP_URL: http://warehouse-mcp:8101/mcp
+      ORCHESTRATION_MCP_URL: http://orchestration-mcp:8102/mcp
+      LANGFUSE_HOST: http://langfuse-web:3000
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-pk-lf-local-dev}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-sk-lf-local-dev}
       CORS_ORIGINS: '["http://localhost:3000"]'
     ports:
       - "${API_PORT:-8000}:8000"
@@ -54,6 +92,67 @@ services:
     ports:
       - "${WEB_PORT:-3000}:3000"
 
+  ollama:
+    image: ollama/ollama:latest
+    profiles: ["full"]
+    entrypoint: ["/bin/sh", "-c", "ollama serve & sleep 3 && ollama pull ${OLLAMA_MODEL:-qwen2.5:1.5b} && wait"]
+    ports:
+      - "${OLLAMA_PORT:-11434}:11434"
+    volumes:
+      - ollama:/root/.ollama
+
+  # LangFuse v3, self-hosted. UI on :3001, sign in with the LANGFUSE_INIT_USER below.
+  langfuse-web:
+    image: langfuse/langfuse:3
+    profiles: ["full"]
+    depends_on: [postgres, clickhouse, redis, minio]
+    ports:
+      - "${LANGFUSE_PORT:-3001}:3000"
+    environment:
+      <<: *langfuse-env
+      NEXTAUTH_URL: http://localhost:${LANGFUSE_PORT:-3001}
+      NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET:-local-dev-nextauth}
+      LANGFUSE_INIT_ORG_ID: reconmind
+      LANGFUSE_INIT_PROJECT_ID: reconmind
+      LANGFUSE_INIT_PROJECT_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-pk-lf-local-dev}
+      LANGFUSE_INIT_PROJECT_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-sk-lf-local-dev}
+      LANGFUSE_INIT_USER_EMAIL: ${LANGFUSE_INIT_USER_EMAIL:-admin@reconmind.local}
+      LANGFUSE_INIT_USER_PASSWORD: ${LANGFUSE_INIT_USER_PASSWORD:-reconmind-local}
+
+  langfuse-worker:
+    image: langfuse/langfuse-worker:3
+    profiles: ["full"]
+    depends_on: [postgres, clickhouse, redis, minio]
+    environment:
+      <<: *langfuse-env
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.8
+    profiles: ["full"]
+    environment:
+      CLICKHOUSE_DB: default
+      CLICKHOUSE_USER: clickhouse
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-clickhouse}
+    volumes:
+      - clickhouse:/var/lib/clickhouse
+
+  redis:
+    image: redis:7-alpine
+    profiles: ["full"]
+    command: ["redis-server", "--requirepass", "${REDIS_AUTH:-local-dev}"]
+
+  minio:
+    image: minio/minio:latest
+    profiles: ["full"]
+    entrypoint: ["sh", "-c", "mkdir -p /data/langfuse && minio server /data"]
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-local-dev-minio}
+    volumes:
+      - minio:/data
+
 volumes:
   pgdata:
   ollama:
+  clickhouse:
+  minio:

@@ -193,10 +193,10 @@ def build_server(engine: Engine | None = None, manifest_path: Path | None = None
     def eng() -> Engine:
         if state["engine"] is None:
             state["engine"] = _engine()
-        return state["engine"]  # type: ignore[no-any-return]
+        return state["engine"]
 
     def manifest() -> dict[str, Any]:
-        return json.loads((manifest_path or _manifest_path()).read_text())  # type: ignore[no-any-return]
+        return json.loads((manifest_path or _manifest_path()).read_text())
 
     def query(sql: str, **params: Any) -> list[dict[str, Any]]:
         with eng().connect().execution_options(postgresql_readonly=True) as conn:

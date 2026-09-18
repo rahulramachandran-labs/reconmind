@@ -59,7 +59,7 @@ async def build_investigations(
         )
         await pool.open()
         stack.push_async_callback(pool.close)
-        checkpointer: Any = AsyncPostgresSaver(pool)  # type: ignore[arg-type]
+        checkpointer: Any = AsyncPostgresSaver(pool)
         await checkpointer.setup()
         store: Any = SqlRunStore(engine)
         sink: Any = SqlStepSink(engine)
