@@ -23,7 +23,7 @@ ReconMind is a multi-agent, RAG-powered copilot that watches a synthetic data pi
 
 ## Contents
 
-**About the project:** [Overview](#overview) · [The problem](#the-problem) · [Objectives](#objectives) · [The solution](#the-solution) · [Key features](#key-features) · [Application screens](#application-screens) · [What an incident report looks like](#what-an-incident-report-looks-like) · [Course concepts applied](#course-concepts-applied) · [Scope and constraints](#scope-and-constraints) · [Project status](#project-status) · [Challenges and learnings](#challenges-and-learnings) · [Reusability and future work](#reusability-and-future-work)
+**About the project:** [Overview](#overview) · [The problem](#the-problem) · [Objectives](#objectives) · [The solution](#the-solution) · [Key features](#key-features) · [Application screens](#application-screens) · [What an incident report looks like](#what-an-incident-report-looks-like) · [Course concepts applied](#course-concepts-applied) · [Scope and constraints](#scope-and-constraints) · [Challenges and learnings](#challenges-and-learnings) · [Reusability and future work](#reusability-and-future-work)
 
 **Technical details:** [Architecture](#architecture) · [Tech stack](#tech-stack) · [Quick start](#quick-start) · [Synthetic data](#synthetic-data) · [Retrieval and evaluation](#retrieval-and-evaluation) · [API](#api) · [Configuration](#configuration) · [Repository layout](#repository-layout) · [Development](#development)
 
@@ -88,14 +88,14 @@ Both gather evidence through read-only **MCP** tool servers and retrieve relevan
 
 ## Application screens
 
-| Screen | What it does | Status |
-|---|---|---|
-| **Ask ReconMind** | Chat with session memory in Postgres; every answer cites its sources and shows which model answered | live (streaming and full agent graph in Phase C) |
-| **Docs & runbooks** | The ingested corpus, searchable on its own, with hybrid / dense / BM25 side by side, so retrieval can be checked before the agents touch it | live |
-| **Incident feed** | Every finding, expandable into the full write-up, with a link to its LangFuse trace | Phase C |
-| **Review queue** | Findings the graph paused on; approve, reject or annotate and the graph picks back up | Phase C |
-| **Traces** | Recent agent runs with cost and latency, linking into LangFuse | Phase C |
-| **Dashboard** | Today's volume vs trailing average, open findings by severity, last DAG run, today's token cost | Phase D |
+| Screen | What it does |
+|---|---|
+| **Dashboard** | Today's volume vs trailing average, open findings by severity, last DAG run, today's token cost |
+| **Incident feed** | Every finding, expandable into the full write-up, with a link to its LangFuse trace |
+| **Review queue** | Findings the graph paused on; approve, reject or annotate and the graph picks back up |
+| **Ask ReconMind** | Streaming chat with session memory in Postgres; every answer cites its sources and shows which model answered |
+| **Docs & runbooks** | The ingested corpus, searchable on its own, with hybrid / dense / BM25 side by side, so retrieval can be checked before the agents touch it |
+| **Traces** | Recent agent runs with cost and latency, linking into LangFuse |
 
 ## What an incident report looks like
 
@@ -133,21 +133,6 @@ The Reporter's output follows a change-request format rather than a raw agent du
 - **Zero-cost demo.** Local Ollama and sentence-transformers behind the provider fallback chain.
 - **Solo build, in phases,** with tests gating each phase before the next starts.
 - **Not in scope:** streaming ingestion, multi-tenant auth, production SLAs.
-
-## Project status
-
-The project is built in four phases. Each ships with green CI before the next starts, and each phase boundary is a git tag.
-
-| Phase | Scope | State |
-|---|---|---|
-| **A** MVP | Single LLM + dense RAG over the docs corpus, FastAPI, one Next.js page, CI, public URL | shipped (`phase-a`) |
-| **B** Production RAG | Seeded generator, hybrid retrieval with RRF, session memory, Postgres + Alembic + ledger trigger, provider fallback chain, Docker Compose, RAGAS gate, Docs screen | in progress |
-| **C** Multi-agent | Two MCP servers, LangGraph with four agents, domain adapter + stub, LangFuse, human-in-the-loop review, injection test, live screens | planned |
-| **D** Polish & deploy | Auth, scheduler, chaos suite, latency budget, rate limiting, dashboard, raised eval thresholds, demo GIF, `v1.0.0` | planned |
-
-What each phase changed is in the [CHANGELOG](CHANGELOG.md); the reasoning behind the big choices is in the [architecture decision records](docs/adr).
-
-**Quality bar:** RAGAS ≥ 0.75 on every metric (raised in Phase D) · every planted anomaly caught · test coverage ≥ 80% · an investigation in under 30 s in demo mode · zero untraced LLM calls.
 
 ## Challenges and learnings
 
@@ -276,8 +261,10 @@ Documents are chunked by markdown section, then by size, with the title and sect
 
 ```bash
 make eval                                                         # hybrid, gate + record
-uv run --group eval python evals/run_ragas.py --retriever dense   # Phase A baseline
+uv run --group eval python evals/run_ragas.py --retriever dense   # dense-only baseline
 ```
+
+Quality bar: RAGAS ≥ 0.75 on every metric, every planted anomaly caught, test coverage ≥ 80%, an investigation in under 30 s in demo mode, and zero untraced LLM calls.
 
 ## API
 
