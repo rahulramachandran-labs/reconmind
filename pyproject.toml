@@ -121,6 +121,7 @@ module = [
     "transformers.*",
     "fastembed.*",
     "rank_bm25.*",
+    "snowballstemmer.*",
     "langchain_community.*",
     "pinecone.*",
     "ragas.*",
