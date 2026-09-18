@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+dist/
+build/
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+next-env.d.ts
+.vercel/
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Retrieval indexes
+.index/
+*.faiss
+*.pkl
+
+# LangFuse / local service data
+langfuse_data/
+.langfuse/
+.volumes/
+
+# Editors / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
