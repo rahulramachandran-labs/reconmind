@@ -1,3 +1,5 @@
+# One-click deploy: https://render.com/deploy?repo=https://github.com/rahulramachandran-labs/reconmind
+# Render asks for the values marked sync: false when the blueprint is created.
 services:
   - type: web
     name: reconmind-labs-api
@@ -16,12 +18,26 @@ services:
           property: connectionString
       - key: SEED_SAMPLE
         value: "true"
-      # no Ollama on the free tier; with no keys set the API answers extractively
+      # one small container: MCP servers run in-process instead of as subprocesses
+      - key: MCP_TRANSPORT
+        value: inprocess
+      - key: SCAN_INTERVAL_MINUTES
+        value: "360"
+      # no Ollama on the free tier; with no keys set, write-ups come from templates
       - key: OLLAMA_BASE_URL
         value: ""
       - key: OPENAI_API_KEY
         sync: false
       - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: LANGFUSE_PUBLIC_KEY
+        sync: false
+      - key: LANGFUSE_SECRET_KEY
+        sync: false
+      - key: LANGFUSE_HOST
+        value: https://cloud.langfuse.com
+      # the same value as RECONMIND_WRITE_TOKEN on the web app
+      - key: WRITE_TOKEN
         sync: false
       - key: CORS_ORIGINS
         value: '["https://reconmind-labs.vercel.app"]'

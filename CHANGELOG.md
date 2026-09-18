@@ -4,6 +4,22 @@ All notable changes, grouped by build phase. Dates are UTC.
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-09-18
+
+### Added
+- Dashboard: volume for the latest business date against its trailing week, a 14-day chart that flags light days per submitter, open findings by severity, the last pipeline run, and today's model usage and cost.
+- Auth.js sign-in: a demo reviewer for the public site and GitHub OAuth with an allow-list. Scans and review decisions go through a server-side route that adds the API's write token and the reviewer's name.
+- APScheduler scans inside the API on a configurable interval (six hours on Render).
+- Per-client rate limits on chat, ask and scan.
+- Cross-encoder reranking over the fused top 10 (context precision 0.756 to 0.830); the offline relevancy judge moved to the 12-layer model.
+- Chaos suite: each anomaly planted alone with the generator must be caught by the right agent at the right severity, and a clean pipeline must produce nothing. A full demo-mode scan must finish in under 30 seconds.
+- In-process MCP transport for single-container deploys.
+- 60-second demo script, blog draft, demo GIF and the Playwright script that records it.
+
+### Changed
+- Eval thresholds raised from 0.75 across the board to faithfulness 0.85, answer relevancy 0.80, context precision 0.80, context recall 0.85.
+- The dashboard is the landing page; Ask ReconMind moved to `/ask`.
+
 ## [phase-c] - 2026-09-18
 
 ### Added

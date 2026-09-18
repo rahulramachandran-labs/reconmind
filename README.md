@@ -16,6 +16,10 @@ ReconMind is a multi-agent, RAG-powered copilot that watches a synthetic data pi
 | **Live app** | [reconmind-labs.vercel.app](https://reconmind-labs.vercel.app) |
 | **API** | `reconmind-labs-api.onrender.com`, deployed from [`render.yaml`](render.yaml) (free tier: the first request after idle takes ~30 s) |
 | **Project deck** | [PDF](docs/slides/Rahul_Ramachandran_ReconMind-ProjectSubmission.pdf) · [PPTX](docs/slides/Rahul_Ramachandran_ReconMind-ProjectSubmission.pptx) |
+| **60-second demo** | [docs/DEMO.md](docs/DEMO.md) |
+| **Write-up** | [docs/blog/reconmind-writeup.md](docs/blog/reconmind-writeup.md) |
+
+![ReconMind: a scan finds four planted incidents, one S1 is signed off in the review queue, a question streams through the agents, and the run's trace shows every tool call](docs/demo.gif)
 
 [![ReconMind project deck](docs/slides/cover.png)](docs/slides/Rahul_Ramachandran_ReconMind-ProjectSubmission.pdf)
 
@@ -25,7 +29,7 @@ ReconMind is a multi-agent, RAG-powered copilot that watches a synthetic data pi
 
 **About the project:** [Overview](#overview) · [The problem](#the-problem) · [Objectives](#objectives) · [The solution](#the-solution) · [Key features](#key-features) · [Application screens](#application-screens) · [What an incident report looks like](#what-an-incident-report-looks-like) · [Course concepts applied](#course-concepts-applied) · [Scope and constraints](#scope-and-constraints) · [Challenges and learnings](#challenges-and-learnings) · [Reusability and future work](#reusability-and-future-work)
 
-**Technical details:** [Architecture](#architecture) · [Tech stack](#tech-stack) · [Quick start](#quick-start) · [Synthetic data](#synthetic-data) · [Retrieval and evaluation](#retrieval-and-evaluation) · [API](#api) · [Configuration](#configuration) · [Repository layout](#repository-layout) · [Development](#development)
+**Technical details:** [Architecture](#architecture) · [Tech stack](#tech-stack) · [Quick start](#quick-start) · [Deploy](#deploy) · [Synthetic data](#synthetic-data) · [Retrieval and evaluation](#retrieval-and-evaluation) · [API](#api) · [Configuration](#configuration) · [Repository layout](#repository-layout) · [Development](#development)
 
 ---
 
@@ -238,6 +242,16 @@ curl -s localhost:8000/ask -H 'content-type: application/json' \
 
 **Zero-cost demo mode.** `DEMO_MODE=true` drops the paid providers from the fallback chain, so answers come from local Ollama (`ollama pull qwen2.5:1.5b`). If no model is reachable at all, the API still returns the most relevant passages with citations and says the answer is extractive. CI and the free hosted tier both run that way.
 
+## Deploy
+
+The web app runs on Vercel and the API (with its Postgres) on Render; a Railway config is included as the alternative.
+
+1. **API:** open [render.com/deploy?repo=…/reconmind](https://render.com/deploy?repo=https://github.com/rahulramachandran-labs/reconmind) and approve the blueprint in [`render.yaml`](render.yaml). It creates the service and a free Postgres, runs migrations, loads the synthetic sample, and schedules a scan every six hours. Fill in `WRITE_TOKEN` (any long random string) and, optionally, model and LangFuse keys.
+2. **Web:** import `frontend/` in Vercel and set `NEXT_PUBLIC_API_URL` / `RECONMIND_API_URL` to the API URL, `RECONMIND_WRITE_TOKEN` to the same token, and `AUTH_SECRET` to a random string. `AUTH_DEMO_MODE=true` lets visitors act as a shared demo reviewer. Set it to `false`, and set `AUTH_GITHUB_ID` / `AUTH_GITHUB_SECRET` / `AUTH_ALLOWED_GITHUB_LOGINS`, for real sign-in.
+3. `make deploy` redeploys the web app from the CLI; the API redeploys on every push to `main`.
+
+Anyone can read. Scans and review decisions go through the web app, which checks the session and forwards the call with the server-side token, so the token never reaches the browser. Chat, ask and scan are rate limited per client.
+
 ## Synthetic data
 
 `scripts/generate_synthetic_pipeline.py` is seeded (`--seed 42` by default) and byte-for-byte reproducible. A test regenerates the committed sample and fails if a single byte differs.
@@ -344,6 +358,7 @@ docs/             ADRs and the project deck
 make test       # pytest with the 80% coverage gate (Postgres tests skip without a database)
 make lint       # ruff, black, mypy, eslint
 make eval       # RAGAS gate
+uv run pytest -m chaos   # plant each anomaly with the generator and check the right agent catches it
 make sync MSG="feat(scope): message"   # hooks, tests, commit, push
 ```
 
