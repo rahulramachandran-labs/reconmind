@@ -135,18 +135,68 @@ export const listIncidents = (params: { status?: string; severity?: string } = {
 };
 export const listRuns = () => request<Run[]>("/runs");
 export const getRun = (id: string) => request<Run>(`/runs/${id}`);
-export const startScan = () => request<{ run_id: string }>("/scan", { method: "POST" });
+export class SignInRequired extends Error {
+  constructor() {
+    super("Sign in as a reviewer to do that");
+  }
+}
+
+/** Writes go through the web app, which checks the session and adds the API token. */
+async function action<T>(path: string, body?: unknown): Promise<T> {
+  const res = await fetch(`/api/actions/${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  if (res.status === 401) throw new SignInRequired();
+  if (res.status === 429) throw new Error("Slow down a little: rate limit reached, try again in a minute");
+  if (!res.ok) throw new Error(`API ${res.status}: ${(await res.text().catch(() => "")).slice(0, 200)}`);
+  return res.json() as Promise<T>;
+}
+
+export const startScan = () => action<{ run_id: string }>("scan");
 export const reviewQueue = () => request<{ reports: IncidentReport[]; plans: PausedPlan[] }>("/review");
 export const reviewReport = (id: string, decision: "approve" | "reject" | "annotate", note?: string) =>
-  request<{ status: string }>(`/review/reports/${id}`, {
-    method: "POST",
-    body: JSON.stringify({ decision, note: note || null, reviewer: "reviewer" }),
-  });
+  action<{ status: string }>(`review/reports/${id}`, { decision, note: note || null });
 export const reviewPlan = (id: string, decision: "approve" | "reject", specialists: string[] = []) =>
-  request<{ status: string }>(`/review/runs/${id}`, {
-    method: "POST",
-    body: JSON.stringify({ decision, specialists }),
-  });
+  action<{ status: string }>(`review/runs/${id}`, { decision, specialists });
+
+export type Dashboard = {
+  adapter: string;
+  pipeline: {
+    as_of: string | null;
+    volume: {
+      rows: number;
+      trailing_avg_7d: number;
+      pct_change: number | null;
+      series: { date: string; rows: number; by_submitter: Record<string, number> }[];
+    } | null;
+    last_run: {
+      business_date: string;
+      state: string;
+      duration_s: number;
+      failed_tasks: string[];
+      runs_failed_14d: number;
+    } | null;
+  };
+  usage: {
+    day: string;
+    runs: number;
+    llm_calls: number;
+    tokens: number;
+    cost_usd: number;
+    providers: { provider: string; model: string | null; calls: number; tokens: number; cost_usd: number }[];
+    last_scan: Run | null;
+  };
+  findings: {
+    run_id: string | null;
+    by_severity: Record<Severity, number>;
+    pending_review: number;
+    items: { id: string; severity: Severity; title: string; status: string }[];
+  };
+};
+
+export const getDashboard = () => request<Dashboard>("/dashboard");
 
 export type StreamEvent = { event: string; data: Record<string, unknown> };
 
@@ -162,6 +212,7 @@ export async function* chatStream(
     body: JSON.stringify({ question, session_id: sessionId ?? null }),
     signal,
   });
+  if (res.status === 429) throw new Error("Slow down a little: rate limit reached, try again in a minute");
   if (!res.ok || !res.body) {
     throw new Error(`API ${res.status}: ${(await res.text().catch(() => "")).slice(0, 200)}`);
   }

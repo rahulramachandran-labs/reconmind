@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Check, Loader2, MessageSquarePlus, X } from "lucide-react";
 
+import { ErrorNote } from "@/components/error-note";
 import { ReportBody, ReportSummary } from "@/components/incident-report";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -61,7 +62,7 @@ function ReportItem({ report, onDone }: { report: IncidentReport; onDone: () => 
             <X /> Reject
           </Button>
         </div>
-        {error && <p className="text-xs text-destructive">{error}</p>}
+        {error && <ErrorNote message={error} />}
       </div>
     </li>
   );
@@ -71,11 +72,15 @@ function PlanItem({ run, onDone }: { run: PausedPlan; onDone: () => void }) {
   const [busy, setBusy] = useState(false);
   const options = ["reconciliation", "data_quality"];
   const [picked, setPicked] = useState<string[]>(run.plan.specialists ?? []);
+  const [error, setError] = useState<string | null>(null);
   async function decide(decision: "approve" | "reject") {
     setBusy(true);
+    setError(null);
     try {
       await reviewPlan(run.id, decision, picked);
       onDone();
+    } catch (e) {
+      setError((e as Error).message);
     } finally {
       setBusy(false);
     }
@@ -106,6 +111,7 @@ function PlanItem({ run, onDone }: { run: PausedPlan; onDone: () => void }) {
           Drop it
         </Button>
       </div>
+      {error && <ErrorNote message={error} />}
     </li>
   );
 }

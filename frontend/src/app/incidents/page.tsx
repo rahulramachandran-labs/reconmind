@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Loader2, Radar } from "lucide-react";
 
+import { ErrorNote } from "@/components/error-note";
 import { ReportBody, ReportSummary } from "@/components/incident-report";
 import { Button } from "@/components/ui/button";
 import { getRun, listIncidents, startScan, type IncidentReport } from "@/lib/api";
@@ -85,9 +86,9 @@ export default function IncidentsPage() {
       </div>
 
       {error && (
-        <p className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm">
-          {error}. The API may be waking up on the free tier; try again in a few seconds.
-        </p>
+        <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3">
+          <ErrorNote message={error.startsWith("Sign in") ? error : `${error}. The API may be waking up on the free tier; try again in a few seconds.`} />
+        </div>
       )}
       {!items && !error && <Loader2 className="size-4 animate-spin text-muted-foreground" />}
       {items?.length === 0 && (

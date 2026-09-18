@@ -6,14 +6,15 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
 const LINKS = [
-  { href: "/", label: "Ask ReconMind" },
+  { href: "/", label: "Dashboard" },
   { href: "/incidents", label: "Incidents" },
   { href: "/review", label: "Review queue" },
+  { href: "/ask", label: "Ask ReconMind" },
   { href: "/docs", label: "Docs & runbooks" },
   { href: "/traces", label: "Traces" },
 ];
 
-export function SiteNav() {
+export function SiteNav({ user }: { user?: React.ReactNode }) {
   const pathname = usePathname();
   return (
     <header className="sticky top-0 z-20 border-b bg-background/85 backdrop-blur">
@@ -39,12 +40,15 @@ export function SiteNav() {
             );
           })}
         </nav>
-        <a
-          href="https://github.com/rahulramachandran-labs/reconmind"
-          className="ml-auto shrink-0 text-xs text-muted-foreground hover:text-foreground"
-        >
-          GitHub
-        </a>
+        <div className="ml-auto flex shrink-0 items-center gap-4">
+          <a
+            href="https://github.com/rahulramachandran-labs/reconmind"
+            className="text-xs text-muted-foreground hover:text-foreground"
+          >
+            GitHub
+          </a>
+          {user}
+        </div>
       </div>
     </header>
   );
