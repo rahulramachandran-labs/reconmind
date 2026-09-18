@@ -16,21 +16,37 @@ class Settings(BaseSettings):
 
     corpus_dir: Path = ROOT / "corpus"
     index_dir: Path = ROOT / ".index"
-    embeddings_backend: Literal["sentence-transformers", "hashing"] = "sentence-transformers"
+    dbt_models_dir: Path = ROOT / "dbt" / "models"
+    embeddings_backend: Literal["sentence-transformers", "fastembed", "openai", "hashing"] = (
+        "sentence-transformers"
+    )
     embeddings_model: str = "sentence-transformers/all-MiniLM-L6-v2"
+    openai_embeddings_model: str = "text-embedding-3-small"
+    retriever: Literal["hybrid", "dense", "bm25"] = "hybrid"
     retrieval_k: int = 5
+    vector_store: Literal["faiss", "pinecone"] = "faiss"
+    pinecone_api_key: SecretStr | None = None
+    pinecone_index: str = "reconmind"
 
-    llm_provider: Literal["openai", "ollama", "none"] = "ollama"
+    # tried in order; DEMO_MODE drops the paid ones so a demo never costs anything
+    llm_providers: list[str] = Field(default=["openai", "anthropic", "ollama"])
+    demo_mode: bool = False
     openai_api_key: SecretStr | None = None
     openai_model: str = "gpt-5-mini"
+    anthropic_api_key: SecretStr | None = None
+    anthropic_model: str = "claude-haiku-4-5"
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "qwen2.5:1.5b"
     llm_timeout_s: float = 60.0
+    llm_cooldown_s: float = 60.0
+
+    database_url: str | None = None
 
     cors_origins: list[str] = Field(
         default=["http://localhost:3000", "https://reconmind-labs.vercel.app"]
     )
     max_question_chars: int = 1000
+    history_turns: int = 3
 
 
 @lru_cache

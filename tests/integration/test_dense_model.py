@@ -29,7 +29,9 @@ CASES = [
 
 @pytest.fixture(scope="module")
 def service(tmp_path_factory: pytest.TempPathFactory) -> RetrievalService:
-    s = Settings(corpus_dir=ROOT / "corpus", index_dir=tmp_path_factory.mktemp("idx"))
+    s = Settings(
+        _env_file=None, corpus_dir=ROOT / "corpus", index_dir=tmp_path_factory.mktemp("idx")
+    )
     return RetrievalService.from_settings(s)
 
 
@@ -42,7 +44,7 @@ def test_relevant_document_in_top_three(
 
 
 def test_index_is_cached_on_disk(service: RetrievalService, tmp_path: Path) -> None:
-    s = Settings(corpus_dir=ROOT / "corpus", index_dir=tmp_path)
+    s = Settings(_env_file=None, corpus_dir=ROOT / "corpus", index_dir=tmp_path)
     RetrievalService.from_settings(s)
     assert list(tmp_path.glob("*/index.faiss"))
     again = RetrievalService.from_settings(s)

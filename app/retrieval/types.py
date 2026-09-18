@@ -11,3 +11,5 @@ class RetrievedChunk(BaseModel):
     text: str
     score: float
     rank: int
+    dense_rank: int | None = None
+    bm25_rank: int | None = None

@@ -8,11 +8,23 @@ from fastapi.middleware.cors import CORSMiddleware
 from app import __version__
 from app.api.routes import router
 from app.config import Settings, get_settings
-from app.llm import LLMClient
+from app.llm import LLMChain
 from app.logging_setup import configure_logging
 from app.retrieval.service import RetrievalService
+from app.sessions import MemorySessionStore, SessionStore, SqlSessionStore
 
 log = logging.getLogger("reconmind")
+
+
+def build_session_store(settings: Settings) -> tuple[SessionStore, bool]:
+    if settings.database_url:
+        from app.db.session import get_engine, ping
+
+        engine = get_engine(settings.database_url)
+        if ping(engine):
+            return SqlSessionStore(engine), True
+        log.warning("database unreachable, keeping chat sessions in memory")
+    return MemorySessionStore(), False
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -22,11 +34,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.settings = settings
+        app.state.llm = LLMChain.from_settings(settings)
         app.state.retrieval = RetrievalService.from_settings(settings)
-        app.state.llm = LLMClient(settings)
+        app.state.sessions, app.state.db_ok = build_session_store(settings)
         log.info(
             "startup complete",
-            extra={"chunks": len(app.state.retrieval.chunks), "llm": settings.llm_provider},
+            extra={
+                "chunks": len(app.state.retrieval.chunks),
+                "providers": app.state.llm.names,
+                "database": app.state.db_ok,
+            },
         )
         yield
 
