@@ -6,6 +6,7 @@ See README.md in this folder for how to turn it into a real adapter.
 """
 
 from datetime import date, datetime
+from typing import Any
 
 from app.domain.protocol import (
     Evidence,
@@ -100,6 +101,9 @@ class SupportTriageAdapter:
         for f in out:
             f.severity = self.severity(f)
         return out
+
+    async def overview(self, tools: ToolBox) -> dict[str, Any]:
+        return {"as_of": "2026-06-03", "volume": None, "last_run": None, "tickets": len(TICKETS)}
 
     def severity(self, finding: Finding) -> Severity:
         return "S2" if finding.finding_type == "sla_breach" else "S4"

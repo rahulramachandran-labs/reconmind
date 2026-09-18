@@ -53,6 +53,14 @@ class Settings(BaseSettings):
     langfuse_secret_key: SecretStr | None = None
     langfuse_host: str | None = None
 
+    # operations
+    scan_interval_minutes: int = 0  # 0 turns the scheduler off
+    write_token: SecretStr | None = None  # when set, scans and reviews need it as a bearer token
+    rate_limit_chat: str = "20/minute"
+    rate_limit_scan: str = "4/minute"
+    rate_limit_ask: str = "30/minute"
+    rate_limits_enabled: bool = True
+
     cors_origins: list[str] = Field(
         default=["http://localhost:3000", "https://reconmind-labs.vercel.app"]
     )

@@ -455,6 +455,57 @@ class RetailReconAdapter:
                 )
         return out
 
+    # -- dashboard -------------------------------------------------------------
+
+    async def overview(self, tools: ToolBox) -> dict[str, Any]:
+        """Volume for the latest business date against its trailing week, and the last run."""
+        runs = (await tools.call(ORCHESTRATION, "list_dag_runs", {"dag_id": DAG_ID}))["runs"]
+        if not runs:
+            return {"as_of": None, "volume": None, "last_run": None}
+        runs.sort(key=lambda r: r["business_date"])
+        last = runs[-1]
+        as_of = date.fromisoformat(last["business_date"])
+        days = [as_of - timedelta(days=i) for i in range(13, -1, -1)]
+        stats = await asyncio.gather(
+            *(
+                tools.call(WAREHOUSE, "get_table_stats", {"table": "transactions", "date": str(d)})
+                for d in days
+            )
+        )
+        series = []
+        for d, day in zip(days, stats, strict=True):
+            latest: dict[str, dict[str, Any]] = {}
+            for f in day["files"]:
+                cur = latest.get(f["submitter_id"])
+                if cur is None or _file_ts(f["file_name"]) > _file_ts(cur["file_name"]):
+                    latest[f["submitter_id"]] = f
+            series.append(
+                {
+                    "date": str(d),
+                    "rows": sum(f["rows"] for f in latest.values()),
+                    "by_submitter": {k: v["rows"] for k, v in sorted(latest.items())},
+                }
+            )
+        trailing = [s["rows"] for s in series[-1 - VOLUME_WINDOW_DAYS : -1] if s["rows"]]
+        avg = mean(trailing) if trailing else 0.0
+        today = series[-1]["rows"]
+        return {
+            "as_of": str(as_of),
+            "volume": {
+                "rows": today,
+                "trailing_avg_7d": round(avg, 1),
+                "pct_change": round(today / avg - 1, 3) if avg else None,
+                "series": series,
+            },
+            "last_run": {
+                "business_date": last["business_date"],
+                "state": last["state"],
+                "duration_s": last["duration_s"],
+                "failed_tasks": last["failed_tasks"],
+                "runs_failed_14d": sum(1 for r in runs[-14:] if r["state"] == "failed"),
+            },
+        }
+
     # -- rubric and wording ----------------------------------------------------
 
     def severity(self, finding: Finding) -> Severity:

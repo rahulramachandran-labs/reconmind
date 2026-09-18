@@ -32,6 +32,7 @@ dependencies = [
     "mcp>=2.2.0",
     "langfuse>=4.15.4",
     "sse-starlette>=3.4.11",
+    "apscheduler>=3.11.3",
 ]
 
 [dependency-groups]
@@ -142,6 +143,7 @@ testpaths = ["tests"]
 asyncio_mode = "auto"
 markers = [
     "model: loads the real sentence-transformers model (slower, downloads weights once)",
+    "chaos: plants anomalies with the generator and checks the agents catch them",
 ]
 filterwarnings = ["ignore::DeprecationWarning"]
 

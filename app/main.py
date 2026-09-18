@@ -7,6 +7,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app import __version__
 from app.api.agents import router as agents_router
+from app.api.dashboard import router as dashboard_router
+from app.api.guards import RateLimiter
 from app.api.routes import router
 from app.config import Settings, get_settings
 from app.llm import LLMChain
@@ -35,6 +37,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.settings = settings
+        app.state.rate_limiter = RateLimiter()
         app.state.llm = LLMChain.from_settings(settings)
         app.state.retrieval = RetrievalService.from_settings(settings)
         app.state.sessions, app.state.db_ok = build_session_store(settings)
@@ -60,9 +63,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "agents": app.state.investigations is not None,
             },
         )
+        scheduler = None
+        if app.state.investigations is not None:
+            from app.scheduler import start_scheduler
+
+            scheduler = start_scheduler(app.state.investigations, settings.scan_interval_minutes)
         try:
             yield
         finally:
+            if scheduler is not None:
+                scheduler.shutdown(wait=False)
             await stack.aclose()
 
     app = FastAPI(
@@ -76,9 +86,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_origins=settings.cors_origins,
         allow_methods=["GET", "POST"],
         allow_headers=["*"],
+        expose_headers=["Retry-After"],
     )
     app.include_router(router)
     app.include_router(agents_router)
+    app.include_router(dashboard_router)
     return app
 
 

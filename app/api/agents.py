@@ -11,6 +11,7 @@ from sse_starlette.sse import EventSourceResponse
 from app.agents.schemas import ReviewDecision
 from app.agents.service import InvestigationService
 from app.api.deps import get_app_settings, get_sessions
+from app.api.guards import rate_limit, require_writer
 from app.config import Settings
 from app.sessions import SessionFull, SessionStore
 
@@ -27,6 +28,7 @@ def get_service(request: Request) -> InvestigationService:
 
 
 Service = Annotated[InvestigationService, Depends(get_service)]
+Reviewer = Annotated[str, Depends(require_writer)]
 _background: set[asyncio.Task[Any]] = set()
 
 
@@ -59,7 +61,7 @@ def _final_text(events: list[dict[str, Any]]) -> tuple[str, dict[str, Any]]:
     return "", {}
 
 
-@router.post("/chat/stream")
+@router.post("/chat/stream", dependencies=[Depends(rate_limit("rate_limit_chat"))])
 async def chat_stream(
     body: ChatRequest, service: Service, sessions: Sessions, settings: AppSettings
 ) -> EventSourceResponse:
@@ -93,8 +95,8 @@ async def chat_stream(
     return EventSourceResponse(events(), ping=10)
 
 
-@router.post("/scan", status_code=202)
-async def scan(service: Service) -> dict[str, str]:
+@router.post("/scan", status_code=202, dependencies=[Depends(rate_limit("rate_limit_scan"))])
+async def scan(service: Service, _: Reviewer) -> dict[str, str]:
     run_id = await asyncio.to_thread(service.new_run, "scan")
     _spawn(service.run_to_end(service.run("scan", run_id=run_id)))
     return {"run_id": str(run_id), "status": "started"}
@@ -140,10 +142,10 @@ def review_queue(service: Service) -> dict[str, Any]:
 
 @router.post("/review/reports/{report_id}")
 async def review_report(
-    report_id: uuid.UUID, body: ReviewDecision, service: Service
+    report_id: uuid.UUID, body: ReviewDecision, service: Service, reviewer: Reviewer
 ) -> dict[str, Any]:
     run_id = await asyncio.to_thread(
-        service.store.record_decision, report_id, body.decision, body.note, body.reviewer
+        service.store.record_decision, report_id, body.decision, body.note, reviewer
     )
     if run_id is None:
         raise HTTPException(409, "that report is not waiting for review")
@@ -158,9 +160,11 @@ async def review_report(
 
 
 @router.post("/review/runs/{run_id}")
-async def review_plan(run_id: uuid.UUID, body: PlanReview, service: Service) -> dict[str, Any]:
+async def review_plan(
+    run_id: uuid.UUID, body: PlanReview, service: Service, reviewer: Reviewer
+) -> dict[str, Any]:
     run = service.store.get_run_row(run_id)
     if run is None or run["status"] != "paused_plan":
         raise HTTPException(409, "that run is not waiting for a plan decision")
-    _spawn(service.run_to_end(service.resume(run_id, body.model_dump())))
+    _spawn(service.run_to_end(service.resume(run_id, body.model_dump() | {"reviewer": reviewer})))
     return {"status": "resumed", "run_id": str(run_id)}

@@ -5,7 +5,8 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import Engine, func, select, update
+from sqlalchemy import Engine, cast, func, select, update
+from sqlalchemy.types import Date
 
 from app.agents.schemas import IncidentReport
 from app.db.models import AgentRun, AgentStep, AuditLedger
@@ -267,6 +268,83 @@ class SqlRunStore:
             r = s.get(ReportRow, report_id)
             return _row_to_report(r) if r else None
 
+    def usage_on(self, day: Any) -> dict[str, Any]:
+        with session_scope(self.engine) as s:
+            runs = s.scalar(
+                select(func.count())
+                .select_from(AgentRun)
+                .where(cast(AgentRun.started_at, Date) == day)
+            )
+            rows = s.execute(
+                select(
+                    AgentStep.provider,
+                    AgentStep.model,
+                    func.count(),
+                    func.sum(AgentStep.prompt_tokens + AgentStep.completion_tokens),
+                    func.sum(AgentStep.cost_usd),
+                )
+                .where(AgentStep.kind == "llm", cast(AgentStep.started_at, Date) == day)
+                .group_by(AgentStep.provider, AgentStep.model)
+            ).all()
+            last_scan = s.scalars(
+                select(AgentRun)
+                .where(AgentRun.trigger == "scan")
+                .order_by(AgentRun.started_at.desc())
+                .limit(1)
+            ).first()
+        providers = [
+            {
+                "provider": p or "failed",
+                "model": m,
+                "calls": n,
+                "tokens": int(t or 0),
+                "cost_usd": float(c or 0),
+            }
+            for p, m, n, t, c in rows
+        ]
+        return {
+            "day": str(day),
+            "runs": runs or 0,
+            "llm_calls": sum(p["calls"] for p in providers),
+            "tokens": sum(p["tokens"] for p in providers),
+            "cost_usd": round(sum(p["cost_usd"] for p in providers), 6),
+            "providers": providers,
+            "last_scan": _row_to_run(last_scan) if last_scan else None,
+        }
+
+    def open_findings(self) -> dict[str, Any]:
+        """Findings from the most recent run that produced any, minus rejected ones."""
+        with session_scope(self.engine) as s:
+            latest = s.scalar(
+                select(ReportRow.run_id).order_by(ReportRow.created_at.desc()).limit(1)
+            )
+            pending = s.scalar(
+                select(func.count())
+                .select_from(ReportRow)
+                .where(ReportRow.status == "pending_review")
+            )
+            rows = (
+                s.scalars(
+                    select(ReportRow).where(
+                        ReportRow.run_id == latest, ReportRow.status != "rejected"
+                    )
+                ).all()
+                if latest
+                else []
+            )
+        by = {sev: 0 for sev in ("S1", "S2", "S3", "S4")}
+        for r in rows:
+            by[r.severity] += 1
+        return {
+            "run_id": str(latest) if latest else None,
+            "by_severity": by,
+            "pending_review": pending or 0,
+            "items": [
+                {"id": str(r.id), "severity": r.severity, "title": r.title, "status": r.status}
+                for r in sorted(rows, key=lambda r: r.severity)
+            ],
+        }
+
     def paused_plan_runs(self) -> list[dict[str, Any]]:
         with session_scope(self.engine) as s:
             runs = s.scalars(
@@ -413,3 +491,25 @@ class MemoryRunStore:
 
     def paused_plan_runs(self) -> list[dict[str, Any]]:
         return [r for r in self.runs.values() if r["status"] == "paused_plan"]
+
+    def usage_on(self, day: Any) -> dict[str, Any]:
+        runs = list(self.runs.values())
+        return {
+            "day": str(day),
+            "runs": len(runs),
+            "llm_calls": sum(r.get("llm_calls", 0) for r in runs),
+            "tokens": 0,
+            "cost_usd": round(sum(r.get("cost_usd", 0.0) for r in runs), 6),
+            "providers": [],
+            "last_scan": next((r for r in reversed(runs) if r["trigger"] == "scan"), None),
+        }
+
+    def open_findings(self) -> dict[str, Any]:
+        live = [r for r in self.reports.values() if r["status"] != "rejected"]
+        by = {sev: sum(1 for r in live if r["severity"] == sev) for sev in ("S1", "S2", "S3", "S4")}
+        return {
+            "run_id": live[-1]["run_id"] if live else None,
+            "by_severity": by,
+            "pending_review": sum(1 for r in live if r["status"] == "pending_review"),
+            "items": [{k: r[k] for k in ("id", "severity", "title", "status")} for r in live],
+        }

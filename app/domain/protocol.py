@@ -80,3 +80,7 @@ class DomainAdapter(Protocol):
     def fallback_analysis(
         self, finding: Finding, sources: list[RetrievedChunk]
     ) -> FindingAnalysis: ...
+
+    async def overview(self, tools: ToolBox) -> dict[str, Any]:
+        """Domain numbers for the dashboard: volume, the last pipeline run."""
+        ...

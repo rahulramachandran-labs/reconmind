@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 
 from app import __version__
 from app.api.deps import get_app_settings, get_llm, get_retrieval, get_sessions
+from app.api.guards import rate_limit
 from app.config import Settings
 from app.llm import LLMChain, Message
 from app.rag import Answer, answer_question
@@ -62,7 +63,9 @@ def healthz(request: Request, retrieval: Retrieval, llm: LLM) -> dict[str, objec
     }
 
 
-@router.post("/ask", response_model=AskResponse)
+@router.post(
+    "/ask", response_model=AskResponse, dependencies=[Depends(rate_limit("rate_limit_ask"))]
+)
 def ask(
     body: AskRequest,
     retrieval: Retrieval,
