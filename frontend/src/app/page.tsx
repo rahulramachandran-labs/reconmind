@@ -8,8 +8,9 @@ export default function Home() {
           Ask the runbooks before you page someone.
         </h1>
         <p className="text-muted-foreground">
-          Answers come from the pipeline&apos;s runbooks, schema docs, dbt models and past incident
-          write-ups, with every claim tied to a source. Follow-up questions keep the conversation.
+          Ask how something works and it answers from the runbooks with citations. Ask what is
+          wrong and the Planner sends the specialist agents to look at the live pipeline, then the
+          Reporter writes it up.
         </p>
       </header>
       <AskPanel />

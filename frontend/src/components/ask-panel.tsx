@@ -1,44 +1,136 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { ArrowUp, FileText, Loader2, RotateCcw } from "lucide-react";
+import { ArrowUp, CheckCircle2, FileText, Loader2, PauseCircle, RotateCcw } from "lucide-react";
 
+import { SeverityBadge } from "@/components/severity";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { ask, type Answer } from "@/lib/api";
+import { chatStream, type Severity } from "@/lib/api";
 
 const EXAMPLES = [
+  "Anything wrong with the pipeline?",
+  "Are there any duplicate submissions this week?",
+  "Did the MOBILE file have a schema problem on 2026-06-16?",
   "Which file wins when a submitter resends the same day?",
-  "How do I tell a renamed column from a dropped one?",
-  "One store is reporting under two outlet ids. What do I check first?",
-  "What severity is a volume drop of 40%?",
 ];
 
-type Turn = { question: string; answer?: Answer; error?: string };
+const NODE_LABEL: Record<string, string> = {
+  planner: "Planner routed the question",
+  reconciliation: "Reconciliation agent checked dedup keys and key drift",
+  data_quality: "Data-Quality agent checked contract, volume and timing",
+  reporter: "Reporter wrote the incident reports",
+  answer: "Answered from the runbooks",
+  plan_review: "Plan check",
+  report_review: "Human review applied",
+};
 
-function Sources({ answer }: { answer: Answer }) {
+type Finding = { severity: Severity; title: string; finding_type: string };
+type Source = { chunk_id: string; doc_id: string; title: string; section: string; doc_type: string };
+type Turn = {
+  question: string;
+  runId?: string;
+  plan?: { intent: string; specialists: string[]; confidence: number; rationale: string };
+  nodes: string[];
+  findings: Finding[];
+  answer?: string;
+  provider?: string;
+  sources: Source[];
+  summary?: { headline: string; summary: string };
+  paused?: boolean;
+  done?: { latency_ms: number; llm_calls: number; cost_usd: number };
+  error?: string;
+};
+
+function TurnView({ turn }: { turn: Turn }) {
+  const busy = !turn.done && !turn.paused && !turn.error;
   return (
-    <ol className="flex flex-col gap-2">
-      {answer.sources.map((s, i) => (
-        <li key={s.chunk_id}>
-          <details className="rounded-lg border bg-background/40 px-3 py-2">
-            <summary className="flex cursor-pointer list-none items-center gap-2 text-sm">
-              <span className="font-mono text-xs text-amber">[{i + 1}]</span>
-              <FileText className="size-3.5 shrink-0 text-teal" />
-              <span className="truncate">{s.title}</span>
-              <span className="hidden truncate text-muted-foreground sm:inline">· {s.section}</span>
-              <Badge variant="secondary" className="ml-auto shrink-0">
-                {s.doc_type}
-              </Badge>
-            </summary>
-            <pre className="mt-2 font-mono text-xs leading-relaxed whitespace-pre-wrap text-muted-foreground">
-              {s.text}
-            </pre>
-          </details>
-        </li>
-      ))}
-    </ol>
+    <section className="flex flex-col gap-3">
+      <p className="self-end rounded-2xl rounded-br-sm bg-secondary px-4 py-2 text-sm">{turn.question}</p>
+      <div className="flex flex-col gap-3 rounded-xl border bg-card p-4">
+        {turn.plan && (
+          <p className="text-xs text-muted-foreground">
+            <span className="text-foreground">
+              {turn.plan.intent === "investigate"
+                ? `Investigating with ${turn.plan.specialists.map((s) => s.replace("_", "-")).join(" + ")}`
+                : turn.plan.intent === "answer"
+                  ? "Answering from the runbooks"
+                  : "Not sure what to check"}
+            </span>{" "}
+            · {turn.plan.rationale}
+          </p>
+        )}
+        <ul className="flex flex-col gap-1 text-xs text-muted-foreground">
+          {turn.nodes
+            .filter((n) => NODE_LABEL[n] && n !== "planner")
+            .map((n, i) => (
+              <li key={i} className="flex items-center gap-1.5">
+                <CheckCircle2 className="size-3 text-teal" /> {NODE_LABEL[n]}
+              </li>
+            ))}
+          {busy && (
+            <li className="flex items-center gap-1.5">
+              <Loader2 className="size-3 animate-spin" /> working...
+            </li>
+          )}
+        </ul>
+        {turn.findings.length > 0 && (
+          <ul className="flex flex-col gap-1.5">
+            {turn.findings.map((f, i) => (
+              <li key={i} className="flex items-center gap-2 text-sm">
+                <SeverityBadge severity={f.severity} />
+                <span className="truncate">{f.title}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+        {turn.summary && (
+          <div className="flex flex-col gap-1">
+            <p className="font-medium">{turn.summary.headline}</p>
+            <p className="text-sm whitespace-pre-wrap text-muted-foreground">{turn.summary.summary}</p>
+            <Link href="/incidents" className="text-xs text-teal hover:underline">
+              Open the full write-ups in the incident feed
+            </Link>
+          </div>
+        )}
+        {turn.answer && <div className="leading-relaxed whitespace-pre-wrap">{turn.answer}</div>}
+        {turn.sources.length > 0 && (
+          <ul className="flex flex-wrap gap-2">
+            {turn.sources.map((s, i) => (
+              <li key={s.chunk_id}>
+                <Link href={`/docs/${s.doc_id}`} className="flex items-center gap-1 rounded-md border px-2 py-1 text-xs hover:border-teal/60">
+                  <span className="font-mono text-amber">[{i + 1}]</span>
+                  <FileText className="size-3 text-teal" />
+                  {s.title}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+        {turn.paused && (
+          <p className="flex items-center gap-2 rounded-md border border-amber/40 bg-amber/10 px-3 py-2 text-sm">
+            <PauseCircle className="size-4 text-amber" />
+            Paused for a human decision.{" "}
+            <Link href="/review" className="underline">
+              Open the review queue
+            </Link>
+          </p>
+        )}
+        {turn.error && <p className="text-sm text-destructive">{turn.error}</p>}
+        {(turn.done || turn.paused) && turn.runId && (
+          <div className="flex flex-wrap items-center gap-3 border-t pt-2 text-xs text-muted-foreground">
+            {turn.provider && <Badge variant="outline" className="font-mono">{turn.provider}</Badge>}
+            {turn.done && <span>{(turn.done.latency_ms / 1000).toFixed(1)}s</span>}
+            {turn.done && <span>{turn.done.llm_calls} LLM calls</span>}
+            <Link href={`/traces/${turn.runId}`} className="hover:text-foreground">
+              trace
+            </Link>
+          </div>
+        )}
+      </div>
+    </section>
   );
 }
 
@@ -47,31 +139,48 @@ export function AskPanel() {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [sessionId, setSessionId] = useState<string | undefined>();
   const [loading, setLoading] = useState(false);
-  const inflight = useRef<AbortController | null>(null);
   const bottom = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     bottom.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [turns]);
 
+  function patch(fn: (t: Turn) => Turn) {
+    setTurns((all) => all.map((t, i) => (i === all.length - 1 ? fn(t) : t)));
+  }
+
   async function submit(q: string) {
     const text = q.trim();
     if (text.length < 3 || loading) return;
-    inflight.current?.abort();
-    const ctrl = new AbortController();
-    inflight.current = ctrl;
     setLoading(true);
     setQuestion("");
-    setTurns((t) => [...t, { question: text }]);
+    setTurns((t) => [...t, { question: text, nodes: [], findings: [], sources: [] }]);
     try {
-      const answer = await ask(text, sessionId, ctrl.signal);
-      setSessionId(answer.session_id);
-      setTurns((t) => t.map((turn, i) => (i === t.length - 1 ? { ...turn, answer } : turn)));
-    } catch (e) {
-      if ((e as Error).name !== "AbortError") {
-        const error = `${(e as Error).message}. The API may be waking up on the free tier; give it 30 seconds and try again.`;
-        setTurns((t) => t.map((turn, i) => (i === t.length - 1 ? { ...turn, error } : turn)));
+      for await (const { event, data } of chatStream(text, sessionId)) {
+        const str = (k: string) => String(data[k] ?? "");
+        if (event === "session") setSessionId(str("session_id"));
+        else if (event === "run") patch((t) => ({ ...t, runId: str("run_id") }));
+        else if (event === "plan") patch((t) => ({ ...t, plan: data as Turn["plan"] }));
+        else if (event === "node") patch((t) => ({ ...t, nodes: [...t.nodes, str("node")] }));
+        else if (event === "finding")
+          patch((t) => ({ ...t, findings: [...t.findings, data as unknown as Finding] }));
+        else if (event === "summary") patch((t) => ({ ...t, summary: data as Turn["summary"] }));
+        else if (event === "answer")
+          patch((t) => ({
+            ...t,
+            answer: str("text"),
+            provider: str("provider"),
+            sources: (data.sources as Source[]) ?? [],
+          }));
+        else if (event === "paused") patch((t) => ({ ...t, paused: true }));
+        else if (event === "done") patch((t) => ({ ...t, done: data as Turn["done"] }));
+        else if (event === "error") patch((t) => ({ ...t, error: str("message") }));
       }
+    } catch (e) {
+      patch((t) => ({
+        ...t,
+        error: `${(e as Error).message}. The API may be waking up on the free tier; give it 30 seconds and try again.`,
+      }));
     } finally {
       setLoading(false);
     }
@@ -93,43 +202,10 @@ export function AskPanel() {
           ))}
         </div>
       )}
-
       {turns.map((turn, i) => (
-        <section key={i} className="flex flex-col gap-3">
-          <p className="self-end rounded-2xl rounded-br-sm bg-secondary px-4 py-2 text-sm">
-            {turn.question}
-          </p>
-          {!turn.answer && !turn.error && (
-            <Loader2 className="size-4 animate-spin text-muted-foreground" />
-          )}
-          {turn.error && (
-            <p className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm">
-              {turn.error}
-            </p>
-          )}
-          {turn.answer && (
-            <div className="flex flex-col gap-3 rounded-xl border bg-card p-4">
-              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                <Badge variant="outline" className="font-mono">
-                  {turn.answer.provider}
-                  {turn.answer.model !== "none" ? ` · ${turn.answer.model}` : ""}
-                </Badge>
-                <span>{(turn.answer.latency_ms / 1000).toFixed(1)}s</span>
-                {turn.answer.fallbacks.length > 0 && (
-                  <span title={turn.answer.fallbacks.join(", ")}>
-                    after {turn.answer.fallbacks.length} fallback
-                    {turn.answer.fallbacks.length > 1 ? "s" : ""}
-                  </span>
-                )}
-              </div>
-              <div className="leading-relaxed whitespace-pre-wrap">{turn.answer.answer}</div>
-              <Sources answer={turn.answer} />
-            </div>
-          )}
-        </section>
+        <TurnView key={i} turn={turn} />
       ))}
       <div ref={bottom} />
-
       <form
         className="sticky bottom-4 flex flex-col gap-2"
         onSubmit={(e) => {
@@ -147,19 +223,11 @@ export function AskPanel() {
                 submit(question);
               }
             }}
-            placeholder={
-              turns.length ? "Ask a follow-up..." : "Ask about a pipeline incident, a runbook, or a past write-up..."
-            }
+            placeholder={turns.length ? "Ask a follow-up..." : "Ask about the pipeline, a runbook, or a past incident..."}
             className="min-h-24 resize-none bg-card pr-14 text-base shadow-lg"
             maxLength={1000}
           />
-          <Button
-            type="submit"
-            size="icon"
-            className="absolute right-3 bottom-3"
-            disabled={loading || question.trim().length < 3}
-            aria-label="Ask"
-          >
+          <Button type="submit" size="icon" className="absolute right-3 bottom-3" disabled={loading || question.trim().length < 3} aria-label="Ask">
             {loading ? <Loader2 className="animate-spin" /> : <ArrowUp />}
           </Button>
         </div>

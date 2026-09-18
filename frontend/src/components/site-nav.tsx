@@ -7,7 +7,10 @@ import { cn } from "@/lib/utils";
 
 const LINKS = [
   { href: "/", label: "Ask ReconMind" },
+  { href: "/incidents", label: "Incidents" },
+  { href: "/review", label: "Review queue" },
   { href: "/docs", label: "Docs & runbooks" },
+  { href: "/traces", label: "Traces" },
 ];
 
 export function SiteNav() {
