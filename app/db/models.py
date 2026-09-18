@@ -127,3 +127,69 @@ class ChatMessage(Base):
     meta: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     session: Mapped[ChatSession] = relationship(back_populates="messages")
+
+
+class AgentRun(Base):
+    __tablename__ = "agent_runs"
+
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    trigger: Mapped[str] = mapped_column(Text)  # scan | question
+    question: Mapped[str | None] = mapped_column(Text, nullable=True)
+    session_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), nullable=True)
+    adapter: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(Text, index=True)  # running | paused | completed | failed
+    plan: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    trace_id: Mapped[str | None] = mapped_column(Text, nullable=True)
+    trace_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    prompt_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    completion_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    cost_usd: Mapped[Decimal] = mapped_column(Numeric(12, 6), default=0)
+    latency_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class AgentStep(Base):
+    """One traced unit of work: an LLM call, a tool call, a retrieval or a node."""
+
+    __tablename__ = "agent_steps"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    run_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("agent_runs.id", ondelete="CASCADE"), index=True
+    )
+    node: Mapped[str] = mapped_column(Text)
+    kind: Mapped[str] = mapped_column(Text)  # node | llm | tool | retrieval
+    name: Mapped[str] = mapped_column(Text)
+    provider: Mapped[str | None] = mapped_column(Text, nullable=True)
+    model: Mapped[str | None] = mapped_column(Text, nullable=True)
+    prompt_version: Mapped[str | None] = mapped_column(Text, nullable=True)
+    input: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    output: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    prompt_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    completion_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    cost_usd: Mapped[Decimal] = mapped_column(Numeric(12, 6), default=0)
+    latency_ms: Mapped[int] = mapped_column(Integer, default=0)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class IncidentReport(Base):
+    __tablename__ = "incident_reports"
+
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    run_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("agent_runs.id", ondelete="CASCADE"), index=True
+    )
+    finding_type: Mapped[str] = mapped_column(Text, index=True)
+    severity: Mapped[str] = mapped_column(Text, index=True)
+    title: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(Text, index=True)  # pending_review | published | rejected
+    report: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    review_decision: Mapped[str | None] = mapped_column(Text, nullable=True)
+    review_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    reviewed_by: Mapped[str | None] = mapped_column(Text, nullable=True)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
