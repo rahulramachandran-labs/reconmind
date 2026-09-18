@@ -1,11 +1,12 @@
 import logging
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from contextlib import AsyncExitStack, asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app import __version__
+from app.api.agents import router as agents_router
 from app.api.routes import router
 from app.config import Settings, get_settings
 from app.llm import LLMChain
@@ -37,15 +38,32 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.llm = LLMChain.from_settings(settings)
         app.state.retrieval = RetrievalService.from_settings(settings)
         app.state.sessions, app.state.db_ok = build_session_store(settings)
+        stack = AsyncExitStack()
+        app.state.investigations = None
+        if settings.agents_enabled:
+            from app.agents.bootstrap import build_investigations
+            from app.db.session import get_engine
+
+            engine = get_engine(settings.database_url) if app.state.db_ok else None
+            try:
+                app.state.investigations = await build_investigations(
+                    settings, stack, app.state.retrieval, app.state.llm, engine
+                )
+            except Exception:
+                log.exception("agents failed to start; serving retrieval only")
         log.info(
             "startup complete",
             extra={
                 "chunks": len(app.state.retrieval.chunks),
                 "providers": app.state.llm.names,
                 "database": app.state.db_ok,
+                "agents": app.state.investigations is not None,
             },
         )
-        yield
+        try:
+            yield
+        finally:
+            await stack.aclose()
 
     app = FastAPI(
         title="ReconMind API",
@@ -60,6 +78,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_headers=["*"],
     )
     app.include_router(router)
+    app.include_router(agents_router)
     return app
 
 

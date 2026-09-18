@@ -42,6 +42,17 @@ class Settings(BaseSettings):
 
     database_url: str | None = None
 
+    # agents
+    agents_enabled: bool = True
+    domain_adapter: str = "retail_recon"
+    warehouse_mcp_url: str | None = None
+    orchestration_mcp_url: str | None = None
+    planner_confidence_threshold: float = 0.5
+    review_confidence_threshold: float = 0.6
+    langfuse_public_key: str | None = None
+    langfuse_secret_key: SecretStr | None = None
+    langfuse_host: str | None = None
+
     cors_origins: list[str] = Field(
         default=["http://localhost:3000", "https://reconmind-labs.vercel.app"]
     )

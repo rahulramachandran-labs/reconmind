@@ -20,6 +20,7 @@ def settings(tmp_path: Path) -> Settings:
         embeddings_backend="hashing",
         llm_providers=[],
         database_url=None,
+        agents_enabled=False,
     )
 
 
