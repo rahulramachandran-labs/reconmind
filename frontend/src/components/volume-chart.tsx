@@ -33,10 +33,10 @@ export function VolumeChart({ series, average }: { series: Day[]; average: numbe
 
   const W = 720;
   const H = 220;
-  const pad = { l: 44, r: 12, t: 20, b: 28 };
+  const pad = { l: 44, r: 12, t: 24, b: 28 };
   const max = Math.max(...series.map((d) => d.rows), average) * 1.1;
-  const step = Math.max(100, Math.ceil(max / 4 / 100) * 100);
-  const ticks = Array.from({ length: Math.floor(max / step) + 1 }, (_, i) => i * step);
+  const step = [50, 100, 200, 250, 500, 1000, 2000, 5000, 10000].find((s) => max / s <= 5) ?? 20000;
+  const ticks = Array.from({ length: Math.ceil(max / step) + 1 }, (_, i) => i * step);
   const band = (W - pad.l - pad.r) / series.length;
   const barW = Math.min(24, band * 0.6);
   const y = (v: number) => H - pad.b - (v / (ticks[ticks.length - 1] || 1)) * (H - pad.t - pad.b);

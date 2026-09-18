@@ -61,7 +61,9 @@ export default function DashboardPage() {
   const f = data?.findings;
   const u = data?.usage;
   const openTotal = f ? Object.values(f.by_severity).reduce((a, b) => a + b, 0) : 0;
-  const down = (v?.pct_change ?? 0) < 0;
+  // small day-to-day wobble is normal; only colour a move the volume check would care about
+  const tone =
+    (v?.pct_change ?? 0) <= -0.25 ? "text-red-300" : (v?.pct_change ?? 0) >= 0.6 ? "text-amber" : "text-muted-foreground";
 
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 px-4 py-8">
@@ -97,7 +99,7 @@ export default function DashboardPage() {
                 <div className="flex items-baseline gap-2">
                   <span className="text-3xl font-semibold">{compact(v.rows)}</span>
                   {v.pct_change != null && (
-                    <span className={down ? "text-sm text-red-300" : "text-sm text-teal"}>
+                    <span className={`text-sm ${tone}`}>
                       {v.pct_change > 0 ? "+" : ""}
                       {(v.pct_change * 100).toFixed(1)}%
                     </span>

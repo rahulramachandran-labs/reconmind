@@ -118,7 +118,8 @@ def heuristic_plan(adapter: DomainAdapter, trigger: str, question: str | None) -
             confidence=0.85,
             rationale="Asked for a general check, so every specialist looks.",
         )
-    matched = [s.role for s in adapter.specialists if any(k in q for k in s.keywords)]
+    matched_specs = [s for s in adapter.specialists if any(k in q for k in s.keywords)]
+    matched = [s.role for s in matched_specs]
     investigative = bool(_INVESTIGATE.search(q))
     knowledge = bool(_KNOWLEDGE.match(q.strip()))
     if knowledge and not investigative:
@@ -133,7 +134,9 @@ def heuristic_plan(adapter: DomainAdapter, trigger: str, question: str | None) -
             intent="investigate",
             specialists=matched,
             confidence=0.85 if investigative else 0.6,
-            rationale="Question mentions " + ", ".join(matched) + " territory.",
+            rationale="Sounds like a job for "
+            + " and ".join(s.title for s in matched_specs)
+            + ", so only that looks.",
         )
     if investigative:
         return PlannerDecision(
