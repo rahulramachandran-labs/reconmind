@@ -93,6 +93,18 @@ def answer_sentences(answer: str) -> list[str]:
     return out
 
 
+def premise_windows(context: str, size: int = 2) -> list[str]:
+    body = context.split("\n", 1)[1] if "\n" in context else context
+    units = [
+        u.replace("**", "").strip(" -|*`")
+        for u in re.split(r"(?<=[.!?])\s+|\n+", body)
+        if len(u.strip(" -|*`")) > 3 and not u.strip().startswith("|---")
+    ]
+    if len(units) <= size:
+        return [" ".join(units)] if units else []
+    return [" ".join(units[i : i + size]) for i in range(len(units) - size + 1)]
+
+
 class OfflineJudge:
     def __init__(self) -> None:
         from sentence_transformers import CrossEncoder
@@ -103,14 +115,21 @@ class OfflineJudge:
         self.rel = CrossEncoder(RELEVANCE_MODEL, device="cpu")
 
     def faithfulness(self, answer: str, contexts: list[str]) -> float:
+        """Share of answer sentences entailed by some passage.
+
+        NLI models are trained on short premises, so each passage is cut into
+        windows of two consecutive sentences or lines and a claim counts as
+        supported if any window entails it (the SummaC zero-shot approach).
+        """
         sentences = answer_sentences(answer)
-        if not sentences or not contexts:
+        windows = [w for ctx in contexts for w in premise_windows(ctx)]
+        if not sentences or not windows:
             return 0.0
-        pairs = [(ctx, s) for s in sentences for ctx in contexts]
-        probs = self.nli.predict(pairs, apply_softmax=True, batch_size=32)
+        pairs = [(w, s) for s in sentences for w in windows]
+        probs = self.nli.predict(pairs, apply_softmax=True, batch_size=64)
         supported = 0
         for i in range(len(sentences)):
-            row = probs[i * len(contexts) : (i + 1) * len(contexts)]
+            row = probs[i * len(windows) : (i + 1) * len(windows)]
             if max(float(p[self.entail]) for p in row) >= 0.5:
                 supported += 1
         return supported / len(sentences)
