@@ -1,0 +1,49 @@
+version: 2
+sources:
+- name: raw
+  description: Submitter files as loaded, one row per line item.
+  tables:
+  - name: transactions
+    description: Contract for every submitter file. validate_schema compares each batch header with these
+      columns.
+    config:
+      contract:
+        enforced: true
+    columns:
+    - name: outlet_id
+      data_type: text
+      description: Store id as sent by the submitter (OUT-NNNN).
+      tests:
+      - not_null
+    - name: location_id
+      data_type: text
+      description: Physical location (LOC-NNNN). The id to trust when it disagrees with outlet_id.
+      tests:
+      - not_null
+    - name: transaction_id
+      data_type: text
+      description: Submitter transaction id. Dedup key part 1.
+      tests:
+      - not_null
+    - name: upc_code
+      data_type: text
+      description: 12-digit UPC. Dedup key part 3.
+      tests:
+      - not_null
+    - name: channel_basket_id
+      data_type: text
+      description: Basket id (BSK-XXXXXXXX). Dedup key part 2.
+      tests:
+      - not_null
+    - name: qty
+      data_type: integer
+      description: Units, negative for returns.
+    - name: amount
+      data_type: numeric(12,2)
+      description: Line amount after discounts.
+    - name: event_ts
+      data_type: timestamptz
+      description: When the sale happened (UTC).
+    - name: submitter_file_name
+      data_type: text
+      description: Source file, SUBMITTERID_YYYYMMDD_HHMM_NAME.txt. Added by the loader.

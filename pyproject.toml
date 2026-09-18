@@ -15,16 +15,17 @@ dependencies = [
     "openai>=1.60",
     "numpy>=1.26,<2",
     "faiss-cpu>=1.8",
-    "sentence-transformers>=3.0,<4",
-    "torch>=2.2.2",
-    # torch 2.2.2 is the last release with Intel macOS wheels, and it needs transformers < 4.50
-    "transformers>=4.41,<4.50 ; sys_platform == 'darwin' and platform_machine == 'x86_64'",
-    "transformers>=4.41 ; sys_platform != 'darwin' or platform_machine != 'x86_64'",
     "langchain-core>=1.0",
     "langchain-community>=0.4",
     "langchain-text-splitters>=1.0",
     "python-json-logger>=2.0",
     "pyyaml>=6.0",
+    "sqlalchemy>=2.0",
+    "alembic>=1.20.0",
+    "psycopg[binary]>=3.2",
+    "rank-bm25>=0.2.2",
+    "anthropic>=1.6.0",
+    "pinecone>=10.0.0",
 ]
 
 [dependency-groups]
@@ -34,9 +35,25 @@ dev = [
     "pytest-cov>=5.0",
     "ruff>=0.6",
     "black>=24.8",
-    "mypy>=1.11",
+    "mypy>=1.11,!=2.3.1",  # 2.3.1 shipped without a compiled Intel macOS wheel
     "types-pyyaml",
     "pre-commit>=4.6.2",
+]
+# torch-backed models: sentence-transformers embeddings locally, cross-encoders for evals
+local-models = [
+    "sentence-transformers>=3.0,<4",
+    "torch>=2.2.2",
+    # torch 2.2.2 is the last release with Intel macOS wheels, and it needs transformers < 4.50
+    "transformers>=4.41,<4.50 ; sys_platform == 'darwin' and platform_machine == 'x86_64'",
+    "transformers>=4.41 ; sys_platform != 'darwin' or platform_machine != 'x86_64'",
+]
+# the same MiniLM weights through onnxruntime, for the slim hosted image
+onnx = [
+    "fastembed>=0.5 ; sys_platform == 'linux'",
+]
+eval = [
+    "ragas>=0.4",
+    "rapidfuzz>=3.14.6",
 ]
 
 [build-system]
@@ -47,6 +64,7 @@ build-backend = "hatchling.build"
 packages = ["app"]
 
 [tool.uv]
+default-groups = ["dev", "local-models"]
 required-environments = [
     "sys_platform == 'darwin' and platform_machine == 'x86_64'",
     "sys_platform == 'darwin' and platform_machine == 'arm64'",
@@ -75,6 +93,8 @@ ignore = ["S101", "RUF001", "RUF002", "RUF003", "SIM905"]
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S", "B011"]
 "scripts/**" = ["S311"]
+"app/pipeline/synthetic.py" = ["S311"]
+"evals/**" = ["S603", "S607", "E402"]
 
 [tool.black]
 line-length = 100
@@ -90,9 +110,23 @@ warn_unused_ignores = true
 warn_redundant_casts = true
 check_untyped_defs = true
 
+# heavy libraries we only touch at the edges: treat them as Any instead of type
+# checking torch and friends on every run
 [[tool.mypy.overrides]]
-module = ["faiss.*", "sentence_transformers.*", "rank_bm25.*", "langchain_community.*"]
+module = [
+    "faiss.*",
+    "sentence_transformers.*",
+    "torch.*",
+    "transformers.*",
+    "fastembed.*",
+    "rank_bm25.*",
+    "langchain_community.*",
+    "pinecone.*",
+    "ragas.*",
+    "datasets.*",
+]
 ignore_missing_imports = true
+follow_imports = "skip"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

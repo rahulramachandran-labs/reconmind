@@ -1,0 +1,5 @@
+submitter_id,submitter_name,channel,expected_daily_files,sla_hhmm,contact
+S1001,POSFEED,store,1,04:00,pos-integrations
+S1002,ECOMM,web,1,03:30,web-platform
+S1003,MOBILE,app,1,03:30,mobile-platform
+S1004,KIOSK,kiosk,1,05:00,store-systems

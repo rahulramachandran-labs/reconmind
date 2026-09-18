@@ -14,7 +14,7 @@ One row per line item, as delivered by submitters. Loaded by `load_raw_transacti
 | location_id | text | no | Physical location, format `LOC-NNNN`. Stable; this is the key to trust when the two disagree. |
 | transaction_id | text | no | Submitter transaction id, format `TXN-NNNNNNNN`. Part of the dedup key. |
 | upc_code | text | no | 12-digit UPC. Part of the dedup key. |
-| channel_basket_id | text | no | Basket id, format `BSK-XXXXXXXX`. Part of the dedup key. |
+| channel_basket_id | text | yes (raw only) | Basket id, format `BSK-XXXXXXXX`. Part of the dedup key. Required by the contract, but the loader maps by name, so a batch that renames it lands here as null. |
 | submitter_file_name | text | no | Source file, `SUBMITTERID_YYYYMMDD_HHMM_NAME.txt`. Added by the loader. |
 | qty | integer | no | Units. Negative for returns. |
 | amount | numeric(12,2) | no | Line amount in the store currency, after discounts. |

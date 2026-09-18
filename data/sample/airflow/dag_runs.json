@@ -1,0 +1,1935 @@
+{
+  "dag_id": "retail_txn_daily",
+  "runs": [
+    {
+      "business_date": "2026-06-01",
+      "dag_id": "retail_txn_daily",
+      "end": "2026-06-02T05:38:21Z",
+      "run_id": "scheduled__2026-06-02T05:15:00Z",
+      "start": "2026-06-02T05:15:00Z",
+      "state": "success",
+      "tasks": [
+        {
+          "duration_s": 60,
+          "end": "2026-06-02T05:16:00Z",
+          "log": [
+            "Poking for 4 submitter files for 20260601",
+            "4 of 4 present at start",
+            "Found S1001_20260601_0209_POSFEED.txt (landed 2026-06-02T02:12:00Z)",
+            "Found S1003_20260601_0218_MOBILE.txt (landed 2026-06-02T02:20:00Z)",
+            "Found S1002_20260601_0308_ECOMM.txt (landed 2026-06-02T03:10:00Z)",
+            "Found S1004_20260601_0354_KIOSK.txt (landed 2026-06-02T03:55:00Z)"
+          ],
+          "start": "2026-06-02T05:15:00Z",
+          "state": "success",
+          "task_id": "wait_for_submitter_files",
+          "try_number": 1
+        },
+        {
+          "duration_s": 244,
+          "end": "2026-06-02T05:20:04Z",
+          "log": [
+            "Loaded 174 rows from S1001_20260601_0209_POSFEED.txt, trailer count matches",
+            "Loaded 90 rows from S1002_20260601_0308_ECOMM.txt, trailer count matches",
+            "Loaded 79 rows from S1003_20260601_0218_MOBILE.txt, trailer count matches",
+            "Loaded 55 rows from S1004_20260601_0354_KIOSK.txt, trailer count matches"
+          ],
+          "start": "2026-06-02T05:16:00Z",
+          "state": "success",
+          "task_id": "load_raw_transactions",
+          "try_number": 1
+        },
+        {
+          "duration_s": 40,
+          "end": "2026-06-02T05:20:44Z",
+          "log": [
+            "4 batches match contract raw.transactions"
+          ],
+          "start": "2026-06-02T05:20:04Z",
+          "state": "success",
+          "task_id": "validate_schema",
+          "try_number": 1
+        },
+        {
+          "duration_s": 221,
+          "end": "2026-06-02T05:24:25Z",
+          "log": [],
+          "start": "2026-06-02T05:20:44Z",
+          "state": "success",
+          "task_id": "dedupe_transactions",
+          "try_number": 1
+        },
+        {
+          "duration_s": 468,
+          "end": "2026-06-02T05:32:13Z",
+          "log": [],
+          "start": "2026-06-02T05:24:25Z",
+          "state": "success",
+          "task_id": "build_stg_transactions",
+          "try_number": 1
+        },
+        {
+          "duration_s": 329,
+          "end": "2026-06-02T05:37:42Z",
+          "log": [],
+          "start": "2026-06-02T05:32:13Z",
+          "state": "success",
+          "task_id": "build_fct_daily_sales",
+          "try_number": 1
+        },
+        {
+          "duration_s": 39,
+          "end": "2026-06-02T05:38:21Z",
+          "log": [
+            "S1001 rows=174",
+            "S1002 rows=90",
+            "S1003 rows=79",
+            "S1004 rows=55"
+          ],
+          "start": "2026-06-02T05:37:42Z",
+          "state": "success",
+          "task_id": "publish_metrics",
+          "try_number": 1
+        }
+      ]
+    },
+    {
+      "business_date": "2026-06-02",
+      "dag_id": "retail_txn_daily",
+      "end": "2026-06-03T05:34:00Z",
+      "run_id": "scheduled__2026-06-03T05:15:00Z",
+      "start": "2026-06-03T05:15:00Z",
+      "state": "success",
+      "tasks": [
+        {
+          "duration_s": 60,
+          "end": "2026-06-03T05:16:00Z",
+          "log": [
+            "Poking for 4 submitter files for 20260602",
+            "4 of 4 present at start",
+            "Found S1003_20260602_0218_MOBILE.txt (landed 2026-06-03T02:21:00Z)",
+            "Found S1001_20260602_0233_POSFEED.txt (landed 2026-06-03T02:37:00Z)",
+            "Found S1002_20260602_0246_ECOMM.txt (landed 2026-06-03T02:47:00Z)",
+            "Found S1004_20260602_0347_KIOSK.txt (landed 2026-06-03T03:49:00Z)"
+          ],
+          "start": "2026-06-03T05:15:00Z",
+          "state": "success",
+          "task_id": "wait_for_submitter_files",
+          "try_number": 1
+        },
+        {
+          "duration_s": 298,
+          "end": "2026-06-03T05:20:58Z",
+          "log": [
+            "Loaded 180 rows from S1001_20260602_0233_POSFEED.txt, trailer count matches",
+            "Loaded 89 rows from S1002_20260602_0246_ECOMM.txt, trailer count matches",
+            "Loaded 84 rows from S1003_20260602_0218_MOBILE.txt, trailer count matches",
+            "Loaded 54 rows from S1004_20260602_0347_KIOSK.txt, trailer count matches"
+          ],
+          "start": "2026-06-03T05:16:00Z",
+          "state": "success",
+          "task_id": "load_raw_transactions",
+          "try_number": 1
+        },
+        {
+          "duration_s": 33,
+          "end": "2026-06-03T05:21:31Z",
+          "log": [
+            "4 batches match contract raw.transactions"
+          ],
+          "start": "2026-06-03T05:20:58Z",
+          "state": "success",
+          "task_id": "validate_schema",
+          "try_number": 1
+        },
+        {
+          "duration_s": 146,
+          "end": "2026-06-03T05:23:57Z",
+          "log": [],
+          "start": "2026-06-03T05:21:31Z",
+          "state": "success",
+          "task_id": "dedupe_transactions",
+          "try_number": 1
+        },
+        {
+          "duration_s": 388,
+          "end": "2026-06-03T05:30:25Z",
+          "log": [],
+          "start": "2026-06-03T05:23:57Z",
+          "state": "success",
+          "task_id": "build_stg_transactions",
+          "try_number": 1
+        },
+        {
+          "duration_s": 185,
+          "end": "2026-06-03T05:33:30Z",
+          "log": [],
+          "start": "2026-06-03T05:30:25Z",
+          "state": "success",
+          "task_id": "build_fct_daily_sales",
+          "try_number": 1
+        },
+        {
+          "duration_s": 30,
+          "end": "2026-06-03T05:34:00Z",
+          "log": [
+            "S1001 rows=180",
+            "S1002 rows=89",
+            "S1003 rows=84",
+            "S1004 rows=54"
+          ],
+          "start": "2026-06-03T05:33:30Z",
+          "state": "success",
+          "task_id": "publish_metrics",
+          "try_number": 1
+        }
+      ]
+    },
+    {
+      "business_date": "2026-06-03",
+      "dag_id": "retail_txn_daily",
+      "end": "2026-06-04T05:35:51Z",
+      "run_id": "scheduled__2026-06-04T05:15:00Z",
+      "start": "2026-06-04T05:15:00Z",
+      "state": "success",
+      "tasks": [
+        {
+          "duration_s": 120,
+          "end": "2026-06-04T05:17:00Z",
+          "log": [
+            "Poking for 4 submitter files for 20260603",
+            "4 of 4 present at start",
+            "Found S1001_20260603_0221_POSFEED.txt (landed 2026-06-04T02:24:00Z)",
+            "Found S1003_20260603_0232_MOBILE.txt (landed 2026-06-04T02:35:00Z)",
+            "Found S1002_20260603_0254_ECOMM.txt (landed 2026-06-04T02:57:00Z)",
+            "Found S1004_20260603_0419_KIOSK.txt (landed 2026-06-04T04:20:00Z)"
+          ],
+          "start": "2026-06-04T05:15:00Z",
+          "state": "success",
+          "task_id": "wait_for_submitter_files",
+          "try_number": 1
+        },
+        {
+          "duration_s": 246,
+          "end": "2026-06-04T05:21:06Z",
+          "log": [
+            "Loaded 174 rows from S1001_20260603_0221_POSFEED.txt, trailer count matches",
+            "Loaded 92 rows from S1002_20260603_0254_ECOMM.txt, trailer count matches",
+            "Loaded 80 rows from S1003_20260603_0232_MOBILE.txt, trailer count matches",
+            "Loaded 55 rows from S1004_20260603_0419_KIOSK.txt, trailer count matches"
+          ],
+          "start": "2026-06-04T05:17:00Z",
+          "state": "success",
+          "task_id": "load_raw_transactions",
+          "try_number": 1
+        },
+        {
+          "duration_s": 49,
+          "end": "2026-06-04T05:21:55Z",
+          "log": [
+            "4 batches match contract raw.transactions"
+          ],
+          "start": "2026-06-04T05:21:06Z",
+          "state": "success",
+          "task_id": "validate_schema",
+          "try_number": 1
+        },
+        {
+          "duration_s": 152,
+          "end": "2026-06-04T05:24:27Z",
+          "log": [],
+          "start": "2026-06-04T05:21:55Z",
+          "state": "success",
+          "task_id": "dedupe_transactions",
+          "try_number": 1
+        },
+        {
+          "duration_s": 362,
+          "end": "2026-06-04T05:30:29Z",
+          "log": [],
+          "start": "2026-06-04T05:24:27Z",
+          "state": "success",
+          "task_id": "build_stg_transactions",
+          "try_number": 1
+        },
+        {
+          "duration_s": 306,
+          "end": "2026-06-04T05:35:35Z",
+          "log": [],
+          "start": "2026-06-04T05:30:29Z",
+          "state": "success",
+          "task_id": "build_fct_daily_sales",
+          "try_number": 1
+        },
+        {
+          "duration_s": 16,
+          "end": "2026-06-04T05:35:51Z",
+          "log": [
+            "S1001 rows=174",
+            "S1002 rows=92",
+            "S1003 rows=80",
+            "S1004 rows=55"
+          ],
+          "start": "2026-06-04T05:35:35Z",
+          "state": "success",
+          "task_id": "publish_metrics",
+          "try_number": 1
+        }
+      ]
+    },
+    {
+      "business_date": "2026-06-04",
+      "dag_id": "retail_txn_daily",
+      "end": "2026-06-05T05:35:50Z",
+      "run_id": "scheduled__2026-06-05T05:15:00Z",
+      "start": "2026-06-05T05:15:00Z",
+      "state": "success",
+      "tasks": [
+        {
+          "duration_s": 180,
+          "end": "2026-06-05T05:18:00Z",
+          "log": [
+            "Poking for 4 submitter files for 20260604",
+            "4 of 4 present at start",
+            "Found S1001_20260604_0213_POSFEED.txt (landed 2026-06-05T02:16:00Z)",
+            "Found S1003_20260604_0238_MOBILE.txt (landed 2026-06-05T02:39:00Z)",
+            "Found S1002_20260604_0259_ECOMM.txt (landed 2026-06-05T03:01:00Z)",
+            "Found S1004_20260604_0348_KIOSK.txt (landed 2026-06-05T03:52:00Z)"
+          ],
+          "start": "2026-06-05T05:15:00Z",
+          "state": "success",
+          "task_id": "wait_for_submitter_files",
+          "try_number": 1
+        },
+        {
+          "duration_s": 222,
+          "end": "2026-06-05T05:21:42Z",
+          "log": [
+            "Loaded 183 rows from S1001_20260604_0213_POSFEED.txt, trailer count matches",
+            "Loaded 90 rows from S1002_20260604_0259_ECOMM.txt, trailer count matches",
+            "Loaded 79 rows from S1003_20260604_0238_MOBILE.txt, trailer count matches",
+            "Loaded 50 rows from S1004_20260604_0348_KIOSK.txt, trailer count matches"
+          ],
+          "start": "2026-06-05T05:18:00Z",
+          "state": "success",
+          "task_id": "load_raw_transactions",
+          "try_number": 1
+        },
+        {
+          "duration_s": 17,
+          "end": "2026-06-05T05:21:59Z",
+          "log": [
+            "4 batches match contract raw.transactions"
+          ],
+          "start": "2026-06-05T05:21:42Z",
+          "state": "success",
+          "task_id": "validate_schema",
+          "try_number": 1
+        },
+        {
+          "duration_s": 139,
+          "end": "2026-06-05T05:24:18Z",
+          "log": [],
+          "start": "2026-06-05T05:21:59Z",
+          "state": "success",
+          "task_id": "dedupe_transactions",
+          "try_number": 1
+        },
+        {
+          "duration_s": 316,
+          "end": "2026-06-05T05:29:34Z",
+          "log": [],
+          "start": "2026-06-05T05:24:18Z",
+          "state": "success",
+          "task_id": "build_stg_transactions",
+          "try_number": 1
+        },
+        {
+          "duration_s": 341,
+          "end": "2026-06-05T05:35:15Z",
+          "log": [],
+          "start": "2026-06-05T05:29:34Z",
+          "state": "success",
+          "task_id": "build_fct_daily_sales",
+          "try_number": 1
+        },
+        {
+          "duration_s": 35,
+          "end": "2026-06-05T05:35:50Z",
+          "log": [
+            "S1001 rows=183",
+            "S1002 rows=90",
+            "S1003 rows=79",
+            "S1004 rows=50"
+          ],
+          "start": "2026-06-05T05:35:15Z",
+          "state": "success",
+          "task_id": "publish_metrics",
+          "try_number": 1
+        }
+      ]
+    },
+    {
+      "business_date": "2026-06-05",
+      "dag_id": "retail_txn_daily",
+      "end": "2026-06-06T05:35:22Z",
+      "run_id": "scheduled__2026-06-06T05:15:00Z",
+      "start": "2026-06-06T05:15:00Z",
+      "state": "success",
+      "tasks": [
+        {
+          "duration_s": 120,
+          "end": "2026-06-06T05:17:00Z",
+          "log": [
+            "Poking for 4 submitter files for 20260605",
+            "4 of 4 present at start",
+            "Found S1003_20260605_0216_MOBILE.txt (landed 2026-06-06T02:20:00Z)",
+            "Found S1001_20260605_0239_POSFEED.txt (landed 2026-06-06T02:40:00Z)",
+            "Found S1002_20260605_0256_ECOMM.txt (landed 2026-06-06T02:57:00Z)",
+            "Found S1004_20260605_0420_KIOSK.txt (landed 2026-06-06T04:22:00Z)"
+          ],
+          "start": "2026-06-06T05:15:00Z",
+          "state": "success",
+          "task_id": "wait_for_submitter_files",
+          "try_number": 1
+        },
+        {
+          "duration_s": 248,
+          "end": "2026-06-06T05:21:08Z",
+          "log": [
+            "Loaded 182 rows from S1001_20260605_0239_POSFEED.txt, trailer count matches",
+            "Loaded 90 rows from S1002_20260605_0256_ECOMM.txt, trailer count matches",
+            "Loaded 83 rows from S1003_20260605_0216_MOBILE.txt, trailer count matches",
+            "Loaded 53 rows from S1004_20260605_0420_KIOSK.txt, trailer count matches"
+          ],
+          "start": "2026-06-06T05:17:00Z",
+          "state": "success",
+          "task_id": "load_raw_transactions",
+          "try_number": 1
+        },
+        {
+          "duration_s": 15,
+          "end": "2026-06-06T05:21:23Z",
+          "log": [
+            "4 batches match contract raw.transactions"
+          ],
+          "start": "2026-06-06T05:21:08Z",
+          "state": "success",
+          "task_id": "validate_schema",
+          "try_number": 1
+        },
+        {
+          "duration_s": 207,
+          "end": "2026-06-06T05:24:50Z",
+          "log": [],
+          "start": "2026-06-06T05:21:23Z",
+          "state": "success",
+          "task_id": "dedupe_transactions",
+          "try_number": 1
+        },
+        {
+          "duration_s": 362,
+          "end": "2026-06-06T05:30:52Z",
+          "log": [],
+          "start": "2026-06-06T05:24:50Z",
+          "state": "success",
+          "task_id": "build_stg_transactions",
+          "try_number": 1
+        },
+        {
+          "duration_s": 240,
+          "end": "2026-06-06T05:34:52Z",
+          "log": [],
+          "start": "2026-06-06T05:30:52Z",
+          "state": "success",
+          "task_id": "build_fct_daily_sales",
+          "try_number": 1
+        },
+        {
+          "duration_s": 30,
+          "end": "2026-06-06T05:35:22Z",
+          "log": [
+            "S1001 rows=182",
+            "S1002 rows=90",
+            "S1003 rows=83",
+            "S1004 rows=53"
+          ],
+          "start": "2026-06-06T05:34:52Z",
+          "state": "success",
+          "task_id": "publish_metrics",
+          "try_number": 1
+        }
+      ]
+    },
+    {
+      "business_date": "2026-06-06",
+      "dag_id": "retail_txn_daily",
+      "end": "2026-06-07T05:38:01Z",
+      "run_id": "scheduled__2026-06-07T05:15:00Z",
+      "start": "2026-06-07T05:15:00Z",
+      "state": "success",
+      "tasks": [
+        {
+          "duration_s": 60,
+          "end": "2026-06-07T05:16:00Z",
+          "log": [
+            "Poking for 4 submitter files for 20260606",
+            "4 of 4 present at start",
+            "Found S1003_20260606_0227_MOBILE.txt (landed 2026-06-07T02:30:00Z)",
+            "Found S1001_20260606_0230_POSFEED.txt (landed 2026-06-07T02:32:00Z)",
+            "Found S1002_20260606_0255_ECOMM.txt (landed 2026-06-07T02:57:00Z)",
+            "Found S1004_20260606_0421_KIOSK.txt (landed 2026-06-07T04:25:00Z)"
+          ],
+          "start": "2026-06-07T05:15:00Z",
+          "state": "success",
+          "task_id": "wait_for_submitter_files",
+          "try_number": 1
+        },
+        {
+          "duration_s": 326,
+          "end": "2026-06-07T05:21:26Z",
+          "log": [
+            "Loaded 178 rows from S1001_20260606_0230_POSFEED.txt, trailer count matches",
+            "Loaded 90 rows from S1002_20260606_0255_ECOMM.txt, trailer count matches",
+            "Loaded 83 rows from S1003_20260606_0227_MOBILE.txt, trailer count matches",
+            "Loaded 54 rows from S1004_20260606_0421_KIOSK.txt, trailer count matches"
+          ],
+          "start": "2026-06-07T05:16:00Z",
+          "state": "success",
+          "task_id": "load_raw_transactions",
+          "try_number": 1
+        },
+        {
+          "duration_s": 45,
+          "end": "2026-06-07T05:22:11Z",
+          "log": [
+            "4 batches match contract raw.transactions"
+          ],
+          "start": "2026-06-07T05:21:26Z",
+          "state": "success",
+          "task_id": "validate_schema",
+          "try_number": 1
+        },
+        {
+          "duration_s": 130,
+          "end": "2026-06-07T05:24:21Z",
+          "log": [],
+          "start": "2026-06-07T05:22:11Z",
+          "state": "success",
+          "task_id": "dedupe_transactions",
+          "try_number": 1
+        },
+        {
+          "duration_s": 472,
+          "end": "2026-06-07T05:32:13Z",
+          "log": [],
+          "start": "2026-06-07T05:24:21Z",
+          "state": "success",
+          "task_id": "build_stg_transactions",
+          "try_number": 1
+        },
+        {
+          "duration_s": 318,
+          "end": "2026-06-07T05:37:31Z",
+          "log": [],
+          "start": "2026-06-07T05:32:13Z",
+          "state": "success",
+          "task_id": "build_fct_daily_sales",
+          "try_number": 1
+        },
+        {
+          "duration_s": 30,
+          "end": "2026-06-07T05:38:01Z",
+          "log": [
+            "S1001 rows=178",
+            "S1002 rows=90",
+            "S1003 rows=83",
+            "S1004 rows=54"
+          ],
+          "start": "2026-06-07T05:37:31Z",
+          "state": "success",
+          "task_id": "publish_metrics",
+          "try_number": 1
+        }
+      ]
+    },
+    {
+      "business_date": "2026-06-07",
+      "dag_id": "retail_txn_daily",
+      "end": "2026-06-08T05:34:36Z",
+      "run_id": "scheduled__2026-06-08T05:15:00Z",
+      "start": "2026-06-08T05:15:00Z",
+      "state": "success",
+      "tasks": [
+        {
+          "duration_s": 180,
+          "end": "2026-06-08T05:18:00Z",
+          "log": [
+            "Poking for 4 submitter files for 20260607",
+            "4 of 4 present at start",
+            "Found S1003_20260607_0216_MOBILE.txt (landed 2026-06-08T02:20:00Z)",
+            "Found S1001_20260607_0228_POSFEED.txt (landed 2026-06-08T02:30:00Z)",
+            "Found S1002_20260607_0309_ECOMM.txt (landed 2026-06-08T03:13:00Z)",
+            "Found S1004_20260607_0339_KIOSK.txt (landed 2026-06-08T03:40:00Z)"
+          ],
+          "start": "2026-06-08T05:15:00Z",
+          "state": "success",
+          "task_id": "wait_for_submitter_files",
+          "try_number": 1
+        },
+        {
+          "duration_s": 352,
+          "end": "2026-06-08T05:23:52Z",
+          "log": [
+            "Loaded 172 rows from S1001_20260607_0228_POSFEED.txt, trailer count matches",
+            "Loaded 89 rows from S1002_20260607_0309_ECOMM.txt, trailer count matches",
+            "Loaded 83 rows from S1003_20260607_0216_MOBILE.txt, trailer count matches",
+            "Loaded 54 rows from S1004_20260607_0339_KIOSK.txt, trailer count matches"
+          ],
+          "start": "2026-06-08T05:18:00Z",
+          "state": "success",
+          "task_id": "load_raw_transactions",
+          "try_number": 1
+        },
+        {
+          "duration_s": 15,
+          "end": "2026-06-08T05:24:07Z",
+          "log": [
+            "4 batches match contract raw.transactions"
+          ],
+          "start": "2026-06-08T05:23:52Z",
+          "state": "success",
+          "task_id": "validate_schema",
+          "try_number": 1
+        },
+        {
+          "duration_s": 135,
+          "end": "2026-06-08T05:26:22Z",
+          "log": [],
+          "start": "2026-06-08T05:24:07Z",
+          "state": "success",
+          "task_id": "dedupe_transactions",
+          "try_number": 1
+        },
+        {
+          "duration_s": 257,
+          "end": "2026-06-08T05:30:39Z",
+          "log": [],
+          "start": "2026-06-08T05:26:22Z",
+          "state": "success",
+          "task_id": "build_stg_transactions",
+          "try_number": 1
+        },
+        {
+          "duration_s": 226,
+          "end": "2026-06-08T05:34:25Z",
+          "log": [],
+          "start": "2026-06-08T05:30:39Z",
+          "state": "success",
+          "task_id": "build_fct_daily_sales",
+          "try_number": 1
+        },
+        {
+          "duration_s": 11,
+          "end": "2026-06-08T05:34:36Z",
+          "log": [
+            "S1001 rows=172",
+            "S1002 rows=89",
+            "S1003 rows=83",
+            "S1004 rows=54"
+          ],
+          "start": "2026-06-08T05:34:25Z",
+          "state": "success",
+          "task_id": "publish_metrics",
+          "try_number": 1
+        }
+      ]
+    },
+    {
+      "business_date": "2026-06-08",
+      "dag_id": "retail_txn_daily",
+      "end": "2026-06-09T05:36:16Z",
+      "run_id": "scheduled__2026-06-09T05:15:00Z",
+      "start": "2026-06-09T05:15:00Z",
+      "state": "success",
+      "tasks": [
+        {
+          "duration_s": 60,
+          "end": "2026-06-09T05:16:00Z",
+          "log": [
+            "Poking for 4 submitter files for 20260608",
+            "4 of 4 present at start",
+            "Found S1001_20260608_0237_POSFEED.txt (landed 2026-06-09T02:39:00Z)",
+            "Found S1003_20260608_0240_MOBILE.txt (landed 2026-06-09T02:44:00Z)",
+            "Found S1002_20260608_0251_ECOMM.txt (landed 2026-06-09T02:53:00Z)",
+            "Found S1004_20260608_0355_KIOSK.txt (landed 2026-06-09T03:56:00Z)"
+          ],
+          "start": "2026-06-09T05:15:00Z",
+          "state": "success",
+          "task_id": "wait_for_submitter_files",
+          "try_number": 1
+        },
+        {
+          "duration_s": 281,
+          "end": "2026-06-09T05:20:41Z",
+          "log": [
+            "Loaded 175 rows from S1001_20260608_0237_POSFEED.txt, trailer count matches",
+            "Loaded 92 rows from S1002_20260608_0251_ECOMM.txt, trailer count matches",
+            "Loaded 77 rows from S1003_20260608_0240_MOBILE.txt, trailer count matches",
+            "Loaded 52 rows from S1004_20260608_0355_KIOSK.txt, trailer count matches"
+          ],
+          "start": "2026-06-09T05:16:00Z",
+          "state": "success",
+          "task_id": "load_raw_transactions",
+          "try_number": 1
+        },
+        {
+          "duration_s": 46,
+          "end": "2026-06-09T05:21:27Z",
+          "log": [
+            "4 batches match contract raw.transactions"
+          ],
+          "start": "2026-06-09T05:20:41Z",
+          "state": "success",
+          "task_id": "validate_schema",
+          "try_number": 1
+        },
+        {
+          "duration_s": 236,
+          "end": "2026-06-09T05:25:23Z",
+          "log": [],
+          "start": "2026-06-09T05:21:27Z",
+          "state": "success",
+          "task_id": "dedupe_transactions",
+          "try_number": 1
+        },
+        {
+          "duration_s": 286,
+          "end": "2026-06-09T05:30:09Z",
+          "log": [],
+          "start": "2026-06-09T05:25:23Z",
+          "state": "success",
+          "task_id": "build_stg_transactions",
+          "try_number": 1
+        },
+        {
+          "duration_s": 336,
+          "end": "2026-06-09T05:35:45Z",
+          "log": [],
+          "start": "2026-06-09T05:30:09Z",
+          "state": "success",
+          "task_id": "build_fct_daily_sales",
+          "try_number": 1
+        },
+        {
+          "duration_s": 31,
+          "end": "2026-06-09T05:36:16Z",
+          "log": [
+            "S1001 rows=175",
+            "S1002 rows=92",
+            "S1003 rows=77",
+            "S1004 rows=52"
+          ],
+          "start": "2026-06-09T05:35:45Z",
+          "state": "success",
+          "task_id": "publish_metrics",
+          "try_number": 1
+        }
+      ]
+    },
+    {
+      "business_date": "2026-06-09",
+      "dag_id": "retail_txn_daily",
+      "end": "2026-06-10T05:38:42Z",
+      "run_id": "scheduled__2026-06-10T05:15:00Z",
+      "start": "2026-06-10T05:15:00Z",
+      "state": "success",
+      "tasks": [
+        {
+          "duration_s": 180,
+          "end": "2026-06-10T05:18:00Z",
+          "log": [
+            "Poking for 4 submitter files for 20260609",
+            "4 of 4 present at start",
+            "Found S1001_20260609_0220_POSFEED.txt (landed 2026-06-10T02:24:00Z)",
+            "Found S1003_20260609_0239_MOBILE.txt (landed 2026-06-10T02:43:00Z)",
+            "Found S1002_20260609_0254_ECOMM.txt (landed 2026-06-10T02:57:00Z)",
+            "Found S1004_20260609_0337_KIOSK.txt (landed 2026-06-10T03:40:00Z)"
+          ],
+          "start": "2026-06-10T05:15:00Z",
+          "state": "success",
+          "task_id": "wait_for_submitter_files",
+          "try_number": 1
+        },
+        {
+          "duration_s": 198,
+          "end": "2026-06-10T05:21:18Z",
+          "log": [
+            "Loaded 178 rows from S1001_20260609_0220_POSFEED.txt, trailer count matches",
+            "Loaded 85 rows from S1002_20260609_0254_ECOMM.txt, trailer count matches",
+            "Loaded 79 rows from S1003_20260609_0239_MOBILE.txt, trailer count matches",
+            "Loaded 50 rows from S1004_20260609_0337_KIOSK.txt, trailer count matches"
+          ],
+          "start": "2026-06-10T05:18:00Z",
+          "state": "success",
+          "task_id": "load_raw_transactions",
+          "try_number": 1
+        },
+        {
+          "duration_s": 40,
+          "end": "2026-06-10T05:21:58Z",
+          "log": [
+            "4 batches match contract raw.transactions"
+          ],
+          "start": "2026-06-10T05:21:18Z",
+          "state": "success",
+          "task_id": "validate_schema",
+          "try_number": 1
+        },
+        {
+          "duration_s": 199,
+          "end": "2026-06-10T05:25:17Z",
+          "log": [],
+          "start": "2026-06-10T05:21:58Z",
+          "state": "success",
+          "task_id": "dedupe_transactions",
+          "try_number": 1
+        },
+        {
+          "duration_s": 446,
+          "end": "2026-06-10T05:32:43Z",
+          "log": [],
+          "start": "2026-06-10T05:25:17Z",
+          "state": "success",
+          "task_id": "build_stg_transactions",
+          "try_number": 1
+        },
+        {
+          "duration_s": 341,
+          "end": "2026-06-10T05:38:24Z",
+          "log": [],
+          "start": "2026-06-10T05:32:43Z",
+          "state": "success",
+          "task_id": "build_fct_daily_sales",
+          "try_number": 1
+        },
+        {
+          "duration_s": 18,
+          "end": "2026-06-10T05:38:42Z",
+          "log": [
+            "S1001 rows=178",
+            "S1002 rows=85",
+            "S1003 rows=79",
+            "S1004 rows=50"
+          ],
+          "start": "2026-06-10T05:38:24Z",
+          "state": "success",
+          "task_id": "publish_metrics",
+          "try_number": 1
+        }
+      ]
+    },
+    {
+      "business_date": "2026-06-10",
+      "dag_id": "retail_txn_daily",
+      "end": "2026-06-11T05:36:52Z",
+      "run_id": "scheduled__2026-06-11T05:15:00Z",
+      "start": "2026-06-11T05:15:00Z",
+      "state": "success",
+      "tasks": [
+        {
+          "duration_s": 60,
+          "end": "2026-06-11T05:16:00Z",
+          "log": [
+            "Poking for 4 submitter files for 20260610",
+            "4 of 4 present at start",
+            "Found S1001_20260610_0205_POSFEED.txt (landed 2026-06-11T02:09:00Z)",
+            "Found S1003_20260610_0240_MOBILE.txt (landed 2026-06-11T02:42:00Z)",
+            "Found S1002_20260610_0246_ECOMM.txt (landed 2026-06-11T02:50:00Z)",
+            "Found S1004_20260610_0354_KIOSK.txt (landed 2026-06-11T03:58:00Z)"
+          ],
+          "start": "2026-06-11T05:15:00Z",
+          "state": "success",
+          "task_id": "wait_for_submitter_files",
+          "try_number": 1
+        },
+        {
+          "duration_s": 290,
+          "end": "2026-06-11T05:20:50Z",
+          "log": [
+            "Loaded 187 rows from S1001_20260610_0205_POSFEED.txt, trailer count matches",
+            "Loaded 84 rows from S1002_20260610_0246_ECOMM.txt, trailer count matches",
+            "Loaded 79 rows from S1003_20260610_0240_MOBILE.txt, trailer count matches",
+            "Loaded 50 rows from S1004_20260610_0354_KIOSK.txt, trailer count matches"
+          ],
+          "start": "2026-06-11T05:16:00Z",
+          "state": "success",
+          "task_id": "load_raw_transactions",
+          "try_number": 1
+        },
+        {
+          "duration_s": 20,
+          "end": "2026-06-11T05:21:10Z",
+          "log": [
+            "4 batches match contract raw.transactions"
+          ],
+          "start": "2026-06-11T05:20:50Z",
+          "state": "success",
+          "task_id": "validate_schema",
+          "try_number": 1
+        },
+        {
+          "duration_s": 201,
+          "end": "2026-06-11T05:24:31Z",
+          "log": [],
+          "start": "2026-06-11T05:21:10Z",
+          "state": "success",
+          "task_id": "dedupe_transactions",
+          "try_number": 1
+        },
+        {
+          "duration_s": 438,
+          "end": "2026-06-11T05:31:49Z",
+          "log": [],
+          "start": "2026-06-11T05:24:31Z",
+          "state": "success",
+          "task_id": "build_stg_transactions",
+          "try_number": 1
+        },
+        {
+          "duration_s": 280,
+          "end": "2026-06-11T05:36:29Z",
+          "log": [],
+          "start": "2026-06-11T05:31:49Z",
+          "state": "success",
+          "task_id": "build_fct_daily_sales",
+          "try_number": 1
+        },
+        {
+          "duration_s": 23,
+          "end": "2026-06-11T05:36:52Z",
+          "log": [
+            "S1001 rows=187",
+            "S1002 rows=84",
+            "S1003 rows=79",
+            "S1004 rows=50"
+          ],
+          "start": "2026-06-11T05:36:29Z",
+          "state": "success",
+          "task_id": "publish_metrics",
+          "try_number": 1
+        }
+      ]
+    },
+    {
+      "business_date": "2026-06-11",
+      "dag_id": "retail_txn_daily",
+      "end": "2026-06-12T05:34:08Z",
+      "run_id": "scheduled__2026-06-12T05:15:00Z",
+      "start": "2026-06-12T05:15:00Z",
+      "state": "success",
+      "tasks": [
+        {
+          "duration_s": 180,
+          "end": "2026-06-12T05:18:00Z",
+          "log": [
+            "Poking for 4 submitter files for 20260611",
+            "4 of 4 present at start",
+            "Found S1001_20260611_0211_POSFEED.txt (landed 2026-06-12T02:14:00Z)",
+            "Found S1003_20260611_0244_MOBILE.txt (landed 2026-06-12T02:45:00Z)",
+            "Found S1002_20260611_0255_ECOMM.txt (landed 2026-06-12T02:58:00Z)",
+            "Found S1004_20260611_0414_KIOSK.txt (landed 2026-06-12T04:15:00Z)"
+          ],
+          "start": "2026-06-12T05:15:00Z",
+          "state": "success",
+          "task_id": "wait_for_submitter_files",
+          "try_number": 1
+        },
+        {
+          "duration_s": 287,
+          "end": "2026-06-12T05:22:47Z",
+          "log": [
+            "Loaded 173 rows from S1001_20260611_0211_POSFEED.txt, trailer count matches",
+            "Loaded 84 rows from S1002_20260611_0255_ECOMM.txt, trailer count matches",
+            "Loaded 80 rows from S1003_20260611_0244_MOBILE.txt, trailer count matches",
+            "Loaded 54 rows from S1004_20260611_0414_KIOSK.txt, trailer count matches"
+          ],
+          "start": "2026-06-12T05:18:00Z",
+          "state": "success",
+          "task_id": "load_raw_transactions",
+          "try_number": 1
+        },
+        {
+          "duration_s": 32,
+          "end": "2026-06-12T05:23:19Z",
+          "log": [
+            "4 batches match contract raw.transactions"
+          ],
+          "start": "2026-06-12T05:22:47Z",
+          "state": "success",
+          "task_id": "validate_schema",
+          "try_number": 1
+        },
+        {
+          "duration_s": 181,
+          "end": "2026-06-12T05:26:20Z",
+          "log": [],
+          "start": "2026-06-12T05:23:19Z",
+          "state": "success",
+          "task_id": "dedupe_transactions",
+          "try_number": 1
+        },
+        {
+          "duration_s": 256,
+          "end": "2026-06-12T05:30:36Z",
+          "log": [],
+          "start": "2026-06-12T05:26:20Z",
+          "state": "success",
+          "task_id": "build_stg_transactions",
+          "try_number": 1
+        },
+        {
+          "duration_s": 187,
+          "end": "2026-06-12T05:33:43Z",
+          "log": [],
+          "start": "2026-06-12T05:30:36Z",
+          "state": "success",
+          "task_id": "build_fct_daily_sales",
+          "try_number": 1
+        },
+        {
+          "duration_s": 25,
+          "end": "2026-06-12T05:34:08Z",
+          "log": [
+            "S1001 rows=173",
+            "S1002 rows=84",
+            "S1003 rows=80",
+            "S1004 rows=54"
+          ],
+          "start": "2026-06-12T05:33:43Z",
+          "state": "success",
+          "task_id": "publish_metrics",
+          "try_number": 1
+        }
+      ]
+    },
+    {
+      "business_date": "2026-06-12",
+      "dag_id": "retail_txn_daily",
+      "end": "2026-06-13T05:36:38Z",
+      "run_id": "scheduled__2026-06-13T05:15:00Z",
+      "start": "2026-06-13T05:15:00Z",
+      "state": "success",
+      "tasks": [
+        {
+          "duration_s": 180,
+          "end": "2026-06-13T05:18:00Z",
+          "log": [
+            "Poking for 4 submitter files for 20260612",
+            "4 of 4 present at start",
+            "Found S1001_20260612_0209_POSFEED.txt (landed 2026-06-13T02:13:00Z)",
+            "Found S1003_20260612_0242_MOBILE.txt (landed 2026-06-13T02:46:00Z)",
+            "Found S1002_20260612_0304_ECOMM.txt (landed 2026-06-13T03:07:00Z)",
+            "Found S1004_20260612_0351_KIOSK.txt (landed 2026-06-13T03:54:00Z)"
+          ],
+          "start": "2026-06-13T05:15:00Z",
+          "state": "success",
+          "task_id": "wait_for_submitter_files",
+          "try_number": 1
+        },
+        {
+          "duration_s": 326,
+          "end": "2026-06-13T05:23:26Z",
+          "log": [
+            "Loaded 176 rows from S1001_20260612_0209_POSFEED.txt, trailer count matches",
+            "Loaded 88 rows from S1002_20260612_0304_ECOMM.txt, trailer count matches",
+            "Loaded 83 rows from S1003_20260612_0242_MOBILE.txt, trailer count matches",
+            "Loaded 54 rows from S1004_20260612_0351_KIOSK.txt, trailer count matches"
+          ],
+          "start": "2026-06-13T05:18:00Z",
+          "state": "success",
+          "task_id": "load_raw_transactions",
+          "try_number": 1
+        },
+        {
+          "duration_s": 29,
+          "end": "2026-06-13T05:23:55Z",
+          "log": [
+            "4 batches match contract raw.transactions"
+          ],
+          "start": "2026-06-13T05:23:26Z",
+          "state": "success",
+          "task_id": "validate_schema",
+          "try_number": 1
+        },
+        {
+          "duration_s": 164,
+          "end": "2026-06-13T05:26:39Z",
+          "log": [],
+          "start": "2026-06-13T05:23:55Z",
+          "state": "success",
+          "task_id": "dedupe_transactions",
+          "try_number": 1
+        },
+        {
+          "duration_s": 286,
+          "end": "2026-06-13T05:31:25Z",
+          "log": [],
+          "start": "2026-06-13T05:26:39Z",
+          "state": "success",
+          "task_id": "build_stg_transactions",
+          "try_number": 1
+        },
+        {
+          "duration_s": 293,
+          "end": "2026-06-13T05:36:18Z",
+          "log": [],
+          "start": "2026-06-13T05:31:25Z",
+          "state": "success",
+          "task_id": "build_fct_daily_sales",
+          "try_number": 1
+        },
+        {
+          "duration_s": 20,
+          "end": "2026-06-13T05:36:38Z",
+          "log": [
+            "S1001 rows=176",
+            "S1002 rows=88",
+            "S1003 rows=83",
+            "S1004 rows=54"
+          ],
+          "start": "2026-06-13T05:36:18Z",
+          "state": "success",
+          "task_id": "publish_metrics",
+          "try_number": 1
+        }
+      ]
+    },
+    {
+      "business_date": "2026-06-13",
+      "dag_id": "retail_txn_daily",
+      "end": "2026-06-14T05:35:59Z",
+      "run_id": "scheduled__2026-06-14T05:15:00Z",
+      "start": "2026-06-14T05:15:00Z",
+      "state": "success",
+      "tasks": [
+        {
+          "duration_s": 120,
+          "end": "2026-06-14T05:17:00Z",
+          "log": [
+            "Poking for 4 submitter files for 20260613",
+            "4 of 4 present at start",
+            "Found S1001_20260613_0227_POSFEED.txt (landed 2026-06-14T02:28:00Z)",
+            "Found S1003_20260613_0236_MOBILE.txt (landed 2026-06-14T02:37:00Z)",
+            "Found S1002_20260613_0256_ECOMM.txt (landed 2026-06-14T02:59:00Z)",
+            "Found S1004_20260613_0401_KIOSK.txt (landed 2026-06-14T04:05:00Z)"
+          ],
+          "start": "2026-06-14T05:15:00Z",
+          "state": "success",
+          "task_id": "wait_for_submitter_files",
+          "try_number": 1
+        },
+        {
+          "duration_s": 273,
+          "end": "2026-06-14T05:21:33Z",
+          "log": [
+            "Loaded 185 rows from S1001_20260613_0227_POSFEED.txt, trailer count matches",
+            "Loaded 88 rows from S1002_20260613_0256_ECOMM.txt, trailer count matches",
+            "Loaded 81 rows from S1003_20260613_0236_MOBILE.txt, trailer count matches",
+            "Loaded 51 rows from S1004_20260613_0401_KIOSK.txt, trailer count matches"
+          ],
+          "start": "2026-06-14T05:17:00Z",
+          "state": "success",
+          "task_id": "load_raw_transactions",
+          "try_number": 1
+        },
+        {
+          "duration_s": 23,
+          "end": "2026-06-14T05:21:56Z",
+          "log": [
+            "4 batches match contract raw.transactions"
+          ],
+          "start": "2026-06-14T05:21:33Z",
+          "state": "success",
+          "task_id": "validate_schema",
+          "try_number": 1
+        },
+        {
+          "duration_s": 209,
+          "end": "2026-06-14T05:25:25Z",
+          "log": [],
+          "start": "2026-06-14T05:21:56Z",
+          "state": "success",
+          "task_id": "dedupe_transactions",
+          "try_number": 1
+        },
+        {
+          "duration_s": 421,
+          "end": "2026-06-14T05:32:26Z",
+          "log": [],
+          "start": "2026-06-14T05:25:25Z",
+          "state": "success",
+          "task_id": "build_stg_transactions",
+          "try_number": 1
+        },
+        {
+          "duration_s": 186,
+          "end": "2026-06-14T05:35:32Z",
+          "log": [],
+          "start": "2026-06-14T05:32:26Z",
+          "state": "success",
+          "task_id": "build_fct_daily_sales",
+          "try_number": 1
+        },
+        {
+          "duration_s": 27,
+          "end": "2026-06-14T05:35:59Z",
+          "log": [
+            "S1001 rows=185",
+            "S1002 rows=88",
+            "S1003 rows=81",
+            "S1004 rows=51"
+          ],
+          "start": "2026-06-14T05:35:32Z",
+          "state": "success",
+          "task_id": "publish_metrics",
+          "try_number": 1
+        }
+      ]
+    },
+    {
+      "business_date": "2026-06-14",
+      "dag_id": "retail_txn_daily",
+      "end": "2026-06-15T05:31:54Z",
+      "run_id": "scheduled__2026-06-15T05:15:00Z",
+      "start": "2026-06-15T05:15:00Z",
+      "state": "success",
+      "tasks": [
+        {
+          "duration_s": 60,
+          "end": "2026-06-15T05:16:00Z",
+          "log": [
+            "Poking for 4 submitter files for 20260614",
+            "4 of 4 present at start",
+            "Found S1001_20260614_0214_POSFEED.txt (landed 2026-06-15T02:17:00Z)",
+            "Found S1003_20260614_0240_MOBILE.txt (landed 2026-06-15T02:41:00Z)",
+            "Found S1002_20260614_0245_ECOMM.txt (landed 2026-06-15T02:49:00Z)",
+            "Found S1004_20260614_0339_KIOSK.txt (landed 2026-06-15T03:40:00Z)"
+          ],
+          "start": "2026-06-15T05:15:00Z",
+          "state": "success",
+          "task_id": "wait_for_submitter_files",
+          "try_number": 1
+        },
+        {
+          "duration_s": 207,
+          "end": "2026-06-15T05:19:27Z",
+          "log": [
+            "Loaded 184 rows from S1001_20260614_0214_POSFEED.txt, trailer count matches",
+            "Loaded 88 rows from S1002_20260614_0245_ECOMM.txt, trailer count matches",
+            "Loaded 80 rows from S1003_20260614_0240_MOBILE.txt, trailer count matches",
+            "Loaded 52 rows from S1004_20260614_0339_KIOSK.txt, trailer count matches"
+          ],
+          "start": "2026-06-15T05:16:00Z",
+          "state": "success",
+          "task_id": "load_raw_transactions",
+          "try_number": 1
+        },
+        {
+          "duration_s": 27,
+          "end": "2026-06-15T05:19:54Z",
+          "log": [
+            "4 batches match contract raw.transactions"
+          ],
+          "start": "2026-06-15T05:19:27Z",
+          "state": "success",
+          "task_id": "validate_schema",
+          "try_number": 1
+        },
+        {
+          "duration_s": 121,
+          "end": "2026-06-15T05:21:55Z",
+          "log": [],
+          "start": "2026-06-15T05:19:54Z",
+          "state": "success",
+          "task_id": "dedupe_transactions",
+          "try_number": 1
+        },
+        {
+          "duration_s": 406,
+          "end": "2026-06-15T05:28:41Z",
+          "log": [],
+          "start": "2026-06-15T05:21:55Z",
+          "state": "success",
+          "task_id": "build_stg_transactions",
+          "try_number": 1
+        },
+        {
+          "duration_s": 181,
+          "end": "2026-06-15T05:31:42Z",
+          "log": [],
+          "start": "2026-06-15T05:28:41Z",
+          "state": "success",
+          "task_id": "build_fct_daily_sales",
+          "try_number": 1
+        },
+        {
+          "duration_s": 12,
+          "end": "2026-06-15T05:31:54Z",
+          "log": [
+            "S1001 rows=184",
+            "S1002 rows=88",
+            "S1003 rows=80",
+            "S1004 rows=52"
+          ],
+          "start": "2026-06-15T05:31:42Z",
+          "state": "success",
+          "task_id": "publish_metrics",
+          "try_number": 1
+        }
+      ]
+    },
+    {
+      "business_date": "2026-06-15",
+      "dag_id": "retail_txn_daily",
+      "end": "2026-06-16T05:39:31Z",
+      "run_id": "scheduled__2026-06-16T05:15:00Z",
+      "start": "2026-06-16T05:15:00Z",
+      "state": "success",
+      "tasks": [
+        {
+          "duration_s": 180,
+          "end": "2026-06-16T05:18:00Z",
+          "log": [
+            "Poking for 4 submitter files for 20260615",
+            "4 of 4 present at start",
+            "Found S1001_20260615_0210_POSFEED.txt (landed 2026-06-16T02:13:00Z)",
+            "Found S1003_20260615_0241_MOBILE.txt (landed 2026-06-16T02:42:00Z)",
+            "Found S1002_20260615_0301_ECOMM.txt (landed 2026-06-16T03:04:00Z)",
+            "Found S1004_20260615_0422_KIOSK.txt (landed 2026-06-16T04:25:00Z)"
+          ],
+          "start": "2026-06-16T05:15:00Z",
+          "state": "success",
+          "task_id": "wait_for_submitter_files",
+          "try_number": 1
+        },
+        {
+          "duration_s": 278,
+          "end": "2026-06-16T05:22:38Z",
+          "log": [
+            "Loaded 186 rows from S1001_20260615_0210_POSFEED.txt, trailer count matches",
+            "Loaded 91 rows from S1002_20260615_0301_ECOMM.txt, trailer count matches",
+            "Loaded 82 rows from S1003_20260615_0241_MOBILE.txt, trailer count matches",
+            "Loaded 52 rows from S1004_20260615_0422_KIOSK.txt, trailer count matches"
+          ],
+          "start": "2026-06-16T05:18:00Z",
+          "state": "success",
+          "task_id": "load_raw_transactions",
+          "try_number": 1
+        },
+        {
+          "duration_s": 20,
+          "end": "2026-06-16T05:22:58Z",
+          "log": [
+            "4 batches match contract raw.transactions"
+          ],
+          "start": "2026-06-16T05:22:38Z",
+          "state": "success",
+          "task_id": "validate_schema",
+          "try_number": 1
+        },
+        {
+          "duration_s": 201,
+          "end": "2026-06-16T05:26:19Z",
+          "log": [],
+          "start": "2026-06-16T05:22:58Z",
+          "state": "success",
+          "task_id": "dedupe_transactions",
+          "try_number": 1
+        },
+        {
+          "duration_s": 461,
+          "end": "2026-06-16T05:34:00Z",
+          "log": [],
+          "start": "2026-06-16T05:26:19Z",
+          "state": "success",
+          "task_id": "build_stg_transactions",
+          "try_number": 1
+        },
+        {
+          "duration_s": 314,
+          "end": "2026-06-16T05:39:14Z",
+          "log": [],
+          "start": "2026-06-16T05:34:00Z",
+          "state": "success",
+          "task_id": "build_fct_daily_sales",
+          "try_number": 1
+        },
+        {
+          "duration_s": 17,
+          "end": "2026-06-16T05:39:31Z",
+          "log": [
+            "S1001 rows=186",
+            "S1002 rows=91",
+            "S1003 rows=82",
+            "S1004 rows=52"
+          ],
+          "start": "2026-06-16T05:39:14Z",
+          "state": "success",
+          "task_id": "publish_metrics",
+          "try_number": 1
+        }
+      ]
+    },
+    {
+      "business_date": "2026-06-16",
+      "dag_id": "retail_txn_daily",
+      "end": "2026-06-17T05:19:59Z",
+      "run_id": "scheduled__2026-06-17T05:15:00Z",
+      "start": "2026-06-17T05:15:00Z",
+      "state": "failed",
+      "tasks": [
+        {
+          "duration_s": 60,
+          "end": "2026-06-17T05:16:00Z",
+          "log": [
+            "Poking for 4 submitter files for 20260616",
+            "4 of 4 present at start",
+            "Found S1003_20260616_0216_MOBILE.txt (landed 2026-06-17T02:20:00Z)",
+            "Found S1001_20260616_0228_POSFEED.txt (landed 2026-06-17T02:29:00Z)",
+            "Found S1002_20260616_0250_ECOMM.txt (landed 2026-06-17T02:54:00Z)",
+            "Found S1004_20260616_0340_KIOSK.txt (landed 2026-06-17T03:44:00Z)"
+          ],
+          "start": "2026-06-17T05:15:00Z",
+          "state": "success",
+          "task_id": "wait_for_submitter_files",
+          "try_number": 1
+        },
+        {
+          "duration_s": 203,
+          "end": "2026-06-17T05:19:23Z",
+          "log": [
+            "Loaded 187 rows from S1001_20260616_0228_POSFEED.txt, trailer count matches",
+            "Loaded 89 rows from S1002_20260616_0250_ECOMM.txt, trailer count matches",
+            "Loaded 82 rows from S1003_20260616_0216_MOBILE.txt, trailer count matches",
+            "Loaded 51 rows from S1004_20260616_0340_KIOSK.txt, trailer count matches"
+          ],
+          "start": "2026-06-17T05:16:00Z",
+          "state": "success",
+          "task_id": "load_raw_transactions",
+          "try_number": 1
+        },
+        {
+          "duration_s": 36,
+          "end": "2026-06-17T05:19:59Z",
+          "log": [
+            "Validating 4 batches against contract raw.transactions",
+            "ContractViolation: S1003_20260616_0216_MOBILE.txt missing ['channel_basket_id']; unexpected ['basket_ref']",
+            "Task failed with no retries remaining"
+          ],
+          "start": "2026-06-17T05:19:23Z",
+          "state": "failed",
+          "task_id": "validate_schema",
+          "try_number": 1
+        },
+        {
+          "duration_s": null,
+          "end": null,
+          "log": [],
+          "start": null,
+          "state": "upstream_failed",
+          "task_id": "dedupe_transactions",
+          "try_number": 0
+        },
+        {
+          "duration_s": null,
+          "end": null,
+          "log": [],
+          "start": null,
+          "state": "upstream_failed",
+          "task_id": "build_stg_transactions",
+          "try_number": 0
+        },
+        {
+          "duration_s": null,
+          "end": null,
+          "log": [],
+          "start": null,
+          "state": "upstream_failed",
+          "task_id": "build_fct_daily_sales",
+          "try_number": 0
+        },
+        {
+          "duration_s": null,
+          "end": null,
+          "log": [],
+          "start": null,
+          "state": "upstream_failed",
+          "task_id": "publish_metrics",
+          "try_number": 0
+        }
+      ]
+    },
+    {
+      "business_date": "2026-06-17",
+      "dag_id": "retail_txn_daily",
+      "end": "2026-06-18T05:36:48Z",
+      "run_id": "scheduled__2026-06-18T05:15:00Z",
+      "start": "2026-06-18T05:15:00Z",
+      "state": "success",
+      "tasks": [
+        {
+          "duration_s": 60,
+          "end": "2026-06-18T05:16:00Z",
+          "log": [
+            "Poking for 4 submitter files for 20260617",
+            "4 of 4 present at start",
+            "Found S1001_20260617_0213_POSFEED.txt (landed 2026-06-18T02:15:00Z)",
+            "Found S1003_20260617_0220_MOBILE.txt (landed 2026-06-18T02:22:00Z)",
+            "Found S1002_20260617_0308_ECOMM.txt (landed 2026-06-18T03:11:00Z)",
+            "Found S1004_20260617_0344_KIOSK.txt (landed 2026-06-18T03:47:00Z)"
+          ],
+          "start": "2026-06-18T05:15:00Z",
+          "state": "success",
+          "task_id": "wait_for_submitter_files",
+          "try_number": 1
+        },
+        {
+          "duration_s": 325,
+          "end": "2026-06-18T05:21:25Z",
+          "log": [
+            "Loaded 187 rows from S1001_20260617_0213_POSFEED.txt, trailer count matches",
+            "Loaded 85 rows from S1002_20260617_0308_ECOMM.txt, trailer count matches",
+            "Loaded 82 rows from S1003_20260617_0220_MOBILE.txt, trailer count matches",
+            "Loaded 51 rows from S1004_20260617_0344_KIOSK.txt, trailer count matches"
+          ],
+          "start": "2026-06-18T05:16:00Z",
+          "state": "success",
+          "task_id": "load_raw_transactions",
+          "try_number": 1
+        },
+        {
+          "duration_s": 17,
+          "end": "2026-06-18T05:21:42Z",
+          "log": [
+            "4 batches match contract raw.transactions"
+          ],
+          "start": "2026-06-18T05:21:25Z",
+          "state": "success",
+          "task_id": "validate_schema",
+          "try_number": 1
+        },
+        {
+          "duration_s": 127,
+          "end": "2026-06-18T05:23:49Z",
+          "log": [],
+          "start": "2026-06-18T05:21:42Z",
+          "state": "success",
+          "task_id": "dedupe_transactions",
+          "try_number": 1
+        },
+        {
+          "duration_s": 454,
+          "end": "2026-06-18T05:31:23Z",
+          "log": [],
+          "start": "2026-06-18T05:23:49Z",
+          "state": "success",
+          "task_id": "build_stg_transactions",
+          "try_number": 1
+        },
+        {
+          "duration_s": 306,
+          "end": "2026-06-18T05:36:29Z",
+          "log": [],
+          "start": "2026-06-18T05:31:23Z",
+          "state": "success",
+          "task_id": "build_fct_daily_sales",
+          "try_number": 1
+        },
+        {
+          "duration_s": 19,
+          "end": "2026-06-18T05:36:48Z",
+          "log": [
+            "S1001 rows=187",
+            "S1002 rows=85",
+            "S1003 rows=82",
+            "S1004 rows=51"
+          ],
+          "start": "2026-06-18T05:36:29Z",
+          "state": "success",
+          "task_id": "publish_metrics",
+          "try_number": 1
+        }
+      ]
+    },
+    {
+      "business_date": "2026-06-18",
+      "dag_id": "retail_txn_daily",
+      "end": "2026-06-19T07:05:10Z",
+      "run_id": "scheduled__2026-06-19T05:15:00Z",
+      "start": "2026-06-19T05:15:00Z",
+      "state": "success",
+      "tasks": [
+        {
+          "duration_s": 5400,
+          "end": "2026-06-19T06:45:00Z",
+          "log": [
+            "Poking for 4 submitter files for 20260618",
+            "3 of 4 present at start",
+            "Found S1003_20260618_0218_MOBILE.txt (landed 2026-06-19T02:19:00Z)",
+            "Found S1002_20260618_0256_ECOMM.txt (landed 2026-06-19T02:58:00Z)",
+            "Found S1004_20260618_0410_KIOSK.txt (landed 2026-06-19T04:13:00Z)",
+            "Found S1001_20260618_0638_POSFEED.txt (landed 2026-06-19T06:41:00Z)"
+          ],
+          "start": "2026-06-19T05:15:00Z",
+          "state": "success",
+          "task_id": "wait_for_submitter_files",
+          "try_number": 1
+        },
+        {
+          "duration_s": 278,
+          "end": "2026-06-19T06:49:38Z",
+          "log": [
+            "Loaded 110 rows from S1001_20260618_0638_POSFEED.txt, trailer count matches",
+            "Loaded 86 rows from S1002_20260618_0256_ECOMM.txt, trailer count matches",
+            "Loaded 81 rows from S1003_20260618_0218_MOBILE.txt, trailer count matches",
+            "Loaded 53 rows from S1004_20260618_0410_KIOSK.txt, trailer count matches"
+          ],
+          "start": "2026-06-19T06:45:00Z",
+          "state": "success",
+          "task_id": "load_raw_transactions",
+          "try_number": 1
+        },
+        {
+          "duration_s": 39,
+          "end": "2026-06-19T06:50:17Z",
+          "log": [
+            "4 batches match contract raw.transactions"
+          ],
+          "start": "2026-06-19T06:49:38Z",
+          "state": "success",
+          "task_id": "validate_schema",
+          "try_number": 1
+        },
+        {
+          "duration_s": 211,
+          "end": "2026-06-19T06:53:48Z",
+          "log": [],
+          "start": "2026-06-19T06:50:17Z",
+          "state": "success",
+          "task_id": "dedupe_transactions",
+          "try_number": 1
+        },
+        {
+          "duration_s": 418,
+          "end": "2026-06-19T07:00:46Z",
+          "log": [],
+          "start": "2026-06-19T06:53:48Z",
+          "state": "success",
+          "task_id": "build_stg_transactions",
+          "try_number": 1
+        },
+        {
+          "duration_s": 248,
+          "end": "2026-06-19T07:04:54Z",
+          "log": [],
+          "start": "2026-06-19T07:00:46Z",
+          "state": "success",
+          "task_id": "build_fct_daily_sales",
+          "try_number": 1
+        },
+        {
+          "duration_s": 16,
+          "end": "2026-06-19T07:05:10Z",
+          "log": [
+            "S1001 rows=110",
+            "S1002 rows=86",
+            "S1003 rows=81",
+            "S1004 rows=53"
+          ],
+          "start": "2026-06-19T07:04:54Z",
+          "state": "success",
+          "task_id": "publish_metrics",
+          "try_number": 1
+        }
+      ]
+    },
+    {
+      "business_date": "2026-06-19",
+      "dag_id": "retail_txn_daily",
+      "end": "2026-06-20T05:35:56Z",
+      "run_id": "scheduled__2026-06-20T05:15:00Z",
+      "start": "2026-06-20T05:15:00Z",
+      "state": "success",
+      "tasks": [
+        {
+          "duration_s": 60,
+          "end": "2026-06-20T05:16:00Z",
+          "log": [
+            "Poking for 4 submitter files for 20260619",
+            "4 of 4 present at start",
+            "Found S1001_20260619_0217_POSFEED.txt (landed 2026-06-20T02:18:00Z)",
+            "Found S1003_20260619_0241_MOBILE.txt (landed 2026-06-20T02:42:00Z)",
+            "Found S1002_20260619_0251_ECOMM.txt (landed 2026-06-20T02:55:00Z)",
+            "Found S1004_20260619_0344_KIOSK.txt (landed 2026-06-20T03:48:00Z)"
+          ],
+          "start": "2026-06-20T05:15:00Z",
+          "state": "success",
+          "task_id": "wait_for_submitter_files",
+          "try_number": 1
+        },
+        {
+          "duration_s": 320,
+          "end": "2026-06-20T05:21:20Z",
+          "log": [
+            "Loaded 183 rows from S1001_20260619_0217_POSFEED.txt, trailer count matches",
+            "Loaded 86 rows from S1002_20260619_0251_ECOMM.txt, trailer count matches",
+            "Loaded 84 rows from S1003_20260619_0241_MOBILE.txt, trailer count matches",
+            "Loaded 53 rows from S1004_20260619_0344_KIOSK.txt, trailer count matches"
+          ],
+          "start": "2026-06-20T05:16:00Z",
+          "state": "success",
+          "task_id": "load_raw_transactions",
+          "try_number": 1
+        },
+        {
+          "duration_s": 39,
+          "end": "2026-06-20T05:21:59Z",
+          "log": [
+            "4 batches match contract raw.transactions"
+          ],
+          "start": "2026-06-20T05:21:20Z",
+          "state": "success",
+          "task_id": "validate_schema",
+          "try_number": 1
+        },
+        {
+          "duration_s": 123,
+          "end": "2026-06-20T05:24:02Z",
+          "log": [],
+          "start": "2026-06-20T05:21:59Z",
+          "state": "success",
+          "task_id": "dedupe_transactions",
+          "try_number": 1
+        },
+        {
+          "duration_s": 445,
+          "end": "2026-06-20T05:31:27Z",
+          "log": [],
+          "start": "2026-06-20T05:24:02Z",
+          "state": "success",
+          "task_id": "build_stg_transactions",
+          "try_number": 1
+        },
+        {
+          "duration_s": 255,
+          "end": "2026-06-20T05:35:42Z",
+          "log": [],
+          "start": "2026-06-20T05:31:27Z",
+          "state": "success",
+          "task_id": "build_fct_daily_sales",
+          "try_number": 1
+        },
+        {
+          "duration_s": 14,
+          "end": "2026-06-20T05:35:56Z",
+          "log": [
+            "S1001 rows=183",
+            "S1002 rows=86",
+            "S1003 rows=84",
+            "S1004 rows=53"
+          ],
+          "start": "2026-06-20T05:35:42Z",
+          "state": "success",
+          "task_id": "publish_metrics",
+          "try_number": 1
+        }
+      ]
+    },
+    {
+      "business_date": "2026-06-20",
+      "dag_id": "retail_txn_daily",
+      "end": "2026-06-21T05:37:31Z",
+      "run_id": "scheduled__2026-06-21T05:15:00Z",
+      "start": "2026-06-21T05:15:00Z",
+      "state": "success",
+      "tasks": [
+        {
+          "duration_s": 180,
+          "end": "2026-06-21T05:18:00Z",
+          "log": [
+            "Poking for 4 submitter files for 20260620",
+            "4 of 4 present at start",
+            "Found S1001_20260620_0224_POSFEED.txt (landed 2026-06-21T02:26:00Z)",
+            "Found S1003_20260620_0226_MOBILE.txt (landed 2026-06-21T02:30:00Z)",
+            "Found S1002_20260620_0309_ECOMM.txt (landed 2026-06-21T03:13:00Z)",
+            "Found S1004_20260620_0414_KIOSK.txt (landed 2026-06-21T04:17:00Z)"
+          ],
+          "start": "2026-06-21T05:15:00Z",
+          "state": "success",
+          "task_id": "wait_for_submitter_files",
+          "try_number": 1
+        },
+        {
+          "duration_s": 349,
+          "end": "2026-06-21T05:23:49Z",
+          "log": [
+            "Loaded 189 rows from S1001_20260620_0224_POSFEED.txt, trailer count matches",
+            "Loaded 91 rows from S1002_20260620_0309_ECOMM.txt, trailer count matches",
+            "Loaded 77 rows from S1003_20260620_0226_MOBILE.txt, trailer count matches",
+            "Loaded 54 rows from S1004_20260620_0414_KIOSK.txt, trailer count matches"
+          ],
+          "start": "2026-06-21T05:18:00Z",
+          "state": "success",
+          "task_id": "load_raw_transactions",
+          "try_number": 1
+        },
+        {
+          "duration_s": 30,
+          "end": "2026-06-21T05:24:19Z",
+          "log": [
+            "4 batches match contract raw.transactions"
+          ],
+          "start": "2026-06-21T05:23:49Z",
+          "state": "success",
+          "task_id": "validate_schema",
+          "try_number": 1
+        },
+        {
+          "duration_s": 132,
+          "end": "2026-06-21T05:26:31Z",
+          "log": [],
+          "start": "2026-06-21T05:24:19Z",
+          "state": "success",
+          "task_id": "dedupe_transactions",
+          "try_number": 1
+        },
+        {
+          "duration_s": 341,
+          "end": "2026-06-21T05:32:12Z",
+          "log": [],
+          "start": "2026-06-21T05:26:31Z",
+          "state": "success",
+          "task_id": "build_stg_transactions",
+          "try_number": 1
+        },
+        {
+          "duration_s": 305,
+          "end": "2026-06-21T05:37:17Z",
+          "log": [],
+          "start": "2026-06-21T05:32:12Z",
+          "state": "success",
+          "task_id": "build_fct_daily_sales",
+          "try_number": 1
+        },
+        {
+          "duration_s": 14,
+          "end": "2026-06-21T05:37:31Z",
+          "log": [
+            "S1001 rows=189",
+            "S1002 rows=91",
+            "S1003 rows=77",
+            "S1004 rows=54"
+          ],
+          "start": "2026-06-21T05:37:17Z",
+          "state": "success",
+          "task_id": "publish_metrics",
+          "try_number": 1
+        }
+      ]
+    },
+    {
+      "business_date": "2026-06-21",
+      "dag_id": "retail_txn_daily",
+      "end": "2026-06-22T05:34:51Z",
+      "run_id": "scheduled__2026-06-22T05:15:00Z",
+      "start": "2026-06-22T05:15:00Z",
+      "state": "success",
+      "tasks": [
+        {
+          "duration_s": 60,
+          "end": "2026-06-22T05:16:00Z",
+          "log": [
+            "Poking for 4 submitter files for 20260621",
+            "4 of 4 present at start",
+            "Found S1001_20260621_0226_POSFEED.txt (landed 2026-06-22T02:27:00Z)",
+            "Found S1003_20260621_0230_MOBILE.txt (landed 2026-06-22T02:32:00Z)",
+            "Found S1002_20260621_0248_ECOMM.txt (landed 2026-06-22T02:49:00Z)",
+            "Found S1004_20260621_0428_KIOSK.txt (landed 2026-06-22T04:30:00Z)"
+          ],
+          "start": "2026-06-22T05:15:00Z",
+          "state": "success",
+          "task_id": "wait_for_submitter_files",
+          "try_number": 1
+        },
+        {
+          "duration_s": 213,
+          "end": "2026-06-22T05:19:33Z",
+          "log": [
+            "Loaded 176 rows from S1001_20260621_0226_POSFEED.txt, trailer count matches",
+            "Loaded 88 rows from S1002_20260621_0248_ECOMM.txt, trailer count matches",
+            "Loaded 78 rows from S1003_20260621_0230_MOBILE.txt, trailer count matches",
+            "Loaded 51 rows from S1004_20260621_0428_KIOSK.txt, trailer count matches"
+          ],
+          "start": "2026-06-22T05:16:00Z",
+          "state": "success",
+          "task_id": "load_raw_transactions",
+          "try_number": 1
+        },
+        {
+          "duration_s": 34,
+          "end": "2026-06-22T05:20:07Z",
+          "log": [
+            "4 batches match contract raw.transactions"
+          ],
+          "start": "2026-06-22T05:19:33Z",
+          "state": "success",
+          "task_id": "validate_schema",
+          "try_number": 1
+        },
+        {
+          "duration_s": 168,
+          "end": "2026-06-22T05:22:55Z",
+          "log": [],
+          "start": "2026-06-22T05:20:07Z",
+          "state": "success",
+          "task_id": "dedupe_transactions",
+          "try_number": 1
+        },
+        {
+          "duration_s": 454,
+          "end": "2026-06-22T05:30:29Z",
+          "log": [],
+          "start": "2026-06-22T05:22:55Z",
+          "state": "success",
+          "task_id": "build_stg_transactions",
+          "try_number": 1
+        },
+        {
+          "duration_s": 244,
+          "end": "2026-06-22T05:34:33Z",
+          "log": [],
+          "start": "2026-06-22T05:30:29Z",
+          "state": "success",
+          "task_id": "build_fct_daily_sales",
+          "try_number": 1
+        },
+        {
+          "duration_s": 18,
+          "end": "2026-06-22T05:34:51Z",
+          "log": [
+            "S1001 rows=176",
+            "S1002 rows=88",
+            "S1003 rows=78",
+            "S1004 rows=51"
+          ],
+          "start": "2026-06-22T05:34:33Z",
+          "state": "success",
+          "task_id": "publish_metrics",
+          "try_number": 1
+        }
+      ]
+    }
+  ],
+  "window_start": "2026-06-01"
+}

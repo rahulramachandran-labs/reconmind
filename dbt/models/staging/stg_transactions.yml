@@ -1,0 +1,46 @@
+version: 2
+models:
+- name: stg_transactions
+  description: Deduplicated line items. Latest submitter file wins on (transaction_id, channel_basket_id,
+    upc_code); outlet ids are remapped through outlet_alias.
+  columns:
+  - name: outlet_id
+    data_type: text
+    tests:
+    - relationships:
+        to: ref('dim_outlet')
+        field: outlet_id
+  - name: location_id
+    data_type: text
+    tests:
+    - not_null
+  - name: transaction_id
+    data_type: text
+    tests:
+    - not_null
+  - name: upc_code
+    data_type: text
+    tests:
+    - not_null
+  - name: channel_basket_id
+    data_type: text
+    tests:
+    - not_null
+  - name: qty
+    data_type: integer
+  - name: amount
+    data_type: numeric(12,2)
+  - name: event_ts
+    data_type: timestamptz
+  - name: business_date
+    data_type: date
+  - name: submitter_id
+    data_type: text
+  - name: submitter_file_name
+    data_type: text
+  tests:
+  - dbt_utils.unique_combination_of_columns:
+      combination_of_columns:
+      - transaction_id
+      - channel_basket_id
+      - upc_code

@@ -13,7 +13,8 @@ SUBMITTERID_YYYYMMDD_HHMM_NAME.txt
 ```
 
 - `SUBMITTERID` is the id from `submitter_registry`, for example `S1001`.
-- `YYYYMMDD_HHMM` is when the submitter produced the file, in UTC. This timestamp decides which copy wins during dedup.
+- `YYYYMMDD` is the business date the file covers.
+- `HHMM` is when the submitter produced the file, in UTC, on the morning after the business date. Together `YYYYMMDD_HHMM` decides which copy wins during dedup.
 - `NAME` is the short submitter name, for example `POSFEED`.
 
 Current submitters:

@@ -20,7 +20,7 @@ A transaction line is uniquely identified by the composite key:
 
 ## Which copy wins
 
-The row from the **latest submitter file** wins. The file timestamp comes from the file name, not from load time, because files are sometimes loaded out of order during catch-up runs:
+The row from the **latest submitter file** wins. The file timestamp comes from the file name (`YYYYMMDD` business date, `HHMM` production time), not from load time, because files are sometimes loaded out of order during catch-up runs:
 
 ```
 SUBMITTERID_YYYYMMDD_HHMM_NAME.txt

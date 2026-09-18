@@ -1,0 +1,21 @@
+version: 2
+models:
+- name: fct_daily_sales
+  description: 'Grain: business_date x outlet_id. What the morning dashboard reads.'
+  columns:
+  - name: business_date
+    data_type: date
+    tests:
+    - not_null
+  - name: outlet_id
+    data_type: text
+    tests:
+    - not_null
+  - name: location_id
+    data_type: text
+  - name: line_items
+    data_type: integer
+  - name: units
+    data_type: integer
+  - name: revenue
+    data_type: numeric(14,2)

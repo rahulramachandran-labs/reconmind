@@ -6,7 +6,7 @@ tags: [orchestration, airflow, dag]
 
 # retail_txn_daily DAG
 
-Runs once per business date at 02:00 UTC. Owner: data-platform.
+Runs once per business date at 05:15 UTC the following morning, after the last submitter SLA. Owner: data-platform.
 
 ```
 wait_for_submitter_files -> load_raw_transactions -> validate_schema

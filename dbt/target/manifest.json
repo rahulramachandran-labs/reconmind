@@ -1,0 +1,226 @@
+{
+  "metadata": {
+    "dbt_schema_version": "https://schemas.getdbt.com/dbt/manifest/v12.json",
+    "dbt_version": "1.9.0",
+    "generated_at": "2026-06-22T05:00:00Z",
+    "project_name": "retail_recon"
+  },
+  "nodes": {
+    "model.retail_recon.dim_outlet": {
+      "columns": {
+        "location_id": {
+          "data_type": "text",
+          "description": "",
+          "name": "location_id"
+        },
+        "outlet_id": {
+          "data_type": "text",
+          "description": "",
+          "name": "outlet_id"
+        },
+        "valid_from": {
+          "data_type": "date",
+          "description": "",
+          "name": "valid_from"
+        },
+        "valid_to": {
+          "data_type": "date",
+          "description": "",
+          "name": "valid_to"
+        }
+      },
+      "config": {
+        "materialized": "table"
+      },
+      "depends_on": {
+        "nodes": []
+      },
+      "description": "One row per active outlet, from outlet_location_map.",
+      "name": "dim_outlet",
+      "original_file_path": "models/marts/dim_outlet.sql",
+      "package_name": "retail_recon",
+      "resource_type": "model"
+    },
+    "model.retail_recon.fct_daily_sales": {
+      "columns": {
+        "business_date": {
+          "data_type": "date",
+          "description": "",
+          "name": "business_date"
+        },
+        "line_items": {
+          "data_type": "integer",
+          "description": "",
+          "name": "line_items"
+        },
+        "location_id": {
+          "data_type": "text",
+          "description": "",
+          "name": "location_id"
+        },
+        "outlet_id": {
+          "data_type": "text",
+          "description": "",
+          "name": "outlet_id"
+        },
+        "revenue": {
+          "data_type": "numeric(14,2)",
+          "description": "",
+          "name": "revenue"
+        },
+        "units": {
+          "data_type": "integer",
+          "description": "",
+          "name": "units"
+        }
+      },
+      "config": {
+        "materialized": "table"
+      },
+      "depends_on": {
+        "nodes": [
+          "model.retail_recon.stg_transactions"
+        ]
+      },
+      "description": "Grain: business_date x outlet_id. What the morning dashboard reads.",
+      "name": "fct_daily_sales",
+      "original_file_path": "models/marts/fct_daily_sales.sql",
+      "package_name": "retail_recon",
+      "resource_type": "model"
+    },
+    "model.retail_recon.stg_transactions": {
+      "columns": {
+        "amount": {
+          "data_type": "numeric(12,2)",
+          "description": "",
+          "name": "amount"
+        },
+        "business_date": {
+          "data_type": "date",
+          "description": "",
+          "name": "business_date"
+        },
+        "channel_basket_id": {
+          "data_type": "text",
+          "description": "",
+          "name": "channel_basket_id"
+        },
+        "event_ts": {
+          "data_type": "timestamptz",
+          "description": "",
+          "name": "event_ts"
+        },
+        "location_id": {
+          "data_type": "text",
+          "description": "",
+          "name": "location_id"
+        },
+        "outlet_id": {
+          "data_type": "text",
+          "description": "",
+          "name": "outlet_id"
+        },
+        "qty": {
+          "data_type": "integer",
+          "description": "",
+          "name": "qty"
+        },
+        "submitter_file_name": {
+          "data_type": "text",
+          "description": "",
+          "name": "submitter_file_name"
+        },
+        "submitter_id": {
+          "data_type": "text",
+          "description": "",
+          "name": "submitter_id"
+        },
+        "transaction_id": {
+          "data_type": "text",
+          "description": "",
+          "name": "transaction_id"
+        },
+        "upc_code": {
+          "data_type": "text",
+          "description": "",
+          "name": "upc_code"
+        }
+      },
+      "config": {
+        "materialized": "view"
+      },
+      "depends_on": {
+        "nodes": [
+          "source.retail_recon.raw.transactions",
+          "model.retail_recon.dim_outlet"
+        ]
+      },
+      "description": "Deduplicated line items. Latest submitter file wins on (transaction_id, channel_basket_id, upc_code); outlet ids are remapped through outlet_alias.",
+      "name": "stg_transactions",
+      "original_file_path": "models/staging/stg_transactions.sql",
+      "package_name": "retail_recon",
+      "resource_type": "model"
+    }
+  },
+  "sources": {
+    "source.retail_recon.raw.transactions": {
+      "columns": {
+        "amount": {
+          "data_type": "numeric(12,2)",
+          "description": "Line amount after discounts.",
+          "name": "amount"
+        },
+        "channel_basket_id": {
+          "data_type": "text",
+          "description": "Basket id (BSK-XXXXXXXX). Dedup key part 2.",
+          "name": "channel_basket_id"
+        },
+        "event_ts": {
+          "data_type": "timestamptz",
+          "description": "When the sale happened (UTC).",
+          "name": "event_ts"
+        },
+        "location_id": {
+          "data_type": "text",
+          "description": "Physical location (LOC-NNNN). The id to trust when it disagrees with outlet_id.",
+          "name": "location_id"
+        },
+        "outlet_id": {
+          "data_type": "text",
+          "description": "Store id as sent by the submitter (OUT-NNNN).",
+          "name": "outlet_id"
+        },
+        "qty": {
+          "data_type": "integer",
+          "description": "Units, negative for returns.",
+          "name": "qty"
+        },
+        "submitter_file_name": {
+          "data_type": "text",
+          "description": "Source file, SUBMITTERID_YYYYMMDD_HHMM_NAME.txt. Added by the loader.",
+          "name": "submitter_file_name"
+        },
+        "transaction_id": {
+          "data_type": "text",
+          "description": "Submitter transaction id. Dedup key part 1.",
+          "name": "transaction_id"
+        },
+        "upc_code": {
+          "data_type": "text",
+          "description": "12-digit UPC. Dedup key part 3.",
+          "name": "upc_code"
+        }
+      },
+      "config": {
+        "contract": {
+          "enforced": true
+        }
+      },
+      "description": "Contract for every submitter file. validate_schema compares each batch header with these columns.",
+      "name": "transactions",
+      "package_name": "retail_recon",
+      "resource_type": "source",
+      "source_name": "raw"
+    }
+  }
+}

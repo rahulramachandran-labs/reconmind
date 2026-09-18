@@ -1,0 +1,19 @@
+version: 2
+models:
+- name: dim_outlet
+  description: One row per active outlet, from outlet_location_map.
+  columns:
+  - name: outlet_id
+    data_type: text
+    tests:
+    - unique
+    - not_null
+  - name: location_id
+    data_type: text
+    tests:
+    - unique
+    - not_null
+  - name: valid_from
+    data_type: date
+  - name: valid_to
+    data_type: date

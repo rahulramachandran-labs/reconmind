@@ -1,0 +1,6 @@
+name: retail_recon
+version: 1.0.0
+config-version: 2
+profile: retail_recon
+model-paths:
+- models

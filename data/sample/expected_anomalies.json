@@ -1,0 +1,65 @@
+{
+  "duplicate_submission": {
+    "business_date": "2026-06-12",
+    "changed_rows": 3,
+    "duplicate_keys": 88,
+    "expected_agent": "reconciliation",
+    "expected_severity": "S2",
+    "original_file": "S1002_20260612_0304_ECOMM.txt",
+    "resend_file": "S1002_20260612_1120_ECOMM.txt",
+    "resend_landed_after_dag": true,
+    "submitter_id": "S1002",
+    "superseded_rows": 88
+  },
+  "key_drift": {
+    "canonical_outlet_id": "OUT-1017",
+    "drift_rate": 0.03,
+    "drifted_outlet_id": "OUT-1071",
+    "drifted_rows": 251,
+    "expected_agent": "reconciliation",
+    "expected_severity": "S2",
+    "location_id": "LOC-0517",
+    "rows_in_window": 8373
+  },
+  "schema_drift": {
+    "affected_rows": 82,
+    "business_date": "2026-06-16",
+    "change": "rename",
+    "expected_agent": "data_quality",
+    "expected_severity": "S1",
+    "failed_task": "validate_schema",
+    "file": "S1003_20260616_0216_MOBILE.txt",
+    "missing_columns": [
+      "channel_basket_id"
+    ],
+    "submitter_id": "S1003",
+    "unexpected_columns": [
+      "basket_ref"
+    ]
+  },
+  "summary": {
+    "anomalies": [
+      "duplicate_submission",
+      "key_drift",
+      "schema_drift",
+      "volume_anomaly"
+    ],
+    "days": 21,
+    "files": 85,
+    "rows": 8461,
+    "seed": 42,
+    "start": "2026-06-01"
+  },
+  "volume_anomaly": {
+    "business_date": "2026-06-18",
+    "expected_agent": "data_quality",
+    "expected_severity": "S2",
+    "file": "S1001_20260618_0638_POSFEED.txt",
+    "landed_at": "2026-06-19T06:41:00Z",
+    "minutes_after_sla": 161,
+    "pct_below_trailing": 0.397,
+    "rows": 110,
+    "submitter_id": "S1001",
+    "trailing_avg_7d": 182.6
+  }
+}
