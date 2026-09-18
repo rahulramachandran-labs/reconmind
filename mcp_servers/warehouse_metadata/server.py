@@ -36,6 +36,7 @@ CONTRACT = [
     "amount",
     "event_ts",
 ]
+REFERENCE_TABLES = {"submitter_registry", "outlet_location_map", "outlet_alias"}
 DESCRIPTIONS = {
     "transactions": "Raw line items from submitter files, one row per line.",
     "file_loads": "One row per loaded file: header, missing and unexpected columns, landing time.",
@@ -101,6 +102,9 @@ class TableStats(BaseModel):
     date: str
     row_count: int
     files: list[FileStats] = []
+    rows: list[dict[str, Any]] | None = Field(
+        default=None, description="Full contents, for the small reference tables only"
+    )
 
 
 class CheckResult(BaseModel):
@@ -265,7 +269,13 @@ def build_server(engine: Engine | None = None, manifest_path: Path | None = None
         d = _day(date)
         if table != "transactions":
             n = query(f"select count(*) as n from {table}")[0]["n"]
-            return TableStats(table=table, date=date, row_count=n)
+            rows = None
+            if table in REFERENCE_TABLES:
+                rows = [
+                    {k: (v.isoformat() if hasattr(v, "isoformat") else v) for k, v in r.items()}
+                    for r in query(f"select * from {table} order by 1")
+                ]
+            return TableStats(table=table, date=date, row_count=n, rows=rows)
         nulls = ", ".join(f"count(*) filter (where {c} is null) as null_{c}" for c in CONTRACT)
         rows = query(
             f"select submitter_file_name, count(*) as rows, {nulls} from transactions "
