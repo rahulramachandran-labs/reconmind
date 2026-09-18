@@ -20,5 +20,5 @@ Fixed-size chunking was the first thing tried. It produced chunks that started m
 
 - A section called "Fix" still carries what it is fixing, which matters for both the dense and (later) keyword side of retrieval.
 - Chunks are small (about 350 characters on average), so `k=5` fits comfortably in a small local model's context.
-- Several chunks from the same document can crowd the top results. That is visible in the dense-only baseline and is one of the reasons for hybrid retrieval in Phase B.
+- Several chunks from the same document can crowd the top results. For questions about a single incident that turned out to be what you want (see [0002](0002-hybrid-retrieval-with-rrf.md)).
 - Tables are kept whole inside a section, which the severity rubric depends on.

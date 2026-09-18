@@ -65,6 +65,30 @@ jobs:
           path: coverage.xml
           if-no-files-found: ignore
 
+  eval:
+    name: ragas gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.1.0
+        with:
+          python-version: "3.12"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      - uses: actions/cache@v6
+        with:
+          path: ~/.cache/huggingface
+          key: hf-eval-v1
+      - run: uv sync --frozen --group eval
+      # no API keys in CI: extractive answers, offline judges (see ADR 0006)
+      - run: uv run python evals/run_ragas.py --answerer extractive --gate --out evals/results/ci.json
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: ragas
+          path: evals/results/ci.json
+          if-no-files-found: ignore
+
   secrets:
     name: gitleaks
     runs-on: ubuntu-latest

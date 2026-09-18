@@ -26,6 +26,7 @@ dependencies = [
     "rank-bm25>=0.2.2",
     "anthropic>=1.6.0",
     "pinecone>=10.0.0",
+    "snowballstemmer>=3.1.1",
 ]
 
 [dependency-groups]

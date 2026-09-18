@@ -35,8 +35,9 @@ def rrf(
 class HybridRetriever(BaseRetriever):
     """BM25 and dense search fused with RRF, as a LangChain retriever.
 
-    ``per_doc_cap`` stops one long document from filling every slot, which was
-    the main failure of the dense-only retriever.
+    ``per_doc_cap`` can stop one document from filling every slot. It is off by
+    default: on the golden set a cap of two cost eight points of recall, because
+    questions about one incident legitimately need several of its sections.
     """
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -46,7 +47,7 @@ class HybridRetriever(BaseRetriever):
     k: int = 5
     candidates: int = 20
     rrf_k: int = 60
-    per_doc_cap: int = 2
+    per_doc_cap: int | None = None
 
     def search(self, query: str, k: int | None = None) -> list[RetrievedChunk]:
         k = k or self.k
@@ -57,7 +58,7 @@ class HybridRetriever(BaseRetriever):
         out: list[RetrievedChunk] = []
         per_doc: dict[str, int] = {}
         for hit, score, ranks in rrf(lists, self.rrf_k):
-            if per_doc.get(hit.doc_id, 0) >= self.per_doc_cap:
+            if self.per_doc_cap and per_doc.get(hit.doc_id, 0) >= self.per_doc_cap:
                 continue
             per_doc[hit.doc_id] = per_doc.get(hit.doc_id, 0) + 1
             out.append(
