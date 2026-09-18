@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: reconmind-api
+    name: reconmind-labs-api
     runtime: docker
     plan: free
     region: oregon
