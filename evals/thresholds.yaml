@@ -1,0 +1,7 @@
+# Minimum mean score per metric over the golden set. CI fails below these.
+# Phase B starting point; raised in Phase D once the agent answers are in.
+min:
+  faithfulness: 0.75
+  answer_relevancy: 0.75
+  context_precision: 0.75
+  context_recall: 0.75
