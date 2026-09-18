@@ -132,3 +132,50 @@
     @apply font-sans;
   }
 }
+
+/* long-form markdown for runbooks and incident write-ups */
+.prose-recon {
+  @apply text-sm leading-relaxed;
+}
+.prose-recon h1 {
+  @apply mt-2 mb-4 text-xl font-semibold;
+}
+.prose-recon h2 {
+  @apply mt-8 mb-3 text-base font-semibold text-amber;
+}
+.prose-recon h3 {
+  @apply mt-6 mb-2 font-semibold;
+}
+.prose-recon p,
+.prose-recon ul,
+.prose-recon ol {
+  @apply my-3;
+}
+.prose-recon ul {
+  @apply list-disc pl-5;
+}
+.prose-recon ol {
+  @apply list-decimal pl-5;
+}
+.prose-recon code {
+  @apply rounded bg-secondary px-1 py-0.5 font-mono text-[0.85em];
+}
+.prose-recon pre {
+  @apply my-4 overflow-x-auto rounded-lg border bg-background/60 p-3;
+}
+.prose-recon pre code {
+  @apply bg-transparent p-0;
+}
+.prose-recon table {
+  @apply my-4 block w-full overflow-x-auto text-xs;
+}
+.prose-recon th,
+.prose-recon td {
+  @apply border px-2 py-1 text-left align-top;
+}
+.prose-recon th {
+  @apply bg-secondary/60;
+}
+.prose-recon strong {
+  @apply text-foreground;
+}
