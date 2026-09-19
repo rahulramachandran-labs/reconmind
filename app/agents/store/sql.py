@@ -9,7 +9,7 @@ from typing import Any
 from sqlalchemy import Engine, cast, func, select, update
 from sqlalchemy.types import Date
 
-from app.agents.schemas import STATUS_AFTER_REVIEW, IncidentReport
+from app.agents.schemas import STATUS_AFTER_REVIEW, WRITE_UP_FIELDS, IncidentReport
 from app.db.models import AgentRun, AgentStep, AuditLedger
 from app.db.models import IncidentReport as ReportRow
 from app.db.session import session_scope
@@ -102,6 +102,23 @@ class SqlRunStore:
                 if existing is not None:
                     existing.seen_count = (existing.seen_count or 1) + 1
                     existing.last_seen_at = now
+                    if r.model_analysis and not existing.report.get("model_analysis"):
+                        # the first write-up was the template's; keep the model's now
+                        existing.report = existing.report | r.model_dump(
+                            mode="json", include=WRITE_UP_FIELDS
+                        )
+                        s.add(
+                            AuditLedger(
+                                actor=f"agent:{r.specialist}",
+                                action="finding.rewritten",
+                                subject=str(existing.id),
+                                payload={
+                                    "run_id": str(run_id),
+                                    "provider": r.model_analysis.provider,
+                                    "model": r.model_analysis.model,
+                                },
+                            )
+                        )
                     s.add(
                         AuditLedger(
                             actor=f"agent:{r.specialist}",
@@ -149,6 +166,36 @@ class SqlRunStore:
                 )
                 out.append(r)
         return out
+
+    def reopen(self, report_id: uuid.UUID, note: str | None, actor: str) -> dict[str, Any] | None:
+        with session_scope(self.engine) as s:
+            row = s.get(ReportRow, report_id)
+            if row is None or row.duplicate_of is not None or row.status == "pending_review":
+                return None
+            s.add(
+                AuditLedger(
+                    actor=f"human:{actor}",
+                    action="finding.reopened",
+                    subject=str(report_id),
+                    payload={"was": row.status, "decision": row.review_decision, "note": note},
+                )
+            )
+            row.status = "pending_review"
+            row.review_decision = row.review_note = row.reviewed_by = None
+            row.reviewed_at = None
+            s.flush()
+            return _row_to_report(row)
+
+    def known_report(self, fp: str) -> dict[str, Any] | None:
+        """The report a finding with this fingerprint already has, if any."""
+        with session_scope(self.engine) as s:
+            row = s.scalars(
+                select(ReportRow)
+                .where(ReportRow.fingerprint == fp, ReportRow.duplicate_of.is_(None))
+                .order_by(ReportRow.created_at)
+                .limit(1)
+            ).first()
+            return _row_to_report(row) if row else None
 
     def record_decision(
         self, report_id: uuid.UUID, decision: str, note: str | None, reviewer: str

@@ -81,3 +81,22 @@ async def test_llm_calls_outside_a_run_are_refused() -> None:
     llm = TracedLLM(LLMChain([ScriptedProvider(lambda s, m: "x")]))
     with pytest.raises(UntracedCall):
         await llm.complete("s", [Message("user", "u")], name="n", prompt_version="v")
+
+
+async def test_a_check_can_reject_a_reply_that_parses() -> None:
+    replies = iter(['{"colour": "red", "score": 0.9}', '{"colour": "red", "score": 0.4}'])
+    provider = ScriptedProvider(lambda s, m: next(replies))
+    tracer = RunTracer(__import__("uuid").uuid4())
+    async with tracer.activate():
+        out, by = await structured(
+            TracedLLM(LLMChain([provider])),
+            system="s",
+            user="pick a colour",
+            schema=Pick,
+            fallback=lambda: Pick(colour="blue", score=0.1),
+            name="pick",
+            prompt_version="t@1",
+            check=lambda p: "too sure of itself" if p.score > 0.5 else None,
+        )
+    assert out.score == 0.4 and by == "scripted"
+    assert "too sure of itself" in provider.calls[1][1][-1].content

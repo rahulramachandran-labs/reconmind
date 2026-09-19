@@ -11,7 +11,7 @@ from app.agents.service import NoModelWriteUp, UnknownIncident
 from app.core.config import ROOT, Settings
 from app.domain.retail_recon import RetailReconAdapter
 from app.llm.providers import Message
-from tests.fakes import ScriptedProvider, well_behaved
+from tests.fakes import ScriptedProvider, ScriptedToolProvider, well_behaved
 from tests.integration.agent_fixtures import retail_service
 
 EXPECTED = json.loads((ROOT / "data" / "sample" / "expected_anomalies.json").read_text())
@@ -216,3 +216,106 @@ async def test_regenerate_without_a_model_keeps_the_template(
         with pytest.raises(UnknownIncident):
             await svc.regenerate(uuid.uuid4(), "rahul")
         assert svc.store.get_incident(uuid.UUID(report["id"]))["analysis_by"] == "template"
+
+
+async def test_the_planner_sees_the_conversation_it_follows(
+    loaded_engine: Engine, settings: Settings
+) -> None:
+    provider = ScriptedProvider(well_behaved)
+    history = [
+        {"role": "user", "content": "Which file wins when a submitter resends the same day?"},
+        {"role": "assistant", "content": "The later file wins [1]."},
+    ]
+    async with retail_service(loaded_engine, settings, [provider]) as svc:
+        await svc.run_to_end(
+            svc.run("question", "What should we look at before reprocessing it?", history)
+        )
+    planner_prompt = next(m for s, m in provider.calls if "route questions" in s)[-1].content
+    assert "Earlier in this conversation" in planner_prompt
+    assert "Which file wins when a submitter resends" in planner_prompt
+
+
+async def test_a_rescan_writes_up_only_what_needs_it(
+    loaded_engine: Engine, settings: Settings
+) -> None:
+    model_up = {"on": False}
+
+    def respond(system: str, messages: list[Message]) -> str:
+        return well_behaved(system, messages) if model_up["on"] else "not json at all"
+
+    provider = ScriptedProvider(respond)
+    count = text("select count(*) from audit_ledger where action = 'finding.rewritten'")
+    with loaded_engine.connect() as conn:
+        rewritten_before = conn.scalar(count)
+    async with retail_service(loaded_engine, settings, [provider]) as svc:
+        await svc.run_to_end(svc.run("scan"))
+        assert all(r["model_analysis"] is None for r in svc.store.list_incidents())
+
+        # the model is back: the template-only write-ups are replaced on the next scan
+        model_up["on"] = True
+        await svc.run_to_end(svc.run("scan"))
+        upgraded = svc.store.list_incidents()
+        assert all(r["analysis_by"] == "model" and r["model_analysis"] for r in upgraded)
+        assert all(r["template"]["root_cause_hypothesis"] for r in upgraded)
+
+        # and once written up, a finding costs no more analysis calls
+        before = len(provider.calls)
+        await svc.run_to_end(svc.run("scan"))
+        analyses = [s for s, _ in provider.calls[before:] if "writing up an incident" in s]
+        assert analyses == []
+    with loaded_engine.connect() as conn:
+        assert conn.scalar(count) - rewritten_before == 4  # the ledger is append-only
+
+
+def _routes_to_explore(system: str, messages: list[Message]) -> str:
+    if "route questions" in system:
+        return json.dumps(
+            {"intent": "explore", "specialists": [], "confidence": 0.8, "rationale": "a fact"}
+        )
+    return well_behaved(system, messages)
+
+
+async def test_the_explorer_answers_from_the_tools_it_chose(
+    loaded_engine: Engine, settings: Settings
+) -> None:
+    provider = ScriptedToolProvider(
+        _routes_to_explore,
+        plan=[("warehouse__get_table_stats", {"table": "transactions", "date": "2026-06-18"})],
+        answer="S1001 sent 110 rows on 2026-06-18, per warehouse__get_table_stats.",
+    )
+    async with retail_service(loaded_engine, settings, [provider]) as svc:
+        events = await svc.run_to_end(
+            svc.run("question", "Which submitter sent the fewest rows on 2026-06-18?")
+        )
+        steps = svc.store.get_run(uuid.UUID(events[0]["run_id"]))["steps"]
+    assert next(e for e in events if e["type"] == "plan")["intent"] == "explore"
+    answer = next(e for e in events if e["type"] == "answer")
+    assert answer["text"].startswith("S1001") and answer["model"] == "fake-1"
+    assert "warehouse-metadata/get_table_stats" in [s["name"] for s in steps if s["kind"] == "tool"]
+    assert [s["name"] for s in steps if s["name"].startswith("explore")] == [
+        "explore",
+        "explore#1",
+        "explore",
+    ], "two model turns, then the explore node itself"
+    # what the tool returned went back to the model
+    last = provider.tool_turns[-1][0]
+    assert any(m["role"] == "tool" and "S1001_20260618" in str(m["content"]) for m in last)
+
+
+async def test_the_explorer_stops_after_three_tool_calls(
+    loaded_engine: Engine, settings: Settings
+) -> None:
+    provider = ScriptedToolProvider(
+        _routes_to_explore,
+        plan=[("orchestration__list_dag_runs", {"dag_id": "retail_txn_daily"})] * 5
+        + [("nowhere__nothing", {})],
+        answer="Done looking.",
+    )
+    async with retail_service(loaded_engine, settings, [provider]) as svc:
+        events = await svc.run_to_end(
+            svc.run("question", "Show me the slowest night on 2026-06-18")
+        )
+        steps = svc.store.get_run(uuid.UUID(events[0]["run_id"]))["steps"]
+    assert sum(1 for s in steps if s["kind"] == "tool" and "list_dag_runs" in s["name"]) == 1 + 3
+    assert provider.tool_turns[-1][1] == [], "the last turn offers no tools"
+    assert next(e for e in events if e["type"] == "answer")["text"] == "Done looking."

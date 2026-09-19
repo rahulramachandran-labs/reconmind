@@ -72,3 +72,13 @@ def test_a_template_cites_only_a_matching_past_incident() -> None:
     matching = [*unrelated, incident("INC-0427: ECOMM resend double counted web revenue")]
     assert "INC-0438" not in A.fallback_analysis(resend, unrelated).root_cause_hypothesis
     assert "INC-0427" in A.fallback_analysis(resend, matching).root_cause_hypothesis
+
+
+def test_what_to_check_next_is_a_runbook_question() -> None:
+    plan = heuristic_plan(A, "question", "What should we check before reprocessing that day?")
+    assert plan.intent == "answer"
+
+
+def test_a_data_question_no_check_covers_goes_to_the_explorer() -> None:
+    plan = heuristic_plan(A, "question", "Show me the busiest submitter on 2026-06-20")
+    assert plan.intent == "explore" and plan.specialists == []

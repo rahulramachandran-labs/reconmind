@@ -24,6 +24,7 @@ class RunStore(Protocol):
     def apply_decisions(
         self, run_id: uuid.UUID, decisions: dict[str, dict[str, Any]]
     ) -> list[dict[str, Any]]: ...
+    def known_report(self, fp: str) -> dict[str, Any] | None: ...
 
 
 @dataclass

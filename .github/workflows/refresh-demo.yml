@@ -1,8 +1,9 @@
 name: Refresh demo
 
 # A free Render instance sleeps after 15 minutes without traffic, so a timer inside
-# the API rarely fires. Every six hours this wakes it, runs a scan, and has the API's
-# model write up any finding that doesn't have a model write-up yet.
+# the API rarely fires. Every six hours this wakes it, runs a scan, has the API's model
+# write up any finding that doesn't have a model write-up yet, and puts a signed-off S1
+# back in the review queue so the next reviewer can try the sign-off too.
 on:
   schedule:
     - cron: "17 */6 * * *"
@@ -69,3 +70,17 @@ jobs:
         run: |
           python3 scripts/regenerate_reports.py --api "$API" $ALL | tee regenerate.log
           { echo; echo "### Model write-ups"; echo; echo '```'; cat regenerate.log; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Reopen the S1 for the next reviewer
+        if: always()
+        env:
+          TOKEN: ${{ secrets.RECONMIND_WRITE_TOKEN }}
+        run: |
+          # each reviewer should find something in the review queue to sign off
+          for id in $(curl -sf "$API/incidents?severity=S1&status=published" | jq -r '.[].id'); do
+            curl -sf -X POST "$API/incidents/$id/reopen" \
+              -H "Authorization: Bearer $TOKEN" -H "X-Reviewer: refresh-demo" \
+              -H 'content-type: application/json' \
+              -d '{"note": "reopened so the next reviewer can sign it off"}' > /dev/null \
+              && echo "reopened $id"
+          done

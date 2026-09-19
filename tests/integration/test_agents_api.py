@@ -113,3 +113,23 @@ def test_regenerate_needs_a_model_and_a_known_incident(client: TestClient) -> No
     res = client.post(f"/incidents/{incidents[0]['id']}/regenerate")
     assert res.status_code == 503, "without a model the template stands"
     assert client.post(f"/incidents/{uuid.uuid4()}/regenerate").status_code == 404
+
+
+def test_a_finding_can_be_reopened_and_signed_off_again(client: TestClient) -> None:
+    started = client.post("/scan")
+    _wait(client, started.json()["run_id"])
+    s1 = next(r for r in client.get("/incidents").json() if r["severity"] == "S1")
+    first = client.post(f"/review/reports/{s1['id']}", json={"decision": "approve"})
+    assert first.json()["status"] == "resumed"
+    assert client.post(f"/incidents/{s1['id']}/reopen", json={"note": "next reviewer"}).is_success
+    queue = client.get("/review").json()["reports"]
+    assert [r["id"] for r in queue] == [s1["id"]]
+    # its run finished when it was first approved, so this decision applies directly
+    again = client.post(
+        f"/review/reports/{s1['id']}", json={"decision": "annotate", "note": "resend asked"}
+    )
+    assert again.json()["status"] == "applied"
+    after = client.get(f"/incidents/{s1['id']}").json()
+    assert after["status"] == "published" and after["review_note"] == "resend asked"
+    assert client.post(f"/incidents/{s1['id']}/reopen").is_success
+    assert client.post(f"/incidents/{s1['id']}/reopen").status_code == 409, "already open"

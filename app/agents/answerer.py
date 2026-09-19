@@ -6,12 +6,7 @@ from typing import Any
 from app.agents.deps import AgentDeps, traced_search
 from app.llm.providers import LLMUnavailable, Message
 from app.rag.extractive import extractive_answer
-from app.rag.prompts import (
-    ANSWER_PROMPT_VERSION,
-    ANSWER_SYSTEM_PROMPT,
-    format_passages,
-    retrieval_query,
-)
+from app.rag.prompts import ANSWER_PROMPT_VERSION, answer_messages, retrieval_query
 
 
 async def run(deps: AgentDeps, state: dict[str, Any]) -> dict[str, Any]:
@@ -22,11 +17,11 @@ async def run(deps: AgentDeps, state: dict[str, Any]) -> dict[str, Any]:
     text, provider, model = extractive_answer(question, chunks), "extractive", None
     fallbacks: list[str] = []
     if deps.llm.enabled:
-        turn = Message("user", f"{format_passages(chunks)}\n\nQuestion: {question}")
+        system, turns = answer_messages(question, chunks, history)
         try:
             out = await deps.llm.complete(
-                ANSWER_SYSTEM_PROMPT,
-                [*history, turn],
+                system,
+                turns,
                 name="answer",
                 prompt_version=ANSWER_PROMPT_VERSION,
             )

@@ -8,7 +8,7 @@ from app.domain.protocol import Evidence, Severity
 
 
 class PlannerDecision(BaseModel):
-    intent: Literal["investigate", "answer", "unclear"]
+    intent: Literal["investigate", "explore", "answer", "unclear"]
     specialists: list[str] = Field(default_factory=list, max_length=6)
     confidence: float = Field(ge=0.0, le=1.0)
     rationale: str = Field(min_length=3, max_length=400)
@@ -97,6 +97,20 @@ class ReviewDecision(BaseModel):
     decision: Literal["approve", "reject", "annotate"]
     note: str | None = Field(default=None, max_length=2000)
     reviewer: str = Field(default="reviewer", max_length=120)
+
+
+# what a model write-up replaces on a report that only had the template's
+WRITE_UP_FIELDS = {
+    "analysis_by",
+    "template",
+    "model_analysis",
+    "root_cause_hypothesis",
+    "recommended_fix",
+    "open_questions",
+    "confidence",
+    "confidence_label",
+    "sources",
+}
 
 
 # the report status each review decision leads to

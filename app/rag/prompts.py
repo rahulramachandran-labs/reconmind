@@ -7,6 +7,9 @@ that block early.
 
 import re
 
+from langchain_core.messages import BaseMessage
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+
 from app.llm.providers import Message
 from app.retrieval.types import RetrievedChunk
 
@@ -47,3 +50,29 @@ def retrieval_query(question: str, history: list[Message]) -> str:
     if prior and (len(question.split()) <= 8 or _FOLLOW_UP.search(question)):
         return f"{prior[-1]} {question}"
     return question
+
+
+# the system prompt, the conversation so far, then the passages and the question
+ANSWER_PROMPT = ChatPromptTemplate.from_messages(
+    [
+        ("system", "{system}"),
+        MessagesPlaceholder("history"),
+        ("human", "{context}\n\nQuestion: {question}"),
+    ]
+)
+
+
+def answer_messages(
+    question: str, chunks: list[RetrievedChunk], history: list[Message]
+) -> tuple[str, list[Message]]:
+    """The system prompt and the turns to send, rendered through ``ANSWER_PROMPT``."""
+    rendered: list[BaseMessage] = ANSWER_PROMPT.format_messages(
+        system=ANSWER_SYSTEM_PROMPT,
+        history=[("human" if m.role == "user" else "ai", m.content) for m in history],
+        context=format_passages(chunks),
+        question=question,
+    )
+    turns = [
+        Message("user" if m.type == "human" else "assistant", str(m.content)) for m in rendered[1:]
+    ]
+    return str(rendered[0].content), turns

@@ -5,13 +5,14 @@ from typing import Annotated, Any, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from langchain_core.messages import AIMessage, HumanMessage
 from pydantic import BaseModel, Field
 
 from app.api.deps import get_app_settings, get_llm, get_retrieval, get_sessions
 from app.api.guards import rate_limit
 from app.core.config import Settings
 from app.llm.providers import LLMChain, Message
-from app.memory.sessions import SessionFull, SessionStore
+from app.memory.sessions import SessionFull, SessionHistory, SessionStore
 from app.rag.answer import Answer, answer_question
 from app.retrieval.service import RetrievalService
 from app.retrieval.types import RetrievedChunk
@@ -69,22 +70,25 @@ def ask(
         session_id = body.session_id
     else:
         session_id = sessions.create(title=question)
+    memory = SessionHistory(sessions, session_id, limit=settings.history_turns * 2)
     history = [
-        Message(m.role, m.content)
-        for m in sessions.history(session_id, limit=settings.history_turns * 2)
+        Message("user" if m.type == "human" else "assistant", str(m.content))
+        for m in memory.messages
     ]
     answer = answer_question(question, retrieval, llm, k=body.k, history=history)
     try:
-        sessions.append(session_id, "user", question)
-        sessions.append(
-            session_id,
-            "assistant",
-            answer.answer,
-            {
-                "provider": answer.provider,
-                "model": answer.model,
-                "sources": [s.chunk_id for s in answer.sources],
-            },
+        memory.add_message(HumanMessage(question))
+        memory.add_message(
+            AIMessage(
+                answer.answer,
+                additional_kwargs={
+                    "meta": {
+                        "provider": answer.provider,
+                        "model": answer.model,
+                        "sources": [s.chunk_id for s in answer.sources],
+                    }
+                },
+            )
         )
     except SessionFull as exc:
         raise HTTPException(409, "session is full, start a new one") from exc

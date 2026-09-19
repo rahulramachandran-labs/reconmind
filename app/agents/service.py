@@ -54,7 +54,7 @@ def to_events(node: str, update: dict[str, Any], roles: set[str]) -> list[Event]
     elif node == "reporter":
         events += [{"type": "report", **r} for r in update.get("reports", [])]
         events.append({"type": "summary", **update["summary"]})
-    elif node == "answer":
+    elif node in ("answer", "explore"):
         events.append(
             {
                 "type": "answer",

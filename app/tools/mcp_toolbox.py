@@ -58,6 +58,29 @@ class MCPToolBox:
             for name, c in self._clients.items()
         }
 
+    async def tool_specs(self) -> tuple[list[dict[str, Any]], dict[str, tuple[str, str]]]:
+        """Every tool on every server, described the way models are offered tools, and a
+        map from those names back to (server, tool). Names are prefixed with the server,
+        ``warehouse__get_table_stats``, so two servers can't collide."""
+        specs: list[dict[str, Any]] = []
+        route: dict[str, tuple[str, str]] = {}
+        for server, client in self._clients.items():
+            prefix = server.split("-")[0]
+            for t in (await client.list_tools()).tools:
+                name = f"{prefix}__{t.name}"
+                route[name] = (server, t.name)
+                specs.append(
+                    {
+                        "type": "function",
+                        "function": {
+                            "name": name,
+                            "description": (t.description or "")[:500],
+                            "parameters": t.input_schema,
+                        },
+                    }
+                )
+        return specs, route
+
     async def call(self, server: str, tool: str, args: dict[str, Any]) -> dict[str, Any]:
         client = self._clients.get(server)
         if client is None:

@@ -20,3 +20,7 @@ The demo has to run at zero cost, on a laptop with no keys, in CI with no networ
 - CI and the free hosted tier exercise the full retrieval path deterministically. The eval gate measures retrieval and grounding rather than whichever model happened to be reachable.
 - Answer quality depends on which provider served the request, so the provider is always visible in the UI and the traces.
 - The extractive floor is honest but blunt. It is a fallback, not a feature to tune.
+
+## Update, 1.1
+
+The free tiers of Groq, Google Gemini and OpenRouter now sit after OpenAI and Anthropic and before Ollama. They speak the OpenAI-compatible API, so they share one provider class; a 429 is retried before the chain moves on, and at most `LLM_CONCURRENCY` calls run at once to stay under a per-minute token limit.

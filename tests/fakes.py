@@ -3,7 +3,7 @@
 import json
 from collections.abc import Callable
 
-from app.llm.providers import Completion, Message
+from app.llm.providers import Completion, Message, ToolCall, ToolTurn
 
 Responder = Callable[[str, list[Message]], str]
 
@@ -53,3 +53,32 @@ def well_behaved(system: str, messages: list[Message]) -> str:
             }
         )
     return f"Answer from the model about: {first[:40]} {prompt[:10]}"
+
+
+class ScriptedToolProvider(ScriptedProvider):
+    """Asks for the tools in ``plan``, one per turn while tools are offered, then answers
+    with ``answer``. Plain completions (the planner, the reporter) go to ``respond``."""
+
+    def __init__(
+        self, respond: Responder, plan: list[tuple[str, dict[str, object]]], answer: str
+    ) -> None:
+        super().__init__(respond)
+        self.plan, self.answer = plan, answer
+        self.tool_turns: list[tuple[list[dict[str, object]], list[str]]] = []
+
+    def complete_tools(
+        self,
+        system: str,
+        messages: list[dict[str, object]],
+        tools: list[dict[str, object]],
+        max_tokens: int,
+    ) -> ToolTurn:
+        offered = [t["function"]["name"] for t in tools]  # type: ignore[index]
+        self.tool_turns.append((list(messages), offered))
+        done = sum(1 for m in messages if m.get("role") == "tool")
+        usage = {"latency_ms": 3, "prompt_tokens": 200, "completion_tokens": 20}
+        if offered and done < len(self.plan):
+            name, args = self.plan[done]
+            call = ToolCall(f"call_{done}", name, json.dumps(args))
+            return ToolTurn("", self.name, self.model, tool_calls=[call], **usage)
+        return ToolTurn(self.answer, self.name, self.model, **usage)

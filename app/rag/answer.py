@@ -11,12 +11,7 @@ from pydantic import BaseModel, Field
 
 from app.llm.providers import LLMChain, LLMUnavailable, Message
 from app.rag.extractive import extractive_answer
-from app.rag.prompts import (
-    ANSWER_PROMPT_VERSION,
-    ANSWER_SYSTEM_PROMPT,
-    format_passages,
-    retrieval_query,
-)
+from app.rag.prompts import ANSWER_PROMPT_VERSION, answer_messages, retrieval_query
 from app.retrieval.service import RetrievalService
 from app.retrieval.types import RetrievedChunk
 
@@ -51,8 +46,8 @@ def answer_question(
     fallbacks: list[str] = []
     if llm.enabled:
         try:
-            turn = Message("user", f"{format_passages(chunks)}\n\nQuestion: {question}")
-            out = llm.complete(ANSWER_SYSTEM_PROMPT, [*history, turn])
+            system, turns = answer_messages(question, chunks, history)
+            out = llm.complete(system, turns)
             return Answer(
                 answer=out.text,
                 sources=chunks,

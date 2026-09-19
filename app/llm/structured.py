@@ -34,10 +34,13 @@ async def structured[T: BaseModel](
     prompt_version: str,
     retries: int = 2,
     calls: list[Completion] | None = None,
+    check: Callable[[T], str | None] | None = None,
 ) -> tuple[T, str]:
     """Ask for JSON matching ``schema``; re-prompt with the validation error up to
     ``retries`` times, then use ``fallback``. Returns the object and who produced it.
-    Every model reply is appended to ``calls`` when given, for latency and cost."""
+    ``check`` can reject a reply that parses but is wrong in a way the schema can't
+    express; its message goes back to the model like a validation error. Every model
+    reply is appended to ``calls`` when given, for latency and cost."""
     if not llm.enabled:
         return fallback(), "template"
     shape = json.dumps(schema.model_json_schema())
@@ -61,14 +64,18 @@ async def structured[T: BaseModel](
         if calls is not None:
             calls.append(out)
         try:
-            return schema.model_validate(extract_json(out.text)), out.provider
+            obj = schema.model_validate(extract_json(out.text))
+            problem = check(obj) if check else None
+            if problem is None:
+                return obj, out.provider
         except (ValueError, ValidationError) as exc:
-            messages += [
-                Message("assistant", out.text),
-                Message(
-                    "user",
-                    f"That did not validate: {str(exc)[:600]}\n"
-                    "Reply again with only the corrected JSON object.",
-                ),
-            ]
+            problem = str(exc)[:600]
+        messages += [
+            Message("assistant", out.text),
+            Message(
+                "user",
+                f"That did not validate: {problem}\n"
+                "Reply again with only the corrected JSON object.",
+            ),
+        ]
     return fallback(), "template"

@@ -6,6 +6,8 @@ from datetime import UTC, datetime
 from typing import Any, Protocol
 from uuid import UUID
 
+from langchain_core.chat_history import BaseChatMessageHistory
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 from sqlalchemy import Engine, func, select
 
 from app.db.models import ChatMessage, ChatSession
@@ -96,3 +98,26 @@ class SqlSessionStore:
                 .limit(limit)
             ).all()
             return [StoredMessage(r.role, r.content, r.created_at, r.meta) for r in reversed(rows)]
+
+
+class SessionHistory(BaseChatMessageHistory):
+    """One chat session as a LangChain message history, over either store, so the rest
+    of the code can read and write conversation turns as LangChain messages."""
+
+    def __init__(self, store: SessionStore, session_id: UUID, limit: int = 20) -> None:
+        self.store, self.session_id, self.limit = store, session_id, limit
+
+    @property
+    def messages(self) -> list[BaseMessage]:  # type: ignore[override]
+        return [
+            HumanMessage(m.content) if m.role == "user" else AIMessage(m.content)
+            for m in self.store.history(self.session_id, limit=self.limit)
+        ]
+
+    def add_message(self, message: BaseMessage) -> None:
+        role = "user" if isinstance(message, HumanMessage) else "assistant"
+        meta = dict(message.additional_kwargs.get("meta") or {})
+        self.store.append(self.session_id, role, str(message.content), meta)
+
+    def clear(self) -> None:
+        raise NotImplementedError("sessions are kept; start a new one instead")

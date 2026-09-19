@@ -10,6 +10,7 @@ RAG path falls back to an extractive answer.
 import logging
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any, Protocol
@@ -53,6 +54,20 @@ class Completion:
     fallbacks: list[str] = field(default_factory=list)
 
 
+@dataclass
+class ToolCall:
+    id: str
+    name: str
+    arguments: str  # JSON, as the model wrote it
+
+
+@dataclass
+class ToolTurn(Completion):
+    """A reply that may ask for tools instead of, or as well as, answering."""
+
+    tool_calls: list[ToolCall] = field(default_factory=list)
+
+
 class LLMUnavailable(RuntimeError):
     pass
 
@@ -86,6 +101,45 @@ class OpenAICompatibleProvider:
         self.name, self.model, self.client = name, model, client
         self.limit_param, self.extra = limit_param, extra or {}
         self.free = free or name == "ollama"  # a local model costs nothing
+
+    def complete_tools(
+        self,
+        system: str,
+        messages: list[dict[str, Any]],
+        tools: list[dict[str, Any]],
+        max_tokens: int,
+    ) -> ToolTurn:
+        """One turn of a tool-calling conversation in the OpenAI format, which every
+        provider here speaks. ``messages`` may hold assistant tool calls and tool results."""
+        start = time.perf_counter()
+        resp = self.client.chat.completions.create(
+            model=self.model,
+            messages=[{"role": "system", "content": system}, *messages],
+            **({"tools": tools} if tools else {}),
+            **{self.limit_param: max_tokens},
+            **self.extra,
+        )
+        msg = resp.choices[0].message
+        calls = [
+            ToolCall(tc.id, tc.function.name, tc.function.arguments or "{}")
+            for tc in (msg.tool_calls or [])
+        ]
+        text = (msg.content or "").strip()
+        if not text and not calls:
+            raise EmptyReply(f"{self.name} returned no text and no tool call")
+        usage = resp.usage
+        p_tok = usage.prompt_tokens if usage else 0
+        c_tok = usage.completion_tokens if usage else 0
+        return ToolTurn(
+            text=text,
+            provider=self.name,
+            model=self.model,
+            latency_ms=int((time.perf_counter() - start) * 1000),
+            prompt_tokens=p_tok,
+            completion_tokens=c_tok,
+            cost_usd=0.0 if self.free else estimate_cost(self.model, p_tok, c_tok),
+            tool_calls=calls,
+        )
 
     def complete(self, system: str, messages: list[Message], max_tokens: int) -> Completion:
         start = time.perf_counter()
@@ -310,17 +364,41 @@ class LLMChain:
     ) -> Completion:
         messages = [Message("user", user)] if isinstance(user, str) else user
         with self._slots:
-            return self._complete(system, messages, max_tokens)
+            return self._first(lambda p: p.complete(system, messages, max_tokens))
 
-    def _complete(self, system: str, messages: list[Message], max_tokens: int) -> Completion:
+    def complete_tools(
+        self,
+        system: str,
+        messages: list[dict[str, Any]],
+        tools: list[dict[str, Any]],
+        max_tokens: int = 900,
+    ) -> ToolTurn:
+        """Like ``complete``, for the providers that can call tools (all but Anthropic's
+        here, which is skipped rather than benched)."""
+        with self._slots:
+            out = self._first(
+                lambda p: p.complete_tools(system, messages, tools, max_tokens),  # type: ignore[attr-defined]
+                can=lambda p: hasattr(p, "complete_tools"),
+            )
+        assert isinstance(out, ToolTurn)
+        return out
+
+    def _first(
+        self,
+        call: Callable[[Provider], Completion],
+        can: Callable[[Provider], bool] = lambda p: True,
+    ) -> Completion:
+        """The first provider that answers, benching the ones that fail."""
         failed: list[str] = []
         now = time.monotonic()
         for p in self.providers:
+            if not can(p):
+                continue
             if self._benched_until.get(p.name, 0) > now:
                 failed.append(f"{p.name}:cooldown")
                 continue
             try:
-                out = p.complete(system, messages, max_tokens)
+                out = call(p)
             except Exception as exc:
                 self._benched_until[p.name] = time.monotonic() + self.cooldown_s
                 failed.append(f"{p.name}:{type(exc).__name__}")

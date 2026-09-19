@@ -153,6 +153,24 @@ async def regenerate(report_id: uuid.UUID, service: Service, reviewer: Reviewer)
         raise HTTPException(503, str(exc)) from exc
 
 
+class Reopen(BaseModel):
+    note: str | None = Field(default=None, max_length=2000)
+
+
+@router.post(
+    "/incidents/{report_id}/reopen", dependencies=[Depends(rate_limit("rate_limit_regenerate"))]
+)
+def reopen(
+    report_id: uuid.UUID, service: Service, reviewer: Reviewer, body: Reopen | None = None
+) -> dict[str, Any]:
+    """Put a decided finding back in the review queue (the fix didn't hold, or the next
+    reviewer should see it). The earlier decision stays in the ledger."""
+    report = service.store.reopen(report_id, (body.note if body else None), reviewer)
+    if report is None:
+        raise HTTPException(409, "only a published or rejected finding can be reopened")
+    return report
+
+
 @router.get("/review")
 def review_queue(service: Service) -> dict[str, Any]:
     return {
@@ -170,6 +188,14 @@ async def review_report(
     )
     if run_id is None:
         raise HTTPException(409, "that report is not waiting for review")
+    run = await asyncio.to_thread(service.store.get_run_row, run_id)
+    if run is None or run["status"] != "paused_review":
+        # a reopened finding: its run finished long ago, so the decision is applied directly
+        decision = {"decision": body.decision, "note": body.note, "reviewer": reviewer}
+        applied = await asyncio.to_thread(
+            service.store.apply_decisions, run_id, {str(report_id): decision}
+        )
+        return {"status": "applied", "run_id": str(run_id), "outcome": applied}
     decided, remaining = await asyncio.to_thread(service.store.pending_decisions, run_id)
     if remaining:
         return {"status": "recorded", "remaining": remaining}

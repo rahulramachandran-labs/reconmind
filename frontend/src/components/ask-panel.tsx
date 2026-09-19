@@ -23,6 +23,7 @@ const NODE_LABEL: Record<string, string> = {
   data_quality: "Data-Quality agent checked contract, volume and timing",
   reporter: "Reporter wrote the incident reports",
   answer: "Answered from the runbooks",
+  explore: "Explorer agent picked read-only tools and answered from what they returned",
   plan_review: "Plan check",
   report_review: "Human review applied",
 };
@@ -91,7 +92,9 @@ function TurnView({ turn }: { turn: Turn }) {
                 ? `Investigating with ${turn.plan.specialists.map((s) => s.replace("_", "-")).join(" + ")}`
                 : turn.plan.intent === "answer"
                   ? "Answering from the runbooks"
-                  : "Not sure what to check"}
+                  : turn.plan.intent === "explore"
+                    ? "Looking at the data with tools"
+                    : "Not sure what to check"}
             </span>{" "}
             · {turn.plan.rationale}
           </p>

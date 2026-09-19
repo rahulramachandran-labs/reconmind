@@ -14,7 +14,7 @@ from app.agents.schemas import PlannerDecision
 from app.domain.protocol import DomainAdapter
 from app.llm.structured import structured
 
-PROMPT_VERSION = "planner@2"
+PROMPT_VERSION = "planner@4"
 
 _KNOWLEDGE = re.compile(
     r"^(what|what's|how|which|why does|why do|can i|can we|should|when|who|is a|is an|does|do i|"
@@ -23,7 +23,7 @@ _KNOWLEDGE = re.compile(
 )
 _INVESTIGATE = re.compile(
     r"\b(are there|any |did we|did the|in the data|right now|today|latest|this week|last week|"
-    r"check|scan|find|show me|look at|investigate|what happened|what went wrong|going on|"
+    r"scan|find|show me|look at|investigate|what happened|what went wrong|going on|"
     r"20\d\d-\d\d-\d\d)",
     re.I,
 )
@@ -63,12 +63,20 @@ def heuristic_plan(adapter: DomainAdapter, trigger: str, question: str | None) -
             + " and ".join(s.title for s in matched_specs)
             + ", so only that looks.",
         )
-    if investigative:
+    if investigative and _PROBLEM.search(q):
         return PlannerDecision(
             intent="investigate",
             specialists=roles,
             confidence=0.65,
-            rationale="Asks about the data but not about a specific failure, so check everything.",
+            rationale="Asks what went wrong without naming a failure, so every specialist looks.",
+        )
+    if investigative:
+        return PlannerDecision(
+            intent="explore",
+            specialists=[],
+            confidence=0.65,
+            rationale="Asks about the data but not about a failure the checks look for, so the "
+            "Explorer looks with the tools.",
         )
     return PlannerDecision(
         intent="unclear",
@@ -76,6 +84,12 @@ def heuristic_plan(adapter: DomainAdapter, trigger: str, question: str | None) -
         confidence=0.3,
         rationale="Could not tell what part of the pipeline this is about.",
     )
+
+
+# asking whether something went wrong, rather than for a fact about the data
+_PROBLEM = re.compile(
+    r"\b(what happened|what went wrong|going on|wrong|issues?|problems?|broken|fail)", re.I
+)
 
 
 async def run(deps: AgentDeps, state: dict[str, Any]) -> dict[str, Any]:
@@ -88,16 +102,27 @@ async def run(deps: AgentDeps, state: dict[str, Any]) -> dict[str, Any]:
             f"- {s.role}: {s.description} (finds: {', '.join(s.finding_types)})"
             for s in adapter.specialists
         )
+        # a follow-up ("what should we check before reprocessing that day?") only makes
+        # sense with the conversation it follows
+        earlier = "".join(
+            f"{m['role']}: {m['content'][:400]}\n" for m in state.get("history", [])[-4:]
+        )
         decision, by = await structured(
             deps.llm,
             system=(
                 "You route questions about a data pipeline to specialist agents.\n"
-                "intent=answer when the runbooks alone can answer it (how/what/why in general);\n"
-                "intent=investigate when it needs a look at the actual data or runs;\n"
+                "intent=answer when the runbooks alone can answer it (how/what/why in general, "
+                "or what to do next);\n"
+                "intent=investigate when it asks whether something is wrong of the kinds the "
+                "specialists find;\n"
+                "intent=explore when it asks for a fact about the actual data or runs (counts, "
+                "times, which files) that isn't one of those kinds of failure;\n"
                 "intent=unclear when you cannot tell. Only use the specialists listed."
             ),
             user=(
-                f"Specialists:\n{roster}\n\nQuestion: {question}\n\n"
+                f"Specialists:\n{roster}\n\n"
+                + (f"Earlier in this conversation:\n{earlier}\n" if earlier else "")
+                + f"Question: {question}\n\n"
                 f"A keyword router suggested: {prior.model_dump_json()}"
             ),
             schema=PlannerDecision,

@@ -109,3 +109,16 @@ def test_ask_sends_sanitised_passages_to_the_model() -> None:
     answer_question("which file wins?", retrieval, LLMChain([echo]))  # type: ignore[arg-type]
     prompt = echo.seen[-1].content
     assert prompt.count("</context>") == 1 and "[tag removed]" in prompt
+
+
+def test_the_answer_prompt_is_a_chat_prompt_template() -> None:
+    from app.rag.prompts import ANSWER_PROMPT, ANSWER_SYSTEM_PROMPT, answer_messages
+
+    assert ANSWER_PROMPT.input_variables == ["context", "history", "question", "system"]
+    chunks = StubRetrieval().search("x")
+    system, turns = answer_messages(
+        "and then?", chunks, [Message("user", "which wins?"), Message("assistant", "later [1]")]
+    )
+    assert system == ANSWER_SYSTEM_PROMPT
+    assert [t.role for t in turns] == ["user", "assistant", "user"]
+    assert turns[-1].content.startswith("<context>") and "Question: and then?" in turns[-1].content

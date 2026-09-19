@@ -60,3 +60,16 @@ def test_memory_run_store_counts_repeats_instead_of_adding_rows() -> None:
         "finding.seen_again",
         "finding.created",
     ]
+
+
+def test_a_session_is_a_langchain_message_history() -> None:
+    from langchain_core.messages import AIMessage, HumanMessage
+
+    from app.memory.sessions import SessionHistory
+
+    store = MemorySessionStore()
+    history = SessionHistory(store, store.create("t"))
+    history.add_message(HumanMessage("which file wins?"))
+    history.add_message(AIMessage("the later one [1]", additional_kwargs={"meta": {"p": "x"}}))
+    assert [type(m).__name__ for m in history.messages] == ["HumanMessage", "AIMessage"]
+    assert store.history(history.session_id)[1].meta == {"p": "x"}

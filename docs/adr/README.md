@@ -16,3 +16,4 @@ One file per decision that would be expensive to reverse, or that someone will a
 | [0010](0010-facts-from-checks-language-from-models.md) | Facts come from checks; models only write the words | accepted |
 | [0011](0011-scheduled-scans-and-finding-fingerprints.md) | Scheduled scans from outside the API; findings are fingerprinted | accepted |
 | [0012](0012-package-layout.md) | Package layout: one module per agent, shared code by concern | accepted |
+| [0013](0013-bounded-tool-use-for-open-questions.md) | The model may choose tools, but only for open questions and only three | accepted |

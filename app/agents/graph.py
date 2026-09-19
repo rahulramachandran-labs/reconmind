@@ -2,15 +2,17 @@
 
     planner --(low confidence)--> plan_review --+
        |                                        |
-       +--(answer)--> answer -------------------+--> finalize
-       |                                        |
+       +--(answer)--> answer -------------------+
+       +--(explore)--> explore -----------------+--> finalize
+       |               (the model picks up to   |
+       |                three read-only tools)  |
        +--(investigate)--> one node per specialist (run concurrently)
                                   |
                                reporter --(S1 or low confidence)--> report_review --> finalize
 
 The specialist nodes are created from the domain adapter, so the same graph
 runs on any adapter. Each agent lives in its own module (planner, specialists,
-reporter, answerer, review); this file only wires them together.
+reporter, answerer, explorer, review); this file only wires them together.
 """
 
 import operator
@@ -21,7 +23,7 @@ from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
-from app.agents import answerer, planner, reporter, review, specialists
+from app.agents import answerer, explorer, planner, reporter, review, specialists
 from app.agents.deps import AgentDeps
 from app.observability.tracer import RunTracer
 
@@ -71,6 +73,7 @@ def build_graph(
     g.add_node("planner", traced("planner", planner.run))
     g.add_node("plan_review", traced("plan_review", review.plan_review))
     g.add_node("answer", traced("answer", answerer.run))
+    g.add_node("explore", traced("explore", explorer.run))
     for role in roles:
         g.add_node(role, traced(role, specialists.build(role)))
     g.add_node("reporter", traced("reporter", reporter.run))
@@ -80,6 +83,8 @@ def build_graph(
     def dispatch(plan: dict[str, Any]) -> list[str]:
         if plan["intent"] == "investigate" and plan["specialists"]:
             return list(plan["specialists"])  # same superstep: they run concurrently
+        if plan["intent"] == "explore":
+            return ["explore"]
         return ["answer"]
 
     def after_plan(state: InvestigationState) -> list[str]:
@@ -108,14 +113,17 @@ def build_graph(
         )
         return "report_review" if pending else "finalize"
 
-    targets = ["plan_review", "answer", *roles]
+    targets = ["plan_review", "answer", "explore", *roles]
     g.add_edge(START, "planner")
     g.add_conditional_edges("planner", after_plan, targets)
-    g.add_conditional_edges("plan_review", after_plan_review, ["finalize", "answer", *roles])
+    g.add_conditional_edges(
+        "plan_review", after_plan_review, ["finalize", "answer", "explore", *roles]
+    )
     for role in roles:
         g.add_edge(role, "reporter")
     g.add_conditional_edges("reporter", after_report, ["report_review", "finalize"])
     g.add_edge("report_review", "finalize")
     g.add_edge("answer", "finalize")
+    g.add_edge("explore", "finalize")
     g.add_edge("finalize", END)
     return g.compile(checkpointer=checkpointer)

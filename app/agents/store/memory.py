@@ -4,7 +4,12 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
-from app.agents.schemas import STATUS_AFTER_REVIEW, IncidentReport, fingerprint
+from app.agents.schemas import (
+    STATUS_AFTER_REVIEW,
+    WRITE_UP_FIELDS,
+    IncidentReport,
+    fingerprint,
+)
 
 
 class MemoryRunStore:
@@ -61,6 +66,8 @@ class MemoryRunStore:
             )
             if existing is not None:
                 existing["seen_count"] = existing.get("seen_count", 1) + 1
+                if r.model_analysis and not existing.get("model_analysis"):
+                    existing.update(r.model_dump(mode="json", include=WRITE_UP_FIELDS))
                 self.ledger.append({"action": "finding.seen_again", "subject": existing["id"]})
                 out.append(
                     IncidentReport(
@@ -72,6 +79,20 @@ class MemoryRunStore:
             self.ledger.append({"action": "finding.created", "subject": str(r.id)})
             out.append(r)
         return out
+
+    def reopen(self, report_id: uuid.UUID, note: str | None, actor: str) -> dict[str, Any] | None:
+        r = self.reports.get(report_id)
+        if r is None or r["status"] == "pending_review":
+            return None
+        self.ledger.append({"action": "finding.reopened", "subject": str(report_id), "by": actor})
+        r.update(status="pending_review", review_decision=None, review_note=None)
+        return r
+
+    def known_report(self, fp: str) -> dict[str, Any] | None:
+        return next(
+            (x for x in self.reports.values() if fingerprint(x["finding_type"], x["title"]) == fp),
+            None,
+        )
 
     def record_decision(
         self, report_id: uuid.UUID, decision: str, note: str | None, reviewer: str
