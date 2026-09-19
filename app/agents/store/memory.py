@@ -116,6 +116,16 @@ class MemoryRunStore:
             out.append({"id": rid, "status": r["status"], "decision": d["decision"]})
         return out
 
+    def update_writeups(
+        self, report_id: uuid.UUID, patch: dict[str, Any], actor: str
+    ) -> dict[str, Any] | None:
+        r = self.reports.get(report_id)
+        if r is None:
+            return None
+        r.update(patch)
+        self.ledger.append({"action": "finding.rewritten", "subject": str(report_id), "by": actor})
+        return r
+
     def mark(self, run_id: uuid.UUID, status: str) -> None:
         self.runs[run_id]["status"] = status
 

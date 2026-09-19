@@ -30,6 +30,7 @@ const STATUS: Record<string, string> = {
   paused_plan: "paused: plan check",
   running: "running",
   completed: "completed",
+  superseded: "superseded: an earlier run carries its review",
   failed: "failed",
 };
 

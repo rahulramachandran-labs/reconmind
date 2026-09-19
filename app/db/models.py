@@ -199,3 +199,11 @@ class IncidentReport(Base):
     last_seen_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+    # a copy written before fingerprints existed points at the report it repeats; the feed and
+    # the review queue show only reports where this is null, a run's detail shows all of its own
+    duplicate_of: Mapped[UUID | None] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("incident_reports.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )

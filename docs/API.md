@@ -10,6 +10,7 @@ The API is FastAPI; interactive docs are served at `/docs` on any running instan
 | `POST` | `/scan` | *writer.* Starts a full scan in the background and returns `{run_id}` (202). Rate limited. |
 | `GET` | `/runs`, `/runs/{id}` | Agent runs with status, cost and latency; one run with every traced step and its reports |
 | `GET` | `/incidents`, `/incidents/{id}` | Incident reports, filterable by `status` and `severity` |
+| `POST` | `/incidents/{id}/regenerate` | *writer.* Runs the finding's checks again and has the active model write it up, as its own traced run. Returns the report with `template` and `model_analysis` side by side; 503 if no model's reply validated, 409 if the checks no longer find it. Rate limited. |
 | `GET` | `/review` | Reports and plans waiting for a person |
 | `POST` | `/review/reports/{id}` | *writer.* `{decision: approve \| reject \| annotate, note?}`. The run resumes once every paused report in it has a decision. |
 | `POST` | `/review/runs/{id}` | *writer.* Approve or reject a plan the Planner was unsure about, optionally choosing the specialists |
@@ -39,7 +40,7 @@ The API is FastAPI; interactive docs are served at `/docs` on any running instan
 | `finding` | Each specialist finding | `specialist`, `finding_type`, `severity`, `title`, `affected_records` |
 | `report` | Reporter done, one per report | The full incident report |
 | `summary` | Reporter done | `headline`, `summary` |
-| `answer` | Runbook questions | `text`, `provider`, `sources` |
+| `answer` | Runbook questions | `text`, `provider`, `model`, `fallbacks` (providers it fell back past), `sources` |
 | `paused` | Waiting for a person | `kind` (`plan` or `reports`) and what needs deciding |
 | `done` | Finished | `latency_ms`, `llm_calls`, `tool_calls`, token counts, `cost_usd`, `trace_url` |
 | `error` | Something failed | `message` |

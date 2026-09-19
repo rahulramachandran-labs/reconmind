@@ -39,6 +39,8 @@ class InvestigationState(TypedDict, total=False):
     review_outcome: list[dict[str, Any]]
     answer: str
     answer_provider: str
+    answer_model: str | None
+    answer_fallbacks: list[str]
     sources: list[dict[str, Any]]
 
 

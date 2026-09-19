@@ -78,6 +78,7 @@ class Settings(BaseSettings):
     rate_limit_chat: str = "20/minute"
     rate_limit_scan: str = "4/minute"
     rate_limit_ask: str = "30/minute"
+    rate_limit_regenerate: str = "10/minute"
     rate_limits_enabled: bool = True
 
     cors_origins: list[str] = Field(

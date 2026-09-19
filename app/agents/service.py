@@ -13,11 +13,25 @@ from langgraph.types import Command
 
 from app.agents.deps import AgentDeps
 from app.agents.graph import build_graph
+from app.agents.schemas import confidence_label, fingerprint
+from app.agents.specialists import analyse, write_ups
 from app.observability.tracer import LangfuseMirror, RunTracer, StepSink
 
 log = logging.getLogger(__name__)
 
 Event = dict[str, Any]
+
+
+class UnknownIncident(LookupError):
+    pass
+
+
+class FindingGone(LookupError):
+    """The checks no longer find what the report describes."""
+
+
+class NoModelWriteUp(RuntimeError):
+    """No model produced a write-up that validated; the report keeps its template."""
 
 
 def to_events(node: str, update: dict[str, Any], roles: set[str]) -> list[Event]:
@@ -46,6 +60,8 @@ def to_events(node: str, update: dict[str, Any], roles: set[str]) -> list[Event]
                 "type": "answer",
                 "text": update["answer"],
                 "provider": update["answer_provider"],
+                "model": update.get("answer_model"),
+                "fallbacks": update.get("answer_fallbacks", []),
                 "sources": update["sources"],
             }
         )
@@ -87,6 +103,72 @@ class InvestigationService:
             run_id, trigger, question, self.deps.adapter.name, tracer.trace_id, session_id
         )
         return run_id
+
+    async def regenerate(self, report_id: uuid.UUID, reviewer: str) -> dict[str, Any]:
+        """Write an existing finding up again with the model the chain would use now,
+        keeping the template's version beside it. Runs as its own traced run, so the
+        model calls, tokens and cost show up like any other run's."""
+        report = await asyncio.to_thread(self.store.get_incident, report_id)
+        if report is None:
+            raise UnknownIncident(str(report_id))
+        adapter, tools = self.deps.adapter, self.deps.tools
+        fp = fingerprint(report["finding_type"], report["title"])
+        run_id = await asyncio.to_thread(
+            self.new_run, "regenerate", f"Write up again: {report['title']}"
+        )
+        tracer = self._tracer_for(str(run_id))
+        start = time.perf_counter()
+        status, summary, error = "failed", None, None
+        try:
+            async with tracer.node("regenerate", {"report_id": str(report_id)}):
+                scope = await adapter.resolve_scope(None, tools)
+                findings = await adapter.run_checks(report["specialist"], tools, scope)
+                finding = next(
+                    (f for f in findings if fingerprint(f.finding_type, f.title) == fp), None
+                )
+                if finding is None:
+                    raise FindingGone(f"the checks no longer find: {report['title']}")
+                written = await analyse(self.deps, finding)
+            template, model = write_ups(adapter, finding, written)
+            if model is None:
+                raise NoModelWriteUp(
+                    "no model produced a write-up that validated; the template stands"
+                )
+            patch = {
+                "analysis_by": "model",
+                "template": template.model_dump(mode="json"),
+                "model_analysis": model.model_dump(mode="json"),
+                "root_cause_hypothesis": model.root_cause_hypothesis,
+                "recommended_fix": model.recommended_fix,
+                "open_questions": model.open_questions,
+                "confidence": model.confidence,
+                "confidence_label": confidence_label(model.confidence),
+                "sources": [
+                    {k: s.model_dump()[k] for k in ("chunk_id", "doc_id", "title", "section")}
+                    for s in written.sources
+                ],
+            }
+            updated = await asyncio.to_thread(
+                self.store.update_writeups, report_id, patch, reviewer
+            )
+            status, summary = "completed", f"Written up again by {model.provider} ({model.model})"
+            return dict(updated or {})
+        except Exception as exc:
+            error = str(exc)[:1000]
+            raise
+        finally:
+            await tracer.flush()
+            await asyncio.to_thread(
+                self.store.finish_run,
+                run_id,
+                status,
+                summary,
+                tracer.totals(),
+                int((time.perf_counter() - start) * 1000),
+                tracer.trace_url,
+                error,
+            )
+            self._tracers.pop(str(run_id), None)
 
     async def run(
         self,

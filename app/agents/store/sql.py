@@ -39,6 +39,8 @@ def _row_to_run(r: AgentRun, **extra: Any) -> dict[str, Any]:
 def _row_to_report(r: ReportRow) -> dict[str, Any]:
     return r.report | {
         "status": r.status,
+        "fingerprint": r.fingerprint,
+        "duplicate_of": str(r.duplicate_of) if r.duplicate_of else None,
         "seen_count": r.seen_count,
         "last_seen_at": r.last_seen_at.isoformat() if r.last_seen_at else None,
         "review_decision": r.review_decision,
@@ -93,8 +95,8 @@ class SqlRunStore:
                 fp = r.fingerprint
                 existing = s.scalars(
                     select(ReportRow)
-                    .where(ReportRow.fingerprint == fp)
-                    .order_by(ReportRow.created_at.desc())
+                    .where(ReportRow.fingerprint == fp, ReportRow.duplicate_of.is_(None))
+                    .order_by(ReportRow.created_at)
                     .limit(1)
                 ).first()
                 if existing is not None:
@@ -154,7 +156,7 @@ class SqlRunStore:
         """Store a reviewer's call. Returns the run id, or None if nothing is pending."""
         with session_scope(self.engine) as s:
             row = s.get(ReportRow, report_id)
-            if row is None or row.status != "pending_review":
+            if row is None or row.status != "pending_review" or row.duplicate_of is not None:
                 return None
             row.review_decision, row.review_note = decision, note
             row.reviewed_by, row.reviewed_at = reviewer, datetime.now(UTC)
@@ -164,7 +166,9 @@ class SqlRunStore:
         with session_scope(self.engine) as s:
             rows = s.scalars(
                 select(ReportRow).where(
-                    ReportRow.run_id == run_id, ReportRow.status == "pending_review"
+                    ReportRow.run_id == run_id,
+                    ReportRow.status == "pending_review",
+                    ReportRow.duplicate_of.is_(None),
                 )
             ).all()
             decided = {
@@ -209,6 +213,30 @@ class SqlRunStore:
                 )
                 out.append({"id": report_id, "status": row.status, "decision": d["decision"]})
         return out
+
+    def update_writeups(
+        self, report_id: uuid.UUID, patch: dict[str, Any], actor: str
+    ) -> dict[str, Any] | None:
+        """Replace a report's write-ups (the fields in ``patch``) and log who asked."""
+        with session_scope(self.engine) as s:
+            row = s.get(ReportRow, report_id)
+            if row is None:
+                return None
+            row.report = row.report | patch
+            s.add(
+                AuditLedger(
+                    actor=f"human:{actor}",
+                    action="finding.rewritten",
+                    subject=str(report_id),
+                    payload={
+                        "analysis_by": patch.get("analysis_by"),
+                        "provider": (patch.get("model_analysis") or {}).get("provider"),
+                        "model": (patch.get("model_analysis") or {}).get("model"),
+                    },
+                )
+            )
+            s.flush()
+            return _row_to_report(row)
 
     def mark(self, run_id: uuid.UUID, status: str) -> None:
         with session_scope(self.engine) as s:
@@ -296,7 +324,12 @@ class SqlRunStore:
         self, status: str | None = None, severity: str | None = None, limit: int = 100
     ) -> list[dict[str, Any]]:
         with session_scope(self.engine) as s:
-            q = select(ReportRow).order_by(ReportRow.last_seen_at.desc()).limit(limit)
+            q = (
+                select(ReportRow)
+                .where(ReportRow.duplicate_of.is_(None))
+                .order_by(ReportRow.last_seen_at.desc())
+                .limit(limit)
+            )
             if status:
                 q = q.where(ReportRow.status == status)
             if severity:
@@ -361,14 +394,16 @@ class SqlRunStore:
                 .order_by(AgentRun.started_at.desc())
                 .limit(1)
             )
-            q = select(ReportRow).where(ReportRow.status != "rejected")
+            q = select(ReportRow).where(
+                ReportRow.status != "rejected", ReportRow.duplicate_of.is_(None)
+            )
             if since is not None:
                 q = q.where(ReportRow.last_seen_at >= since)
             rows = s.scalars(q).all()
             pending = s.scalar(
                 select(func.count())
                 .select_from(ReportRow)
-                .where(ReportRow.status == "pending_review")
+                .where(ReportRow.status == "pending_review", ReportRow.duplicate_of.is_(None))
             )
         by = {sev: 0 for sev in ("S1", "S2", "S3", "S4")}
         for r in rows:

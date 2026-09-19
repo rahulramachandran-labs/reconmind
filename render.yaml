@@ -21,7 +21,7 @@ services:
       # one small container: MCP servers run in-process instead of as subprocesses
       - key: MCP_TRANSPORT
         value: inprocess
-      # scans come from .github/workflows/scheduled-scan.yml; a free instance sleeps too
+      # scans come from .github/workflows/refresh-demo.yml; a free instance sleeps too
       # often for a timer inside the API to be useful
       - key: SCAN_INTERVAL_MINUTES
         value: "0"

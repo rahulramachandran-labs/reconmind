@@ -2,6 +2,7 @@
 
 import json
 import time
+import uuid
 from collections.abc import Iterator
 
 import pytest
@@ -101,3 +102,14 @@ def test_plan_review_endpoint_refuses_runs_that_are_not_waiting(client: TestClie
 def test_agent_routes_503_when_agents_are_off(settings: Settings) -> None:
     with TestClient(create_app(settings)) as c:
         assert c.post("/scan").status_code == 503
+
+
+def test_regenerate_needs_a_model_and_a_known_incident(client: TestClient) -> None:
+    started = client.post("/scan")
+    _wait(client, started.json()["run_id"])
+    incidents = client.get("/incidents").json()
+    assert len(incidents) == 4 and all(r["duplicate_of"] is None for r in incidents)
+    assert all(r["template"] and r["model_analysis"] is None for r in incidents)
+    res = client.post(f"/incidents/{incidents[0]['id']}/regenerate")
+    assert res.status_code == 503, "without a model the template stands"
+    assert client.post(f"/incidents/{uuid.uuid4()}/regenerate").status_code == 404

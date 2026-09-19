@@ -9,7 +9,8 @@ from app.db.session import normalize_url
 
 config = context.config
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    # keep the app's loggers working when migrations run in-process (tests do this)
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 target_metadata = Base.metadata
 

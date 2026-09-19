@@ -5,6 +5,17 @@ All notable changes, grouped by build phase. Dates are UTC.
 ## [Unreleased]
 
 ### Added
+- Every incident report keeps two write-ups: the template's (`template`) and, when a model's reply validated, the model's (`model_analysis`, with provider, model, latency, tokens, cost and prompt version). `analysis_by` is now `model` or `template`. The problem statement and counts stay the checks' in both.
+- `POST /incidents/{id}/regenerate` (write token): runs the finding's checks again and has the active model write it up, as its own traced run. `make regenerate-reports` and `scripts/regenerate_reports.py` do it for every finding without a model write-up.
+- `refresh-demo.yml` replaces `scheduled-scan.yml`: the six-hourly scan, then model write-ups for new findings.
+- The chat stream's `answer` event names the model and any providers it fell back past.
+- Startup logs which model providers are active and which were skipped, and why (for example `no GROQ_API_KEY`); with none, a warning says answers will be extractive.
+
+### Fixed
+- Migration 0004 folds findings duplicated before fingerprints: one report per finding keeps the seen count and latest sighting, the copies point at it through `duplicate_of` and leave the feed and the review queue, and runs that were waiting only on copies are marked `superseded`. Nothing is deleted; each fold is in the ledger.
+- Alembic no longer disables the app's loggers when migrations run in-process.
+
+### Added
 - Free-tier model providers in the fallback chain, after OpenAI and Anthropic and before Ollama: Groq (`openai/gpt-oss-120b`), Google Gemini (`gemini-3.6-flash`, thinking off; new keys can no longer use 2.5 Flash) and OpenRouter (`deepseek/deepseek-v4-flash-0731:free`), each through the OpenAI-compatible API with the same cooldown, cost accounting and tracing. Free-tier calls retry a 429 before falling through, record $0, and run at most `LLM_CONCURRENCY` (2) at a time so a scan stays under a tokens-per-minute limit.
 - `GET /model`: the provider and model the next call goes to, the fallback order, and whether the last call fell back. `/healthz` adds `llm_models`.
 - CI calls a Render deploy hook (`RENDER_DEPLOY_HOOK_URL`) once every check on `main` has passed.

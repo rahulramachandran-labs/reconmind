@@ -236,6 +236,23 @@ def build_providers(settings: Settings) -> list[Provider]:
                 settings, "ollama", settings.ollama_base_url.rstrip("/") + "/v1", max_retries=0
             )
             providers.append(OpenAICompatibleProvider("ollama", settings.ollama_model, client))
+    active = [p.name for p in providers]
+    skipped = {
+        name: (
+            "DEMO_MODE"
+            if settings.demo_mode and name in ("openai", "anthropic")
+            else "no OLLAMA_BASE_URL" if name == "ollama" else f"no {name.upper()}_API_KEY"
+        )
+        for name in settings.llm_providers
+        if name not in active
+    }
+    if active:
+        log.info("model providers", extra={"active": active, "skipped": skipped})
+    else:
+        log.warning(
+            "no model provider configured: answers will be extractive and write-ups templates",
+            extra={"skipped": skipped},
+        )
     return providers
 
 

@@ -3,11 +3,14 @@ import json
 import time
 import uuid
 
+import pytest
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
+from app.agents.service import NoModelWriteUp, UnknownIncident
 from app.core.config import ROOT, Settings
 from app.domain.retail_recon import RetailReconAdapter
+from app.llm.providers import Message
 from tests.fakes import ScriptedProvider, well_behaved
 from tests.integration.agent_fixtures import retail_service
 
@@ -106,7 +109,11 @@ async def test_every_llm_call_is_traced(loaded_engine: Engine, settings: Setting
     assert plan["planned_by"] == "scripted"
     assert plan["specialists"] == ["reconciliation"], "invented specialists are dropped"
     reports = [e for e in events if e["type"] == "report"]
-    assert reports and all(r["analysis_by"] == "scripted" for r in reports)
+    assert reports and all(
+        r["analysis_by"] == "model" and r["model_analysis"]["provider"] == "scripted"
+        for r in reports
+    )
+    assert all(r["template"]["root_cause_hypothesis"] for r in reports), "the template is kept"
     drift = next(r for r in reports if r["finding_type"] == "key_drift")
     assert drift["confidence"] <= 0.75, "model confidence is capped at the prior plus 0.15"
 
@@ -163,3 +170,49 @@ async def test_a_rejected_finding_stays_rejected_on_rescan(
         assert s1["repeat"] and s1["status"] == "rejected"
         assert again[-1]["type"] == "done"
         assert svc.store.open_findings()["by_severity"]["S1"] == 0
+
+
+async def test_regenerate_writes_a_model_version_beside_the_template(
+    loaded_engine: Engine, settings: Settings
+) -> None:
+    model_up = {"on": False}
+
+    def respond(system: str, messages: list[Message]) -> str:
+        return well_behaved(system, messages) if model_up["on"] else "not json at all"
+
+    async with retail_service(loaded_engine, settings, [ScriptedProvider(respond)]) as svc:
+        await svc.run_to_end(svc.run("scan"))
+        drift = next(r for r in svc.store.list_incidents() if r["finding_type"] == "key_drift")
+        assert drift["analysis_by"] == "template" and drift["model_analysis"] is None
+        model_up["on"] = True
+        out = await svc.regenerate(uuid.UUID(drift["id"]), "rahul")
+        regen = next(r for r in svc.store.list_runs() if r["trigger"] == "regenerate")
+    model, template = out["model_analysis"], out["template"]
+    assert out["analysis_by"] == "model"
+    assert (model["provider"], model["model"]) == ("scripted", "fake-1")
+    assert model["prompt_tokens"] == 100 and model["cost_usd"] == 0.0001 and model["latency_ms"] > 0
+    assert out["root_cause_hypothesis"] == model["root_cause_hypothesis"]
+    assert model["root_cause_hypothesis"] != template["root_cause_hypothesis"]
+    # the facts are the checks', in both versions
+    assert model["problem_statement"] == template["problem_statement"] == out["problem_statement"]
+    assert out["affected_records"] == drift["affected_records"]
+    assert out["confidence"] <= 0.75, "still capped at the template's confidence plus 0.15"
+    assert regen["status"] == "completed" and regen["llm_calls"] >= 1
+    with loaded_engine.connect() as conn:
+        actor = conn.scalar(
+            text("select actor from audit_ledger where action = 'finding.rewritten'")
+        )
+    assert actor == "human:rahul"
+
+
+async def test_regenerate_without_a_model_keeps_the_template(
+    loaded_engine: Engine, settings: Settings
+) -> None:
+    async with retail_service(loaded_engine, settings) as svc:
+        await svc.run_to_end(svc.run("scan"))
+        report = svc.store.list_incidents()[0]
+        with pytest.raises(NoModelWriteUp):
+            await svc.regenerate(uuid.UUID(report["id"]), "rahul")
+        with pytest.raises(UnknownIncident):
+            await svc.regenerate(uuid.uuid4(), "rahul")
+        assert svc.store.get_incident(uuid.UUID(report["id"]))["analysis_by"] == "template"

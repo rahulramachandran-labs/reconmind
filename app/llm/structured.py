@@ -6,7 +6,7 @@ from collections.abc import Callable
 
 from pydantic import BaseModel, ValidationError
 
-from app.llm.providers import LLMUnavailable, Message
+from app.llm.providers import Completion, LLMUnavailable, Message
 from app.llm.traced import TracedLLM
 
 _FENCE = re.compile(r"```(?:json)?\s*(\{.*?\})\s*```", re.S)
@@ -33,9 +33,11 @@ async def structured[T: BaseModel](
     name: str,
     prompt_version: str,
     retries: int = 2,
+    calls: list[Completion] | None = None,
 ) -> tuple[T, str]:
     """Ask for JSON matching ``schema``; re-prompt with the validation error up to
-    ``retries`` times, then use ``fallback``. Returns the object and who produced it."""
+    ``retries`` times, then use ``fallback``. Returns the object and who produced it.
+    Every model reply is appended to ``calls`` when given, for latency and cost."""
     if not llm.enabled:
         return fallback(), "template"
     shape = json.dumps(schema.model_json_schema())
@@ -56,6 +58,8 @@ async def structured[T: BaseModel](
             )
         except LLMUnavailable:
             return fallback(), "template"
+        if calls is not None:
+            calls.append(out)
         try:
             return schema.model_validate(extract_json(out.text)), out.provider
         except (ValueError, ValidationError) as exc:

@@ -1,23 +1,29 @@
-name: Scheduled scan
+name: Refresh demo
 
 # A free Render instance sleeps after 15 minutes without traffic, so a timer inside
-# the API rarely fires. This wakes it and starts a scan every six hours instead.
+# the API rarely fires. Every six hours this wakes it, runs a scan, and has the API's
+# model write up any finding that doesn't have a model write-up yet.
 on:
   schedule:
     - cron: "17 */6 * * *"
   workflow_dispatch:
+    inputs:
+      all:
+        description: "Write up every finding again, not just the ones without a model write-up"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 concurrency:
-  group: scheduled-scan
+  group: refresh-demo
   cancel-in-progress: false
 
 jobs:
-  scan:
+  refresh:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     env:
       API: ${{ vars.RECONMIND_API_URL || 'https://reconmind-labs-api.onrender.com' }}
     steps:
@@ -35,7 +41,7 @@ jobs:
           TOKEN: ${{ secrets.RECONMIND_WRITE_TOKEN }}
         run: |
           run_id=$(curl -sf -X POST "$API/scan" \
-            -H "Authorization: Bearer $TOKEN" -H "X-Reviewer: scheduled-scan" | jq -r .run_id)
+            -H "Authorization: Bearer $TOKEN" -H "X-Reviewer: refresh-demo" | jq -r .run_id)
           echo "run $run_id"
           status=running
           for i in $(seq 1 60); do
@@ -44,9 +50,22 @@ jobs:
             sleep 5
           done
           {
-            echo "### Scheduled scan: $status"
+            echo "### Scan: $status"
             echo
             curl -sf "$API/runs/$run_id" | jq -r '.summary // "no summary"'
           } >> "$GITHUB_STEP_SUMMARY"
           echo "status: $status"
           [ "$status" = "completed" ] || [ "$status" = "paused_review" ]
+
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: scripts/regenerate_reports.py
+          sparse-checkout-cone-mode: false
+
+      - name: Model write-ups
+        env:
+          WRITE_TOKEN: ${{ secrets.RECONMIND_WRITE_TOKEN }}
+          ALL: ${{ inputs.all && '--all' || '' }}
+        run: |
+          python3 scripts/regenerate_reports.py --api "$API" $ALL | tee regenerate.log
+          { echo; echo "### Model write-ups"; echo; echo '```'; cat regenerate.log; echo '```'; } >> "$GITHUB_STEP_SUMMARY"

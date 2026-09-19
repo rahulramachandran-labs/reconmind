@@ -9,7 +9,12 @@ from pydantic import BaseModel, Field
 from sse_starlette.sse import EventSourceResponse
 
 from app.agents.schemas import ReviewDecision
-from app.agents.service import InvestigationService
+from app.agents.service import (
+    FindingGone,
+    InvestigationService,
+    NoModelWriteUp,
+    UnknownIncident,
+)
 from app.api.deps import get_app_settings, get_sessions
 from app.api.guards import rate_limit, require_writer
 from app.core.config import Settings
@@ -130,6 +135,22 @@ def incident(report_id: uuid.UUID, service: Service) -> dict[str, Any]:
     if r is None:
         raise HTTPException(404, "unknown incident")
     return r
+
+
+@router.post(
+    "/incidents/{report_id}/regenerate",
+    dependencies=[Depends(rate_limit("rate_limit_regenerate"))],
+)
+async def regenerate(report_id: uuid.UUID, service: Service, reviewer: Reviewer) -> dict[str, Any]:
+    """Write the finding up again with the active model; the template's version is kept."""
+    try:
+        return await service.regenerate(report_id, reviewer)
+    except UnknownIncident as exc:
+        raise HTTPException(404, "unknown incident") from exc
+    except FindingGone as exc:
+        raise HTTPException(409, str(exc)) from exc
+    except NoModelWriteUp as exc:
+        raise HTTPException(503, str(exc)) from exc
 
 
 @router.get("/review")

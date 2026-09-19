@@ -33,7 +33,7 @@ Anyone can read. Scans and review decisions go through the web app's server, whi
 
 ## Scheduled scans
 
-Add the API's write token as the repository secret `RECONMIND_WRITE_TOKEN`. [`scheduled-scan.yml`](../.github/workflows/scheduled-scan.yml) then wakes the API, starts a scan every six hours, waits for it and writes the outcome to the workflow summary. You can also start one by hand from the Actions tab. A finding an earlier scan already reported is counted again rather than written up twice, so the review queue holds one item per problem ([ADR 0011](adr/0011-scheduled-scans-and-finding-fingerprints.md)).
+Add the API's write token as the repository secret `RECONMIND_WRITE_TOKEN`. [`refresh-demo.yml`](../.github/workflows/refresh-demo.yml) then wakes the API every six hours, starts a scan, waits for it, and has the API's model write up any finding that has no model write-up yet ([`scripts/regenerate_reports.py`](../scripts/regenerate_reports.py)); the outcome goes to the workflow summary. You can also run it by hand from the Actions tab, with *all* ticked to write every finding up again. `make regenerate-reports API=<url>` does the write-ups from your machine, with `WRITE_TOKEN` in the environment. A finding an earlier scan already reported is counted again rather than written up twice, so the review queue holds one item per problem ([ADR 0011](adr/0011-scheduled-scans-and-finding-fingerprints.md)).
 
 ## Free-tier notes
 

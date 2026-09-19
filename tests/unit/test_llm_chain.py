@@ -279,3 +279,24 @@ def test_status_without_any_provider_is_extractive() -> None:
     with pytest.raises(LLMUnavailable):
         chain.complete("s", "u")
     assert chain.last is None
+
+
+def test_missing_keys_are_logged_by_name(caplog: pytest.LogCaptureFixture) -> None:
+    settings = Settings(
+        llm_providers=["groq", "gemini"],
+        groq_api_key=None,
+        gemini_api_key=SecretStr("k"),
+        _env_file=None,
+    )
+    with caplog.at_level("INFO", logger="app.llm.providers"):
+        providers = build_providers(settings)
+    assert [p.name for p in providers] == ["gemini"]
+    record = next(r for r in caplog.records if r.getMessage() == "model providers")
+    assert record.skipped == {"groq": "no GROQ_API_KEY"}  # type: ignore[attr-defined]
+
+
+def test_no_provider_at_all_is_a_warning(caplog: pytest.LogCaptureFixture) -> None:
+    settings = Settings(llm_providers=["groq"], groq_api_key=None, _env_file=None)
+    with caplog.at_level("WARNING", logger="app.llm.providers"):
+        assert build_providers(settings) == []
+    assert any("no model provider configured" in r.getMessage() for r in caplog.records)

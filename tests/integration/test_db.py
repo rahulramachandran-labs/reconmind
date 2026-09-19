@@ -111,3 +111,77 @@ def test_ping_and_engine_cache(db_url: str) -> None:
     engine = get_engine(db_url)
     assert ping(engine) and get_engine(db_url) is engine
     assert not ping(get_engine("postgresql+psycopg://nobody:x@127.0.0.1:1/none"))
+
+
+def test_migration_0004_folds_findings_duplicated_before_fingerprints(
+    db_url: str, migrated_engine: Engine
+) -> None:
+    from uuid import uuid4
+
+    from alembic import command
+    from alembic.config import Config
+
+    cfg = Config(str(ROOT / "alembic.ini"))
+    cfg.attributes["url"] = db_url
+    command.downgrade(cfg, "0003")
+    runs = [uuid4() for _ in range(3)]
+    s1 = [uuid4() for _ in runs]
+    s2 = [uuid4(), uuid4()]
+    with migrated_engine.begin() as conn:
+        for age, run in zip((3, 2, 1), runs, strict=True):
+            conn.execute(
+                text(
+                    "insert into agent_runs (id, trigger, adapter, status, plan, prompt_tokens,"
+                    " completion_tokens, cost_usd, started_at) values (:id, 'scan',"
+                    " 'retail_recon', 'paused_review', '{}', 0, 0, 0,"
+                    " now() - make_interval(hours => :age))"
+                ),
+                {"id": run, "age": age},
+            )
+
+        def report(rid, run, age, severity, status, title, seen=1):  # type: ignore[no-untyped-def]
+            conn.execute(
+                text(
+                    "insert into incident_reports (id, run_id, finding_type, severity, title,"
+                    " status, report, created_at, fingerprint, seen_count, last_seen_at)"
+                    " values (:id, :run, 'x', :sev, :title, :status, '{}',"
+                    " now() - make_interval(hours => :age), 'x:' || :title, :seen,"
+                    " now() - make_interval(hours => :age))"
+                ),
+                {
+                    "id": rid,
+                    "run": run,
+                    "age": age,
+                    "sev": severity,
+                    "status": status,
+                    "title": title,
+                    "seen": seen,
+                },
+            )
+
+        for rid, run, age, seen in zip(s1, runs, (3, 2, 1), (1, 1, 2), strict=True):
+            report(rid, run, age, "S1", "pending_review", "renamed a column", seen)
+        report(s2[0], runs[0], 3, "S2", "published", "resent a file")
+        report(s2[1], runs[1], 2, "S2", "published", "resent a file")
+    command.upgrade(cfg, "head")
+
+    with migrated_engine.connect() as conn:
+        rows = {
+            r.id: r
+            for r in conn.execute(
+                text("select id, duplicate_of, seen_count, last_seen_at from incident_reports")
+            )
+        }
+        status = dict(conn.execute(text("select id, status from agent_runs")).all())
+        merged = conn.scalar(
+            text("select count(*) from audit_ledger where action = 'finding.merged'")
+        )
+    # the first report of each finding stays, carrying every sighting
+    assert rows[s1[0]].duplicate_of is None and rows[s1[0]].seen_count == 4
+    assert rows[s1[0]].last_seen_at == max(rows[i].last_seen_at for i in s1)
+    assert rows[s1[1]].duplicate_of == rows[s1[2]].duplicate_of == s1[0]
+    assert rows[s2[1]].duplicate_of == s2[0] and rows[s2[0]].seen_count == 2
+    # the first run still carries the review; the runs waiting only on copies are superseded
+    assert status[runs[0]] == "paused_review"
+    assert status[runs[1]] == status[runs[2]] == "superseded"
+    assert merged == 3

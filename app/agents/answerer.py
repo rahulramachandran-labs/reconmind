@@ -19,7 +19,8 @@ async def run(deps: AgentDeps, state: dict[str, Any]) -> dict[str, Any]:
     history = [Message(m["role"], m["content"]) for m in state.get("history", [])]
     query = retrieval_query(question, history)
     chunks = traced_search(deps.retrieval, query, 5)
-    text, provider = extractive_answer(question, chunks), "extractive"
+    text, provider, model = extractive_answer(question, chunks), "extractive", None
+    fallbacks: list[str] = []
     if deps.llm.enabled:
         turn = Message("user", f"{format_passages(chunks)}\n\nQuestion: {question}")
         try:
@@ -29,11 +30,13 @@ async def run(deps: AgentDeps, state: dict[str, Any]) -> dict[str, Any]:
                 name="answer",
                 prompt_version=ANSWER_PROMPT_VERSION,
             )
-            text, provider = out.text, out.provider
-        except LLMUnavailable:
-            pass
+            text, provider, model, fallbacks = out.text, out.provider, out.model, out.fallbacks
+        except LLMUnavailable as exc:
+            fallbacks = str(exc).removeprefix("no provider answered: ").split(", ")
     return {
         "answer": text,
         "answer_provider": provider,
+        "answer_model": model,
+        "answer_fallbacks": fallbacks,
         "sources": [c.model_dump(exclude={"text"}) for c in chunks],
     }

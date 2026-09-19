@@ -4,7 +4,7 @@ SHELL := /bin/bash
 API_PORT ?= 8000
 WEB_PORT ?= 3000
 
-.PHONY: help bootstrap dev api web test test-fast lint fmt eval index deck sync deploy clean db seed
+.PHONY: help bootstrap dev api web test test-fast lint fmt eval index deck sync deploy clean db seed regenerate-reports
 
 help: ## list targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
@@ -55,6 +55,9 @@ fmt: ## format python
 
 eval: ## RAGAS gate on the golden set; appends a row to evals/history.csv
 	uv run --group eval python evals/run_ragas.py --gate --record
+
+regenerate-reports: ## write findings up again with the API's model. API=<url>, WRITE_TOKEN in the env
+	python3 scripts/regenerate_reports.py --api $(or $(API),http://localhost:$(API_PORT))
 
 index: ## build the dense index into .index/
 	uv run python -c "from app.core.config import Settings; from app.retrieval.service import RetrievalService; s = RetrievalService.from_settings(Settings()); print(len(s.chunks), 'chunks indexed')"

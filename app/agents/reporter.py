@@ -9,8 +9,10 @@ from app.agents.deps import AgentDeps
 from app.agents.schemas import (
     AffectedRecords,
     IncidentReport,
+    ModelWriteUp,
     RunSummary,
     SourceRef,
+    WriteUp,
     confidence_label,
 )
 from app.domain.protocol import SEVERITY_ORDER, Finding, FindingAnalysis
@@ -78,11 +80,15 @@ async def run(deps: AgentDeps, state: dict[str, Any]) -> dict[str, Any]:
                 open_questions=a.open_questions,
                 evidence=f.evidence,
                 sources=[SourceRef(**s) for s in item["sources"]],
-                analysis_by=item["analysis_by"],
+                analysis_by="model" if item.get("model_analysis") else "template",
                 needs_review=bool(reasons),
                 review_reason="; ".join(reasons) or None,
                 trace_url=tracer.trace_url if tracer else None,
                 status="pending_review" if reasons else "published",
+                template=WriteUp(**item["template"]) if item.get("template") else None,
+                model_analysis=(
+                    ModelWriteUp(**item["model_analysis"]) if item.get("model_analysis") else None
+                ),
             )
         )
     # repeats of findings an earlier scan reported come back resolved to that report

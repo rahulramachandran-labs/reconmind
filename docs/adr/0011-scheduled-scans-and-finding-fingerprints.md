@@ -21,3 +21,7 @@ Making scans actually run on a schedule exposed a second problem. Every scan wro
 - The review queue holds one item per real problem, however often scans run.
 - A finding whose numbers change (drift grows from 3.0% to 3.4%) gets a new title, so it becomes a new report that needs a fresh look. That is deliberate: a changing problem deserves a fresh look.
 - GitHub disables scheduled workflows in public repositories after 60 days without commits, and can delay scheduled runs at busy times. Both are fine for a demo; a production deployment would use an always-on instance or a platform cron.
+
+## Update, 1.2
+
+The workflow is now `refresh-demo.yml`. After the scan it asks the API's model to write up any finding that has no model write-up yet. Reports duplicated before fingerprints existed are folded into one per finding by migration 0004.

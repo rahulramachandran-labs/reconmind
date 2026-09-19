@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
@@ -24,6 +25,29 @@ class AffectedRecords(BaseModel):
     count: int
     rate: float | None = None
     detail: str
+
+
+class WriteUp(BaseModel):
+    """The explanation part of a report. The problem statement is always the checks'."""
+
+    problem_statement: str
+    root_cause_hypothesis: str
+    recommended_fix: list[str]
+    open_questions: list[str]
+    confidence: float = Field(ge=0.0, le=1.0)
+
+
+class ModelWriteUp(WriteUp):
+    """A write-up a model produced, with what producing it took."""
+
+    provider: str
+    model: str | None = None
+    latency_ms: int = 0
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    cost_usd: float = 0.0
+    prompt_version: str | None = None
+    generated_at: datetime | None = None
 
 
 class IncidentReport(BaseModel):
@@ -54,6 +78,10 @@ class IncidentReport(BaseModel):
     repeat: bool = Field(
         default=False, description="Already reported by an earlier scan; not written up again"
     )
+    # both versions are kept so a reader can compare them; the fields above show the model's
+    # when there is one ("model" in analysis_by), otherwise the template's
+    template: WriteUp | None = None
+    model_analysis: ModelWriteUp | None = None
 
     @property
     def fingerprint(self) -> str:
