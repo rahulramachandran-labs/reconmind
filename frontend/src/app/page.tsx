@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { AlertTriangle, CheckCircle2, Loader2, Radar, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Loader2, XCircle } from "lucide-react";
 
 import { ErrorNote } from "@/components/error-note";
+import { usd } from "@/components/incident-report";
+import { ScanButton } from "@/components/scan-button";
 import { SeverityBadge, StatusText, ago } from "@/components/severity";
-import { Button } from "@/components/ui/button";
 import { VolumeChart } from "@/components/volume-chart";
 import { getDashboard, getRun, startScan, type Dashboard, type Severity } from "@/lib/api";
 
@@ -75,10 +76,7 @@ export default function DashboardPage() {
             {u?.last_scan && ` Last scan ${ago(u.last_scan.started_at)}.`}
           </p>
         </div>
-        <Button onClick={scan} disabled={scanning}>
-          {scanning ? <Loader2 className="animate-spin" /> : <Radar />}
-          {scanning ? "Scanning..." : "Run a scan"}
-        </Button>
+        <ScanButton scanning={scanning} onScan={scan} from="/" />
       </header>
 
       {error && (
@@ -159,14 +157,23 @@ export default function DashboardPage() {
                 <span className="text-sm text-muted-foreground">No runs</span>
               )}
             </Tile>
-            <Tile label="Model usage today (UTC)" footer={u ? `${u.runs} agent run${u.runs === 1 ? "" : "s"}, ${u.llm_calls} LLM calls` : undefined}>
+            <Tile
+              label="Model usage today (UTC)"
+              footer={u ? `${u.runs} agent run${u.runs === 1 ? "" : "s"} today` : undefined}
+            >
               {u && (
                 <div className="flex flex-col gap-1">
-                  <span className="text-3xl font-semibold">${u.cost_usd.toFixed(u.cost_usd < 1 ? 4 : 2)}</span>
+                  <span className="flex items-baseline gap-2">
+                    <span className="text-3xl font-semibold">{u.llm_calls.toLocaleString()}</span>
+                    <span className="text-sm text-muted-foreground">model call{u.llm_calls === 1 ? "" : "s"}</span>
+                  </span>
+                  <span className="font-mono text-xs">
+                    {compact(u.tokens)} tokens · {usd(u.cost_usd)}
+                  </span>
                   <span className="text-xs text-muted-foreground">
                     {u.providers.length
-                      ? u.providers.map((p) => `${p.provider} ${p.calls}`).join(" · ")
-                      : "no model calls: answers came from templates and the runbooks"}
+                      ? u.providers.map((p) => `${p.provider}${p.model ? ` ${p.model}` : ""}: ${p.calls}`).join(" · ")
+                      : "no model calls yet today"}
                   </span>
                 </div>
               )}

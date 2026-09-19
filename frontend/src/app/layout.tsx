@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { ColdStartNotice } from "@/components/cold-start";
 import { SiteNav } from "@/components/site-nav";
 import { UserMenu } from "@/components/user-menu";
 import "./globals.css";
@@ -18,6 +19,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="en" className={`dark ${sans.variable} ${mono.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col">
         <SiteNav user={<UserMenu />} />
+        <ColdStartNotice />
         {children}
       </body>
     </html>

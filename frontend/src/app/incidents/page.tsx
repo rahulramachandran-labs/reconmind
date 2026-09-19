@@ -1,11 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Loader2, Radar } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 import { ErrorNote } from "@/components/error-note";
 import { ReportBody, ReportSummary } from "@/components/incident-report";
-import { Button } from "@/components/ui/button";
+import { ScanButton } from "@/components/scan-button";
 import { getRun, listIncidents, startScan, type IncidentReport } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -57,10 +57,7 @@ export default function IncidentsPage() {
             Every finding the agents have written up. Open one for the full report.
           </p>
         </div>
-        <Button onClick={scan} disabled={!!scanning}>
-          {scanning ? <Loader2 className="animate-spin" /> : <Radar />}
-          {scanning ? "Scanning..." : "Run a scan"}
-        </Button>
+        <ScanButton scanning={!!scanning} onScan={scan} from="/incidents" />
       </header>
 
       <div className="flex flex-wrap gap-2 text-xs">

@@ -37,12 +37,46 @@ type Turn = {
   findings: Finding[];
   answer?: string;
   provider?: string;
+  model?: string;
+  fallbacks?: string[];
+  /** Who wrote each incident report in an investigation: a provider, or "template". */
+  writtenBy: string[];
   sources: Source[];
   summary?: { headline: string; summary: string };
   paused?: boolean;
   done?: { latency_ms: number; llm_calls: number; cost_usd: number };
   error?: string;
 };
+
+function AnsweredBy({ turn }: { turn: Turn }) {
+  if (turn.answer !== undefined) {
+    if (!turn.provider || turn.provider === "extractive") {
+      return (
+        <p className="text-xs text-amber">
+          No model answered this one. It is an extractive answer: the most relevant runbook passages, quoted as they
+          are.
+        </p>
+      );
+    }
+    return (
+      <Badge variant="outline" className="font-mono">
+        answered by {turn.provider}
+        {turn.model && ` · ${turn.model}`}
+        {turn.fallbacks?.length ? ` after ${turn.fallbacks.join(", ")} did not respond` : ""}
+      </Badge>
+    );
+  }
+  if (!turn.writtenBy.length) return null;
+  const models = [...new Set(turn.writtenBy.filter((w) => w !== "template"))];
+  if (!models.length) {
+    return <p className="text-xs text-amber">No model was reachable, so the write-ups come from templates.</p>;
+  }
+  return (
+    <Badge variant="outline" className="font-mono">
+      written up by {models.join(", ")}
+    </Badge>
+  );
+}
 
 function TurnView({ turn }: { turn: Turn }) {
   const busy = !turn.done && !turn.paused && !turn.error;
@@ -121,7 +155,7 @@ function TurnView({ turn }: { turn: Turn }) {
         {turn.error && <p className="text-sm text-destructive">{turn.error}</p>}
         {(turn.done || turn.paused) && turn.runId && (
           <div className="flex flex-wrap items-center gap-3 border-t pt-2 text-xs text-muted-foreground">
-            {turn.provider && <Badge variant="outline" className="font-mono">{turn.provider}</Badge>}
+            <AnsweredBy turn={turn} />
             {turn.done && <span>{(turn.done.latency_ms / 1000).toFixed(1)}s</span>}
             {turn.done && <span>{turn.done.llm_calls} LLM calls</span>}
             <Link href={`/traces/${turn.runId}`} className="hover:text-foreground">
@@ -134,7 +168,7 @@ function TurnView({ turn }: { turn: Turn }) {
   );
 }
 
-export function AskPanel() {
+export function AskPanel({ examples = EXAMPLES, inline = false }: { examples?: string[]; inline?: boolean } = {}) {
   const [question, setQuestion] = useState("");
   const [turns, setTurns] = useState<Turn[]>([]);
   const [sessionId, setSessionId] = useState<string | undefined>();
@@ -154,7 +188,7 @@ export function AskPanel() {
     if (text.length < 3 || loading) return;
     setLoading(true);
     setQuestion("");
-    setTurns((t) => [...t, { question: text, nodes: [], findings: [], sources: [] }]);
+    setTurns((t) => [...t, { question: text, nodes: [], findings: [], writtenBy: [], sources: [] }]);
     try {
       for await (const { event, data } of chatStream(text, sessionId)) {
         const str = (k: string) => String(data[k] ?? "");
@@ -164,12 +198,18 @@ export function AskPanel() {
         else if (event === "node") patch((t) => ({ ...t, nodes: [...t.nodes, str("node")] }));
         else if (event === "finding")
           patch((t) => ({ ...t, findings: [...t.findings, data as unknown as Finding] }));
-        else if (event === "summary") patch((t) => ({ ...t, summary: data as Turn["summary"] }));
+        else if (event === "report") {
+          const m = data.model_analysis as { provider?: string; model?: string } | null | undefined;
+          const by = m?.provider ? `${m.provider}${m.model ? ` · ${m.model}` : ""}` : str("analysis_by") === "model" ? "model" : str("analysis_by");
+          patch((t) => ({ ...t, writtenBy: [...t.writtenBy, by] }));
+        } else if (event === "summary") patch((t) => ({ ...t, summary: data as Turn["summary"] }));
         else if (event === "answer")
           patch((t) => ({
             ...t,
             answer: str("text"),
             provider: str("provider"),
+            model: str("model") || undefined,
+            fallbacks: (data.fallbacks as string[]) ?? [],
             sources: (data.sources as Source[]) ?? [],
           }));
         else if (event === "paused") patch((t) => ({ ...t, paused: true }));
@@ -190,7 +230,7 @@ export function AskPanel() {
     <div className="flex flex-col gap-6">
       {turns.length === 0 && (
         <div className="flex flex-wrap gap-2">
-          {EXAMPLES.map((ex) => (
+          {examples.map((ex) => (
             <button
               key={ex}
               type="button"
@@ -207,7 +247,7 @@ export function AskPanel() {
       ))}
       <div ref={bottom} />
       <form
-        className="sticky bottom-4 flex flex-col gap-2"
+        className={inline ? "flex flex-col gap-2" : "sticky bottom-4 flex flex-col gap-2"}
         onSubmit={(e) => {
           e.preventDefault();
           submit(question);

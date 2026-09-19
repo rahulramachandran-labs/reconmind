@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { ModelPill } from "@/components/model-pill";
+import { REPO_URL } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 const LINKS = [
@@ -12,6 +14,7 @@ const LINKS = [
   { href: "/ask", label: "Ask ReconMind" },
   { href: "/docs", label: "Docs & runbooks" },
   { href: "/traces", label: "Traces" },
+  { href: "/verify", label: "Verify" },
 ];
 
 export function SiteNav({ user }: { user?: React.ReactNode }) {
@@ -41,8 +44,9 @@ export function SiteNav({ user }: { user?: React.ReactNode }) {
           })}
         </nav>
         <div className="ml-auto flex shrink-0 items-center gap-4">
+          <ModelPill />
           <a
-            href="https://github.com/rahulramachandran-labs/reconmind"
+            href={REPO_URL}
             className="text-xs text-muted-foreground hover:text-foreground"
           >
             GitHub

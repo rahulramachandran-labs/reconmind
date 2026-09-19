@@ -1,4 +1,38 @@
 export const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000").replace(/\/$/, "");
+export const REPO_URL = "https://github.com/rahulramachandran-labs/reconmind";
+
+// A free instance sleeps when idle and the first request after that can take a minute.
+// Any call still waiting after five seconds flips this on; the next response flips it off.
+const WAKE_AFTER_MS = 5000;
+let waking = false;
+const wakeListeners = new Set<() => void>();
+
+function setWaking(value: boolean) {
+  if (waking === value) return;
+  waking = value;
+  wakeListeners.forEach((l) => l());
+}
+
+export const apiWaking = {
+  subscribe(listener: () => void) {
+    wakeListeners.add(listener);
+    return () => {
+      wakeListeners.delete(listener);
+    };
+  },
+  get: () => waking,
+};
+
+async function watched(url: string, init?: RequestInit): Promise<Response> {
+  const timer = setTimeout(() => setWaking(true), WAKE_AFTER_MS);
+  try {
+    const res = await fetch(url, init);
+    setWaking(false);
+    return res;
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 export type Source = {
   chunk_id: string;
@@ -33,7 +67,7 @@ export type CorpusDocBody = CorpusDoc & { body: string };
 export type SearchMode = "hybrid" | "dense" | "bm25";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
+  const res = await watched(`${API_URL}${path}`, {
     ...init,
     headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
   });
@@ -60,6 +94,26 @@ export const search = (q: string, mode: SearchMode, k = 8) =>
 export type Severity = "S1" | "S2" | "S3" | "S4";
 
 export type Evidence = { source: string; summary: string; data?: Record<string, unknown> };
+
+/** The parts of a report that are written rather than measured. */
+export type WriteUp = {
+  problem_statement: string;
+  root_cause_hypothesis: string;
+  recommended_fix: string[];
+  open_questions: string[];
+  confidence: number;
+};
+
+export type ModelWriteUp = WriteUp & {
+  provider: string;
+  model: string | null;
+  latency_ms: number;
+  prompt_tokens: number;
+  completion_tokens: number;
+  cost_usd: number;
+  prompt_version?: string | null;
+  generated_at?: string | null;
+};
 
 export type IncidentReport = {
   id: string;
@@ -89,7 +143,22 @@ export type IncidentReport = {
   review_note?: string | null;
   reviewed_by?: string | null;
   created_at?: string;
+  /** What the deterministic checks and the adapter's templates wrote. */
+  template?: WriteUp | null;
+  /** What the model wrote from the same facts, with who wrote it and what it cost. */
+  model_analysis?: ModelWriteUp | null;
 };
+
+export type ModelStatus = {
+  provider: string;
+  model: string | null;
+  chain: string[];
+  fell_back: boolean | null;
+  last_call_at: string | null;
+};
+
+export const getModel = () => request<ModelStatus>("/model");
+export const getIncident = (id: string) => request<IncidentReport>(`/incidents/${id}`);
 
 export type RunStep = {
   node: string;
@@ -163,6 +232,7 @@ export const reviewReport = (id: string, decision: "approve" | "reject" | "annot
   action<{ status: string }>(`review/reports/${id}`, { decision, note: note || null });
 export const reviewPlan = (id: string, decision: "approve" | "reject", specialists: string[] = []) =>
   action<{ status: string }>(`review/runs/${id}`, { decision, specialists });
+export const regenerateReport = (id: string) => action<IncidentReport>(`incidents/${id}/regenerate`);
 
 export type Dashboard = {
   adapter: string;
@@ -209,7 +279,7 @@ export async function* chatStream(
   sessionId: string | undefined,
   signal?: AbortSignal,
 ): AsyncGenerator<StreamEvent> {
-  const res = await fetch(`${API_URL}/chat/stream`, {
+  const res = await watched(`${API_URL}/chat/stream`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
     body: JSON.stringify({ question, session_id: sessionId ?? null }),

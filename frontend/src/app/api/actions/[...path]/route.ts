@@ -6,7 +6,13 @@ import { auth } from "@/auth";
 // scan or review decision carries the name of the signed-in reviewer.
 const API = (process.env.RECONMIND_API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000").replace(/\/$/, "");
 const UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
-const ALLOWED = [new RegExp("^scan$"), new RegExp(`^review/reports/${UUID}$`), new RegExp(`^review/runs/${UUID}$`)];
+const ALLOWED = [
+  new RegExp("^scan$"),
+  new RegExp(`^review/reports/${UUID}$`),
+  new RegExp(`^review/runs/${UUID}$`),
+  new RegExp(`^incidents/${UUID}/regenerate$`),
+];
+const NO_BODY = [new RegExp("^scan$"), new RegExp(`^incidents/${UUID}/regenerate$`)];
 
 export async function POST(request: Request, ctx: RouteContext<"/api/actions/[...path]">) {
   const session = await auth();
@@ -29,7 +35,7 @@ export async function POST(request: Request, ctx: RouteContext<"/api/actions/[..
   const res = await fetch(`${API}/${target}`, {
     method: "POST",
     headers,
-    body: target === "scan" ? undefined : await request.text(),
+    body: NO_BODY.some((re) => re.test(target)) ? undefined : await request.text(),
     cache: "no-store",
   });
   return new NextResponse(await res.text(), {
