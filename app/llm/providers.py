@@ -201,8 +201,9 @@ def build_providers(settings: Settings) -> list[Provider]:
                 settings.gemini_base_url,
                 max_retries=FREE_TIER_RETRIES,
             )
-            # 2.5 models think by default and the thinking counts against max_tokens
-            extra = {"reasoning_effort": "none"} if "2.5" in settings.gemini_model else {}
+            # 2.5 and later think by default, and the thinking counts against max_tokens
+            thinks = not settings.gemini_model.startswith(("gemini-1", "gemini-2.0"))
+            extra = {"reasoning_effort": "none"} if thinks else {}
             providers.append(
                 OpenAICompatibleProvider(
                     "gemini",

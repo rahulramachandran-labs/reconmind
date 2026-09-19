@@ -188,7 +188,7 @@ def _mocked(
             "gemini",
             "generativelanguage.googleapis.com",
             "/v1beta/openai/chat/completions",
-            "gemini-2.5-flash",
+            "gemini-3.6-flash",
             "max_tokens",
             {"reasoning_effort": "none"},
         ),
