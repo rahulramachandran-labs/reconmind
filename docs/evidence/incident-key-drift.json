@@ -1,8 +1,8 @@
 {
-  "id": "67bc3814-3aba-4103-85dc-c1ae69748596",
+  "id": "5564310c-b53b-4a8b-82bd-ca423be9ca48",
   "title": "LOC-0517 also reporting as OUT-1071 (3.0% of rows)",
   "repeat": false,
-  "run_id": "b5444ae1-f162-41ff-8a82-28f65425be9c",
+  "run_id": "78b3d94d-58f0-4d68-a38b-599efb8f2e0a",
   "status": "published",
   "sources": [
     {
@@ -76,37 +76,39 @@
     "cost_usd": 0.0,
     "provider": "groq",
     "confidence": 0.75,
-    "latency_ms": 1221,
-    "generated_at": "2026-09-19T19:00:42.020038Z",
-    "prompt_tokens": 1177,
+    "latency_ms": 1307,
+    "generated_at": "2026-09-19T20:33:30.951685Z",
+    "prompt_tokens": 1205,
     "open_questions": [
-      "Was the incorrect outlet_id ever introduced intentionally as a temporary alias, or is it purely a data entry error?",
-      "Are there any other locations that share the same drifted outlet_id (OUT-1071) in the same window?",
-      "What is the timeline for the source team to deploy the header fix, and does it require a schema change?",
-      "Do we need to adjust any downstream alert thresholds now that the alias will be added?"
+      "What caused the incorrect outlet_id to be emitted at the source (e.g., config change, manual entry error)?",
+      "Why did 4 separate submitters report the same drift\u2014are they independent pipelines or shared ingestion points?",
+      "Is there a monitoring gap that allowed the drift to persist for 21 days before detection?",
+      "Will the alias addition impact any other locations that may have used OUT-1071 historically?",
+      "Do we need to adjust the detection window or alert thresholds to surface similar drifts earlier?"
     ],
-    "prompt_version": "specialist-analysis@3",
+    "prompt_version": "specialist-analysis@4",
     "recommended_fix": [
-      "Contact the 4 submitters (see metrics) to confirm which outlet_id (OUT-1017 or OUT-1071) is correct for LOC-0517.",
-      "Insert an alias record for the drifted id (OUT-1071) into the `outlet_alias` table with appropriate `valid_from` and `valid_to` timestamps.",
-      "Trigger a backfill of the staging model `stg_transactions` for the window 2026-06-01 to 2026-06-21, then rebuild `fct_daily_sales` for the same dates (follow the backfill runbook).",
-      "Ask the source system owner to correct the outlet header in future extracts and log the ticket number in the incident documentation."
+      "Confirm with the 4 submitters which outlet_id (OUT-1017 or OUT-1071) is correct for LOC-0517.",
+      "Add OUT-1071 as an alias in the outlet_alias table with appropriate valid_from/valid_to timestamps so the staging model can remap it.",
+      "Rebuild the stg_transactions and fct_daily_sales models for the affected dates (2026-06-01 to 2026-06-21) following the backfill runbook.",
+      "Instruct the source system owner to correct the header/outlet_id at source and document the ticket number in the incident write\u2011up."
     ],
-    "completion_tokens": 400,
+    "completion_tokens": 443,
     "problem_statement": "Location LOC-0517 is reporting sales under two outlet ids: its canonical OUT-1017 and OUT-1071, which outlet_location_map does not map to it. 251 of 8373 deduplicated rows (3.0%) between 2026-06-01 and 2026-06-21 are affected, so store-level numbers for this location are split.",
-    "root_cause_hypothesis": "The source system that feeds LOC-0517 transmitted transactions with an incorrect outlet header, using OUT-1071 instead of the canonical OUT-1017. This created a key\u2011drift condition where the same location_id appears under two outlet_ids in the immutable transactions layer, which is not reflected in the outlet_location_map."
+    "root_cause_hypothesis": "The source system that generates the transaction feed for location LOC-0517 emitted an incorrect outlet_id (OUT-1071) in its header for a subset of records. This id is not present in the authoritative outlet_location_map (canonical OUT-1017), causing key drift. The drift persisted from first_seen 2026-06-01 to last_seen 2026-06-21 and was reported by 4 submitters, indicating a mis\u2011configuration or data\u2011entry error at the source rather than a downstream processing bug."
   },
   "open_questions": [
-    "Was the incorrect outlet_id ever introduced intentionally as a temporary alias, or is it purely a data entry error?",
-    "Are there any other locations that share the same drifted outlet_id (OUT-1071) in the same window?",
-    "What is the timeline for the source team to deploy the header fix, and does it require a schema change?",
-    "Do we need to adjust any downstream alert thresholds now that the alias will be added?"
+    "What caused the incorrect outlet_id to be emitted at the source (e.g., config change, manual entry error)?",
+    "Why did 4 separate submitters report the same drift\u2014are they independent pipelines or shared ingestion points?",
+    "Is there a monitoring gap that allowed the drift to persist for 21 days before detection?",
+    "Will the alias addition impact any other locations that may have used OUT-1071 historically?",
+    "Do we need to adjust the detection window or alert thresholds to surface similar drifts earlier?"
   ],
   "recommended_fix": [
-    "Contact the 4 submitters (see metrics) to confirm which outlet_id (OUT-1017 or OUT-1071) is correct for LOC-0517.",
-    "Insert an alias record for the drifted id (OUT-1071) into the `outlet_alias` table with appropriate `valid_from` and `valid_to` timestamps.",
-    "Trigger a backfill of the staging model `stg_transactions` for the window 2026-06-01 to 2026-06-21, then rebuild `fct_daily_sales` for the same dates (follow the backfill runbook).",
-    "Ask the source system owner to correct the outlet header in future extracts and log the ticket number in the incident documentation."
+    "Confirm with the 4 submitters which outlet_id (OUT-1017 or OUT-1071) is correct for LOC-0517.",
+    "Add OUT-1071 as an alias in the outlet_alias table with appropriate valid_from/valid_to timestamps so the staging model can remap it.",
+    "Rebuild the stg_transactions and fct_daily_sales models for the affected dates (2026-06-01 to 2026-06-21) following the backfill runbook.",
+    "Instruct the source system owner to correct the header/outlet_id at source and document the ticket number in the incident write\u2011up."
   ],
   "affected_records": {
     "rate": 0.03,
@@ -115,12 +117,12 @@
   },
   "confidence_label": "high",
   "problem_statement": "Location LOC-0517 is reporting sales under two outlet ids: its canonical OUT-1017 and OUT-1071, which outlet_location_map does not map to it. 251 of 8373 deduplicated rows (3.0%) between 2026-06-01 and 2026-06-21 are affected, so store-level numbers for this location are split.",
-  "root_cause_hypothesis": "The source system that feeds LOC-0517 transmitted transactions with an incorrect outlet header, using OUT-1071 instead of the canonical OUT-1017. This created a key\u2011drift condition where the same location_id appears under two outlet_ids in the immutable transactions layer, which is not reflected in the outlet_location_map.",
+  "root_cause_hypothesis": "The source system that generates the transaction feed for location LOC-0517 emitted an incorrect outlet_id (OUT-1071) in its header for a subset of records. This id is not present in the authoritative outlet_location_map (canonical OUT-1017), causing key drift. The drift persisted from first_seen 2026-06-01 to last_seen 2026-06-21 and was reported by 4 submitters, indicating a mis\u2011configuration or data\u2011entry error at the source rather than a downstream processing bug.",
   "fingerprint": "key_drift:LOC-0517 also reporting as OUT-1071 (3.0% of rows)",
   "duplicate_of": null,
-  "last_seen_at": "2026-09-19T19:00:42.029802+00:00",
+  "last_seen_at": "2026-09-19T20:33:30.975347+00:00",
   "review_decision": null,
   "reviewed_by": null,
   "reviewed_at": null,
-  "created_at": "2026-09-19T19:00:42.032929+00:00"
+  "created_at": "2026-09-19T20:33:30.976627+00:00"
 }

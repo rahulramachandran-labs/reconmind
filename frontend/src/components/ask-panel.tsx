@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { ArrowUp, CheckCircle2, FileText, Loader2, PauseCircle, RotateCcw } from "lucide-react";
 
+import { Markdown } from "@/components/markdown";
 import { SeverityBadge } from "@/components/severity";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -132,7 +133,11 @@ function TurnView({ turn }: { turn: Turn }) {
             </Link>
           </div>
         )}
-        {turn.answer && <div className="leading-relaxed whitespace-pre-wrap">{turn.answer}</div>}
+        {turn.answer && (
+          <div className="leading-relaxed">
+            <Markdown>{turn.answer}</Markdown>
+          </div>
+        )}
         {turn.sources.length > 0 && (
           <ul className="flex flex-wrap gap-2">
             {turn.sources.map((s, i) => (

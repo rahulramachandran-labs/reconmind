@@ -129,6 +129,11 @@ def trace_block(summary: dict[str, Any]) -> str:
     for s in steps:
         if s["kind"] == "retrieval":
             out.append(f"{s['node']:<13} retrieval  {s['name']}   {s['latency_ms']:,} ms")
+    if tools and not any(s["name"].startswith("analyse") for s in llm):
+        out.append(
+            "data_quality  (no write-up call: the finding already had one from the scan, "
+            "so it was reused)"
+        )
     for s in llm:
         if s["node"] == "planner":
             continue
@@ -303,8 +308,8 @@ def results_block(s: dict[str, Any]) -> str:
 
     def went(a: dict[str, Any]) -> str:
         if a.get("intent") == "investigate":
-            who = " and ".join(x.replace("_", "-") for x in a.get("specialists") or [])
-            return f"went to {who}"
+            names = [x.replace("_", "-").title() for x in a.get("specialists") or []]
+            return f"went to the {' and '.join(names)} agent{'s' if len(names) > 1 else ''}"
         if a.get("intent") == "explore":
             return "went to the Explorer"
         if a.get("intent") == "answer":
@@ -325,8 +330,9 @@ def results_block(s: dict[str, Any]) -> str:
             tools = ", ".join(f"`{x.split('/')[1]}`" for x in a["tools_used"])
             line += f"; the model chose {tools}"
         if a.get("reply"):
-            line += f". It said: *\u201c{first_sentence(a['reply'])}\u201d*"
-        out.append(line + ("" if line.endswith(".") else "."))
+            said = first_sentence(a["reply"]).rstrip(".")
+            line += f". It said: *\u201c{said}.\u201d*"
+        out.append(line if line.endswith("*") else line + ".")
     rg, rs = s.get("regenerate_s1") or {}, s.get("rescan") or {}
     after = s.get("feed_after", [])
     out.append("")
@@ -347,7 +353,7 @@ def results_block(s: dict[str, Any]) -> str:
         notes.append(
             f"A second scan took {rs.get('latency_ms', 0) / 1000:.1f} s and paused for nothing; "
             f"the feed still held {len(after)} findings, each counted as seen again (the S1 "
-            f"{s1.get('seen_count')} times, counting the questions that looked at it). It reused "
+            f"{s1.get('seen_count')} times, counting any question that looked at it). It reused "
             f"the stored write-ups rather than asking the model again, so its {rs['llm_calls']} "
             f"model call{'s' if rs['llm_calls'] != 1 else ''} went to the summary"
             + (f", after falling back past {', '.join(fell)}." if fell else ".")

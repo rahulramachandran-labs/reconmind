@@ -1,10 +1,10 @@
 {
   "status_code": 200,
   "body": {
-    "id": "204a8a64-dda2-4206-951a-3ce8f0012885",
+    "id": "f2067395-d123-40cf-96db-f39a1c0e7b26",
     "title": "S1003_20260616_0216_MOBILE.txt renamed channel_basket_id to basket_ref",
     "repeat": false,
-    "run_id": "b5444ae1-f162-41ff-8a82-28f65425be9c",
+    "run_id": "78b3d94d-58f0-4d68-a38b-599efb8f2e0a",
     "status": "pending_review",
     "sources": [
       {
@@ -84,8 +84,8 @@
       "confidence": 0.8
     },
     "trace_url": null,
-    "confidence": 0.95,
-    "seen_count": 3,
+    "confidence": 0.94,
+    "seen_count": 2,
     "specialist": "data_quality",
     "analysis_by": "model",
     "review_note": null,
@@ -94,42 +94,44 @@
     "review_reason": "S1 findings always get a human sign-off",
     "model_analysis": {
       "problem_statement": "S1003_20260616_0216_MOBILE.txt (2026-06-16) does not match the raw.transactions contract: missing ['channel_basket_id'], unexpected ['basket_ref']. 82 rows landed with the missing column null; that column is part of the dedup key, so dedup cannot run for this batch.",
-      "root_cause_hypothesis": "The submitter S1003 (MOBILE channel) updated their file export formatting and renamed the field `channel_basket_id` to `basket_ref` in `S1003_20260616_0216_MOBILE.txt`. Because the loader maps input data by exact header names against the `raw.transactions` schema contract, the 82 incoming records landed with `channel_basket_id` as NULL. This triggered a `ContractViolation` failure during the `validate_schema` task in the `retail_txn_daily` DAG. Since `channel_basket_id` is part of the deduplication key, this schema drift breaks downstream data integrity, similar to past incident INC-0438.",
+      "root_cause_hypothesis": "The mobile export pipeline introduced a schema change by renaming the dedup\u2011key column `channel_basket_id` to `basket_ref`. The rename propagated to the daily file S1003_20260616_0216_MOBILE.txt, causing `validate_schema` to flag a missing column and an unexpected column. Because the value profile (BSK\u2011 prefixed IDs) matches, this is a rename rather than a drop, similar to the root cause documented in incident INC\u20110438.",
       "recommended_fix": [
-        "Check the logs for `validate_schema` task in the `retail_txn_daily` DAG to verify the affected file `S1003_20260616_0216_MOBILE.txt`.",
-        "Verify the value profile of `basket_ref` in the staged raw file against `runbooks/schema-drift.md` (e.g., verifying 'BSK-' prefix patterns) to confirm it matches the historical `channel_basket_id` data.",
-        "Contact submitter S1003 / the mobile engineering team to confirm whether `basket_ref` is a permanent schema rename or an accidental release regression.",
-        "If temporary/accidental, work with the submitter to re-issue the file `S1003_20260616_0216_MOBILE.txt` with the required `channel_basket_id` column header.",
-        "If permanent, update the downstream ingestion mapping / dbt contract for the MOBILE file source to alias `basket_ref` to `channel_basket_id` prior to deduplication.",
-        "Backfill or re-ingest the 82 affected records from `S1003_20260616_0216_MOBILE.txt` so `channel_basket_id` is properly populated for business date 2026-06-16."
+        "Update the dbt contract for the `transactions` raw table to replace `channel_basket_id` with `basket_ref` (or add `basket_ref` as an alias).",
+        "Add a column mapping rule in the ingestion loader to map `basket_ref` to the internal `channel_basket_id` field until downstream consumers are updated.",
+        "Backfill the 82 affected rows: copy the `basket_ref` values into `channel_basket_id` for the 2026\u201106\u201116 batch.",
+        "Communicate the schema change to downstream data consumers and update any deduplication logic that relies on the original column name.",
+        "Add a regression test in the schema\u2011drift detection suite to verify future renames of this column are caught and auto\u2011handled.",
+        "Document the change in the schema\u2011drift runbook and create a versioned changelog entry."
       ],
       "open_questions": [
-        "Is `basket_ref` a permanent header change by submitter S1003 or a temporary file generation bug?",
-        "Do values in `basket_ref` adhere to the expected `BSK-` format and string length of `channel_basket_id` as outlined in `runbooks/schema-drift.md`?",
-        "Are other pending or upcoming MOBILE channel export files for business date 2026-06-16 also affected by this header change?"
+        "Has the mobile team issued a formal schema change announcement and version bump for the export library?",
+        "Are there any other files from the same submitter (S1003) that may have received the rename earlier or later than 2026\u201106\u201116?",
+        "Will downstream pipelines that use `channel_basket_id` as a dedup key need additional code changes beyond the alias mapping?",
+        "Is the `basket_ref` name intended to be permanent, or will future releases revert or further rename the column?"
       ],
-      "confidence": 0.95,
-      "provider": "gemini",
-      "model": "gemini-3.6-flash",
-      "latency_ms": 4239,
-      "prompt_tokens": 1344,
-      "completion_tokens": 630,
+      "confidence": 0.94,
+      "provider": "groq",
+      "model": "openai/gpt-oss-120b",
+      "latency_ms": 1574,
+      "prompt_tokens": 1256,
+      "completion_tokens": 504,
       "cost_usd": 0.0,
-      "prompt_version": "specialist-analysis@3",
-      "generated_at": "2026-09-19T19:01:41.930726Z"
+      "prompt_version": "specialist-analysis@4",
+      "generated_at": "2026-09-19T20:37:46.345779Z"
     },
     "open_questions": [
-      "Is `basket_ref` a permanent header change by submitter S1003 or a temporary file generation bug?",
-      "Do values in `basket_ref` adhere to the expected `BSK-` format and string length of `channel_basket_id` as outlined in `runbooks/schema-drift.md`?",
-      "Are other pending or upcoming MOBILE channel export files for business date 2026-06-16 also affected by this header change?"
+      "Has the mobile team issued a formal schema change announcement and version bump for the export library?",
+      "Are there any other files from the same submitter (S1003) that may have received the rename earlier or later than 2026\u201106\u201116?",
+      "Will downstream pipelines that use `channel_basket_id` as a dedup key need additional code changes beyond the alias mapping?",
+      "Is the `basket_ref` name intended to be permanent, or will future releases revert or further rename the column?"
     ],
     "recommended_fix": [
-      "Check the logs for `validate_schema` task in the `retail_txn_daily` DAG to verify the affected file `S1003_20260616_0216_MOBILE.txt`.",
-      "Verify the value profile of `basket_ref` in the staged raw file against `runbooks/schema-drift.md` (e.g., verifying 'BSK-' prefix patterns) to confirm it matches the historical `channel_basket_id` data.",
-      "Contact submitter S1003 / the mobile engineering team to confirm whether `basket_ref` is a permanent schema rename or an accidental release regression.",
-      "If temporary/accidental, work with the submitter to re-issue the file `S1003_20260616_0216_MOBILE.txt` with the required `channel_basket_id` column header.",
-      "If permanent, update the downstream ingestion mapping / dbt contract for the MOBILE file source to alias `basket_ref` to `channel_basket_id` prior to deduplication.",
-      "Backfill or re-ingest the 82 affected records from `S1003_20260616_0216_MOBILE.txt` so `channel_basket_id` is properly populated for business date 2026-06-16."
+      "Update the dbt contract for the `transactions` raw table to replace `channel_basket_id` with `basket_ref` (or add `basket_ref` as an alias).",
+      "Add a column mapping rule in the ingestion loader to map `basket_ref` to the internal `channel_basket_id` field until downstream consumers are updated.",
+      "Backfill the 82 affected rows: copy the `basket_ref` values into `channel_basket_id` for the 2026\u201106\u201116 batch.",
+      "Communicate the schema change to downstream data consumers and update any deduplication logic that relies on the original column name.",
+      "Add a regression test in the schema\u2011drift detection suite to verify future renames of this column are caught and auto\u2011handled.",
+      "Document the change in the schema\u2011drift runbook and create a versioned changelog entry."
     ],
     "affected_records": {
       "rate": null,
@@ -138,13 +140,13 @@
     },
     "confidence_label": "high",
     "problem_statement": "S1003_20260616_0216_MOBILE.txt (2026-06-16) does not match the raw.transactions contract: missing ['channel_basket_id'], unexpected ['basket_ref']. 82 rows landed with the missing column null; that column is part of the dedup key, so dedup cannot run for this batch.",
-    "root_cause_hypothesis": "The submitter S1003 (MOBILE channel) updated their file export formatting and renamed the field `channel_basket_id` to `basket_ref` in `S1003_20260616_0216_MOBILE.txt`. Because the loader maps input data by exact header names against the `raw.transactions` schema contract, the 82 incoming records landed with `channel_basket_id` as NULL. This triggered a `ContractViolation` failure during the `validate_schema` task in the `retail_txn_daily` DAG. Since `channel_basket_id` is part of the deduplication key, this schema drift breaks downstream data integrity, similar to past incident INC-0438.",
+    "root_cause_hypothesis": "The mobile export pipeline introduced a schema change by renaming the dedup\u2011key column `channel_basket_id` to `basket_ref`. The rename propagated to the daily file S1003_20260616_0216_MOBILE.txt, causing `validate_schema` to flag a missing column and an unexpected column. Because the value profile (BSK\u2011 prefixed IDs) matches, this is a rename rather than a drop, similar to the root cause documented in incident INC\u20110438.",
     "fingerprint": "schema_drift:S1003_20260616_0216_MOBILE.txt renamed channel_basket_id to basket_ref",
     "duplicate_of": null,
-    "last_seen_at": "2026-09-19T19:01:33.529424+00:00",
+    "last_seen_at": "2026-09-19T20:34:15.011231+00:00",
     "review_decision": null,
     "reviewed_by": null,
     "reviewed_at": null,
-    "created_at": "2026-09-19T19:00:42.032929+00:00"
+    "created_at": "2026-09-19T20:33:30.976627+00:00"
   }
 }

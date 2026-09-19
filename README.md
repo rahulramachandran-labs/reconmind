@@ -52,35 +52,37 @@ flowchart LR
 ### What a run looks like
 
 <!-- evidence:trace -->
-An excerpt from the trace of one captured run, the question *Did the MOBILE file have a schema problem on 2026-06-16?*, answered in 16.6 s by `groq/openai/gpt-oss-120b`:
+An excerpt from the trace of one captured run, the question *Did the MOBILE file have a schema problem on 2026-06-16?*, answered in 1.6 s by `groq/openai/gpt-oss-120b`:
 
 ```
-run 08cdde6e  "Did the MOBILE file have a schema problem on 2026-06-16?"  completed
+run 0caa0531  "Did the MOBILE file have a schema problem on 2026-06-16?"  completed
 
-planner       llm   planner   groq/openai/gpt-oss-120b   482 ms   436 + 113 tokens   $0
-              -> intent: investigate, specialists: ['data_quality'], confidence: 0.85
-                 rationale: Checking for a schema problem requires diffing the MOBILE file against
-                 the dbt contract, which is the responsibility of the data_quality specialist.
-planner       tool  orchestration-metadata/list_dag_runs   6 ms   {"dag_id": "retail_txn_daily"}
+planner       llm   planner   groq/openai/gpt-oss-120b   562 ms   481 + 151 tokens   $0
+              -> intent: investigate, specialists: ['data_quality'], confidence: 0.92
+                 rationale: The query asks about a possible schema problem for a specific file on a
+                 given date, which falls under the data_quality specialist's responsibility to
+                 detect schema_drift. This is an investigation of a potential issue.
+planner       tool  orchestration-metadata/list_dag_runs   15 ms   {"dag_id": "retail_txn_daily"}
 data_quality  tool  orchestration-metadata/get_failed_tasks   14 ms
               <- {"since": "2026-06-09"}
               -> validate_schema failed on 2026-06-16: ContractViolation:
                  S1003_20260616_0216_MOBILE.txt missing ['channel_basket_id']; unexpected
                  ['basket_ref']
-data_quality  tool  get_dbt_manifest, get_table_stats, get_timing_history: 11 calls, 14-60 ms each
-data_quality  retrieval  hybrid search   554 ms
-data_quality  llm   analyse:schema_drift   groq/openai/gpt-oss-120b   9,440 ms   1,228 + 468 tokens   $0
-              -> The Mobile team deployed a new export library that renamed the deduplication key
-                 column from `channel_basket_id` to `basket_ref`.
-reporter      llm   reporter:summary   groq/openai/gpt-oss-120b   5,983 ms   382 + 200 tokens   $0
-              -> S1: Missing channel_basket_id prevents dedup in S1003_20260616_0216_MOBILE batch
+data_quality  tool  get_dbt_manifest, get_table_stats, get_timing_history: 11 calls, 19-116 ms each
+data_quality  (no write-up call: the finding already had one from the scan, so it was reused)
+reporter      llm   reporter:summary   groq/openai/gpt-oss-120b   799 ms   382 + 167 tokens   $0
+              -> S1: Missing channel_basket_id in S1003_20260616_0216_MOBILE.txt prevents
+                 deduplication
 ```
 
-The full trace, 21 steps with every input and output, is [`docs/evidence/ask-mobile-run.json`](docs/evidence/ask-mobile-run.json).
+The full trace, 19 steps with every input and output, is [`docs/evidence/ask-mobile-run.json`](docs/evidence/ask-mobile-run.json).
 <!-- /evidence:trace -->
 
 <!-- evidence:schema -->
-Every report is validated against this model before it is stored ([`app/agents/schemas.py`](https://github.com/rahulramachandran-labs/reconmind/blob/e8dcd0ea700d14f6544851cf466ef0851850d285/app/agents/schemas.py#L53-L88)):
+<details>
+<summary>The report contract: every report is validated against this Pydantic model before it is stored</summary>
+
+From [`app/agents/schemas.py`](https://github.com/rahulramachandran-labs/reconmind/blob/3c192583a4961a8e63dddcb7f8bcfff6538add2c/app/agents/schemas.py#L53-L88):
 
 ```python
 class IncidentReport(BaseModel):
@@ -120,30 +122,32 @@ class IncidentReport(BaseModel):
     def fingerprint(self) -> str:
         return fingerprint(self.finding_type, self.title)
 ```
+
+</details>
 <!-- /evidence:schema -->
 
 ### One report, as a reviewer sees it
 
 <!-- evidence:report -->
-The key-drift report from that scan, exactly as the API returned it:
+The key-drift report from the captured scan, exactly as the API returned it:
 
 > **Problem.** Location LOC-0517 is reporting sales under two outlet ids: its canonical OUT-1017 and OUT-1071, which outlet_location_map does not map to it. 251 of 8373 deduplicated rows (3.0%) between 2026-06-01 and 2026-06-21 are affected, so store-level numbers for this location are split.
 >
 > **Affected records.** 251 records (3.0%) · **Severity** S2 · **Status** published
 >
-> **Root-cause hypothesis.** The source system that feeds LOC-0517 transmitted transactions with an incorrect outlet header, using OUT-1071 instead of the canonical OUT-1017. This created a key‑drift condition where the same location_id appears under two outlet_ids in the immutable transactions layer, which is not reflected in the outlet_location_map.
+> **Root-cause hypothesis.** The source system that generates the transaction feed for location LOC-0517 emitted an incorrect outlet_id (OUT-1071) in its header for a subset of records. This id is not present in the authoritative outlet_location_map (canonical OUT-1017), causing key drift. The drift persisted from first_seen 2026-06-01 to last_seen 2026-06-21 and was reported by 4 submitters, indicating a mis‑configuration or data‑entry error at the source rather than a downstream processing bug.
 >
-> **Recommended fix.** 1. Contact the 4 submitters (see metrics) to confirm which outlet_id (OUT-1017 or OUT-1071) is correct for LOC-0517. 2. Insert an alias record for the drifted id (OUT-1071) into the `outlet_alias` table with appropriate `valid_from` and `valid_to` timestamps. 3. Trigger a backfill of the staging model `stg_transactions` for the window 2026-06-01 to 2026-06-21, then rebuild `fct_daily_sales` for the same dates (follow the backfill runbook). 4. Ask the source system owner to correct the outlet header in future extracts and log the ticket number in the incident documentation.
+> **Recommended fix.** 1. Confirm with the 4 submitters which outlet_id (OUT-1017 or OUT-1071) is correct for LOC-0517. 2. Add OUT-1071 as an alias in the outlet_alias table with appropriate valid_from/valid_to timestamps so the staging model can remap it. 3. Rebuild the stg_transactions and fct_daily_sales models for the affected dates (2026-06-01 to 2026-06-21) following the backfill runbook. 4. Instruct the source system owner to correct the header/outlet_id at source and document the ticket number in the incident write‑up.
 >
 > **Confidence.** 0.75 (high)
 >
-> **Open questions.** Was the incorrect outlet_id ever introduced intentionally as a temporary alias, or is it purely a data entry error? Are there any other locations that share the same drifted outlet_id (OUT-1071) in the same window? What is the timeline for the source team to deploy the header fix, and does it require a schema change? Do we need to adjust any downstream alert thresholds now that the alias will be added?
+> **Open questions.** What caused the incorrect outlet_id to be emitted at the source (e.g., config change, manual entry error)? Why did 4 separate submitters report the same drift—are they independent pipelines or shared ingestion points? Is there a monitoring gap that allowed the drift to persist for 21 days before detection? Will the alias addition impact any other locations that may have used OUT-1071 historically? Do we need to adjust the detection window or alert thresholds to surface similar drifts earlier?
 >
 > **Evidence.** `mcp:warehouse-metadata/run_check`: 251 deduplicated rows (158 baskets) at LOC-0517 carry OUT-1071, which outlet_location_map does not map there; canonical is OUT-1017
 >
 > **Runbooks consulted.** Key drift between outlet_id and location_id: *Why it matters*, *Fix*, *Overview*, *Detection*
 
-Run `b5444ae1-f162-41ff-8a82-28f65425be9c`, captured 2026-09-19 19:00:42 UTC · `analysis_by: model` · written by `openai/gpt-oss-120b` (groq) in 1,221 ms (1,177 prompt + 400 completion tokens, $0.00). The problem statement and counts come from the deterministic check; the root cause, fix, confidence and open questions are the model's, with confidence capped at the template's 0.60 plus 0.15. The template's own version is stored beside it, and its hypothesis reads: *"Whole baskets (158) from 4 submitter(s) carry OUT-1071, so the id is set at the register or export profile rather than corrupted row by row; OUT-1071 looks like a transposition of OUT-1017."* Raw JSON: [`docs/evidence/incident-key-drift.json`](docs/evidence/incident-key-drift.json).
+Run `78b3d94d-58f0-4d68-a38b-599efb8f2e0a`, captured 2026-09-19 20:33:30 UTC · `analysis_by: model` · written by `openai/gpt-oss-120b` (groq) in 1,307 ms (1,205 prompt + 443 completion tokens, $0.00). The problem statement and counts come from the deterministic check; the root cause, fix, confidence and open questions are the model's, with confidence capped at the template's 0.60 plus 0.15. The template's own version is stored beside it, and its hypothesis reads: *"Whole baskets (158) from 4 submitter(s) carry OUT-1071, so the id is set at the register or export profile rather than corrupted row by row; OUT-1071 looks like a transposition of OUT-1017."* Raw JSON: [`docs/evidence/incident-key-drift.json`](docs/evidence/incident-key-drift.json).
 <!-- /evidence:report -->
 
 ### Why it is built this way
@@ -158,25 +162,27 @@ Run `b5444ae1-f162-41ff-8a82-28f65425be9c`, captured 2026-09-19 19:00:42 UTC · 
 ## Results
 
 <!-- evidence:results -->
-From the last capture of every scenario, on 2026-09-19, against a freshly seeded local stack with Groq's free tier first in the fallback chain ([`docs/evidence/`](docs/evidence/README.md)). Planted sizes are from [`expected_anomalies.json`](data/sample/expected_anomalies.json).
+From the last capture, on 2026-09-19: a freshly seeded local stack with Groq's free tier first in the fallback chain, and every scenario a reviewer would try ([`docs/evidence/`](docs/evidence/README.md)). Planted sizes are from [`expected_anomalies.json`](data/sample/expected_anomalies.json).
 
-| Planted anomaly | Planted size | Finding produced | Severity (expected) | Outcome | Written by |
+| Planted anomaly | Planted size | Finding produced | Severity | Outcome | Written by |
 |---|---|---|---|---|---|
-| Schema drift | `S1003_20260616_0216_MOBILE.txt` renames `channel_basket_id` to `basket_ref`: 82 rows | S1003_20260616_0216_MOBILE.txt renamed channel_basket_id to basket_ref (82 records) | S1 (S1) | held for review | `groq/openai/gpt-oss-120b` |
-| Key drift | `LOC-0517` also reports as `OUT-1071`: 251 of 8,373 rows | LOC-0517 also reporting as OUT-1071 (3.0% of rows) (251 records) | S2 (S2) | published | `groq/openai/gpt-oss-120b` |
-| Duplicate submission | `S1002_20260612_1120_ECOMM.txt` supersedes 88 rows, 3 with changed values, after the DAG ran | Resent file S1002_20260612_1120_ECOMM.txt supersedes 88 rows (88 records) | S2 (S2) | published | `groq/openai/gpt-oss-120b` |
-| Volume anomaly | `S1001_20260618_0638_POSFEED.txt`: 110 rows vs 182.6 trailing, 161 min late | S1001 2026-06-18: 110 rows, 40% below its 7-day average (73 records) | S2 (S2) | published | `groq/openai/gpt-oss-120b` |
+| Schema drift | `S1003_20260616_0216_MOBILE.txt` renames `channel_basket_id` to `basket_ref`: 82 rows | S1003_20260616_0216_MOBILE.txt renamed channel_basket_id to basket_ref; 82 records | S1, as expected | held for review | `groq/openai/gpt-oss-120b` |
+| Key drift | `LOC-0517` also reports as `OUT-1071`: 251 of 8,373 rows | LOC-0517 also reporting as OUT-1071 (3.0% of rows); 251 records | S2, as expected | published | `groq/openai/gpt-oss-120b` |
+| Duplicate submission | `S1002_20260612_1120_ECOMM.txt` supersedes 88 rows, 3 with changed values, after the DAG ran | Resent file S1002_20260612_1120_ECOMM.txt supersedes 88 rows; 88 records | S2, as expected | published | `groq/openai/gpt-oss-120b` |
+| Volume anomaly | `S1001_20260618_0638_POSFEED.txt`: 110 rows vs 182.6 trailing, 161 min late | S1001 2026-06-18: 110 rows, 40% below its 7-day average; 73 records | S2, as expected | published | `groq/openai/gpt-oss-120b` |
 
-- **Every planted anomaly found**, each by the expected specialist at the expected severity, and nothing else flagged.
-- **Scan:** 14.8 s from the request to four written-up findings: 5 agent nodes, 30 MCP tool calls, 4 retrievals, 5 model calls (5,602 prompt and 2,161 completion tokens, $0.00 on the free tier).
-- **Investigation question:** *Did the MOBILE file have a schema problem on 2026-06-16?* went to Data-Quality only; 3 model calls.
-- **Runbook question and follow-up:** *Which file wins when a submitter resends the same day?* was answered from the runbooks with a citation; the follow-up in the same session, *What should we check before reprocessing that day?*, used 6 model calls (gemini/gemini-3.6-flash, groq/openai/gpt-oss-120b), because Groq's per-minute token limit sent some calls on to the next provider.
-- **Written up again:** `POST /incidents/{id}/regenerate` on the S1 returned HTTP 200 with `analysis_by: model`, written by `gemini/gemini-3.6-flash` in 4,239 ms, the template's version kept beside it.
-- **Signed off:** approving the S1 with a note resumed its paused run and published it.
-- **Scanned again:** the second scan completed without pausing, and the feed still holds 4 findings, each seen again (the S1 4 times, counting the questions that looked at it).
-- **Tests:** 158 passed, 0 failed, 93.17% line and branch coverage ([`tests.txt`](docs/evidence/tests.txt)).
-- **RAGAS gate:** pass (faithfulness 0.911, answer relevancy 0.862, context precision 0.830, context recall 0.922; hybrid retrieval, extractive answers, offline judges).
-- **CI:** [run 35462138190](https://github.com/rahulramachandran-labs/reconmind/actions/runs/35462138190) on `0487a57`, success.
+All four planted anomalies were found, each by the specialist expected to find it and at the expected severity, and nothing else was flagged. The scan took 13.6 s from the request to four written-up findings: 5 agent nodes, 30 MCP tool calls, 4 retrievals and 5 model calls (5,714 prompt and 2,093 completion tokens, $0.00 on the free tier).
+
+Then the questions, each a real run:
+
+- *Did the MOBILE file have a schema problem on 2026-06-16?* went to the Data-Quality agent in 1.6 s, 2 model calls. It said: *“S1: Missing channel_basket_id in S1003_20260616_0216_MOBILE.txt prevents deduplication.”*
+- *Which file wins when a submitter resends the same day?* was answered from the runbooks in 1.9 s, 2 model calls. It said: *“The resend that has the later `YYYYMMDD_HHMM` timestamp in its file name wins.”*
+- *What should we check before reprocessing that day?* was answered from the runbooks in 2.5 s, 2 model calls (asked in the same session, so the Planner saw the question before it). It said: *“Before reprocessing, verify that the corrected (resend) file has a later `HHMM` timestamp in its name so the latest‑file‑wins logic will select it, and then compare the `publish_metrics` output to the file’s trailer counts to confirm they match [2].”*
+- *Show me which submitter sent the fewest rows on 2026-06-18, and when its file landed.* went to the Explorer in 2.6 s, 3 model calls; the model chose `get_table_stats`. It said: *“The submitter with the fewest rows on 2026‑06‑18 was **S1004**, whose file contributed **53 rows**.”*
+
+Writing the S1 up again with `POST /incidents/{id}/regenerate` returned HTTP 200, `analysis_by: model`, from `groq/openai/gpt-oss-120b` in 1,574 ms, with the template's version kept beside it. Approving it with a note resumed its paused run and published it. A second scan took 1.2 s and paused for nothing; the feed still held 4 findings, each counted as seen again (the S1 3 times, counting any question that looked at it). It reused the stored write-ups rather than asking the model again, so its 1 model call went to the summary.
+
+`make test`: 172 passed, 0 failed, 92.58% line and branch coverage ([`tests.txt`](docs/evidence/tests.txt)). The RAGAS gate: pass (faithfulness 0.911, answer relevancy 0.862, context precision 0.830, context recall 0.922). CI: [run 35467705767](https://github.com/rahulramachandran-labs/reconmind/actions/runs/35467705767) on `3c19258`, success.
 <!-- /evidence:results -->
 
 ## Screens
@@ -191,8 +197,9 @@ Captured at 1440×900 from a freshly seeded local stack with Groq's free tier wr
 | **Incident detail: model analysis**<br><br>The key-drift report as the model wrote it. The chip names the model, its latency, tokens and cost. | <img src="docs/screenshots/incident-detail.png" width="560" alt="Incident detail: model analysis"> |
 | **Incident detail: deterministic checks**<br><br>The template the model's answer is held against: the same problem and counts, and a calibrated confidence. *Side by side* shows both at once. | <img src="docs/screenshots/incident-template.png" width="560" alt="Incident detail: deterministic checks"> |
 | **Review queue**<br><br>The S1 waits for a person, with the reason it paused. | <img src="docs/screenshots/review.png" width="560" alt="Review queue"> |
-| **Ask ReconMind: an investigation**<br><br>The MOBILE question goes to Data-Quality only, and the steps stream in. From the captured run, the first two sentences of the answer, written by `groq/openai/gpt-oss-120b`: *“S1: Missing channel_basket_id prevents dedup in S1003_20260616_0216_MOBILE batch. The S1003_20260616_0216_MOBILE.txt file from 2026-06-16 was renamed, replacing the required 'channel_basket_id' column with 'basket_ref'.”* | <img src="docs/screenshots/ask.png" width="560" alt="Ask ReconMind: an investigation"> |
+| **Ask ReconMind: an investigation**<br><br>The MOBILE question goes to Data-Quality only, and the steps stream in. From the captured run, the first two sentences of the answer, written by `groq/openai/gpt-oss-120b`: *“S1: Missing channel_basket_id in S1003_20260616_0216_MOBILE.txt prevents deduplication. The file S1003_20260616_0216_MOBILE.txt (dated 2026-06-16) does not conform to the raw.transactions contract: the required field 'channel_basket_id' is missing and an unexpected field 'basket_ref' appears.”* | <img src="docs/screenshots/ask.png" width="560" alt="Ask ReconMind: an investigation"> |
 | **Ask ReconMind: a runbook question**<br><br>Answered from the runbooks with numbered citations, and the footer names the model that answered. | <img src="docs/screenshots/ask-runbook.png" width="560" alt="Ask ReconMind: a runbook question"> |
+| **Ask ReconMind: a fact no check covers**<br><br>The Planner sends it to the Explorer, which picks the read-only tools itself (at most three), then answers from what they returned. | <img src="docs/screenshots/ask-explore.png" width="560" alt="Ask ReconMind: a fact no check covers"> |
 | **Traces**<br><br>The scan's trace: each agent, then its MCP tool calls, retrievals and model calls with their latency. The headline and summary at the top are the model's. | <img src="docs/screenshots/trace.png" width="560" alt="Traces"> |
 | **Docs & runbooks, hybrid**<br><br>`basket_ref ContractViolation` with hybrid search: the schema-drift runbook and incident INC-0438 come first. The badges show each hit's dense and BM25 rank; INC-0438 is 10th on meaning alone and 1st on keywords. | <img src="docs/screenshots/docs-hybrid.png" width="560" alt="Docs & runbooks, hybrid"> |
 | **Docs & runbooks, dense only**<br><br>The same query with embeddings only: docs and dbt models for the transactions table fill the top four, the runbook is 5th and the incident isn't in the top five. | <img src="docs/screenshots/docs-dense.png" width="560" alt="Docs & runbooks, dense only"> |
@@ -345,12 +352,12 @@ CI also runs ruff, black and mypy, then 158 tests with an 80% coverage gate (cur
 ### Testing
 
 <!-- evidence:testing -->
-From the last captured run of `make test` ([`docs/evidence/tests.txt`](docs/evidence/tests.txt)): 158 passed, 0 failed, 93.17% coverage.
+From the last captured run of `make test` ([`docs/evidence/tests.txt`](docs/evidence/tests.txt)): 172 passed, 0 failed, 92.58% coverage.
 
 | Layer | Tests | What it covers |
 |---|---|---|
-| Unit | 103 | Retrieval (tokenizer, RRF, reranker), the model fallback chain, structured output, prompts, tracing, the synthetic generator, rate limits |
-| Integration | 49 | Postgres and the append-only ledger, both MCP servers through a real client, the agent graph end to end, the API |
+| Unit | 112 | Retrieval (tokenizer, RRF, reranker), the model fallback chain, structured output, prompts, tracing, the synthetic generator, rate limits |
+| Integration | 54 | Postgres and the append-only ledger, both MCP servers through a real client, the agent graph end to end, the API |
 | of which prompt injection | 1 | A runbook carrying planted instructions can't change a severity or approve anything ([test](tests/integration/test_prompt_injection.py)) |
 | of which domain-agnostic proof | 2 | The same graph runs on the support-triage domain, and no agent module imports a domain ([test](tests/integration/test_domain_agnostic.py)) |
 | Chaos | 6 | Each anomaly planted on its own is caught by the right agent at the right severity, a clean pipeline raises nothing, and a scan fits the 30-second budget ([tests](tests/chaos/test_injected_anomalies.py)) |
@@ -371,17 +378,17 @@ From the last captured run of `make test` ([`docs/evidence/tests.txt`](docs/evid
 ### Course concepts applied
 
 <!-- evidence:course -->
-Links in *Where* and *Test* point at the exact lines, pinned to commit `e8dcd0e`. [docs/COURSE_MAPPING.md](docs/COURSE_MAPPING.md) says more about each.
+Links in *Where* and *Test* point at the exact lines, pinned to commit `3c19258`. [docs/COURSE_MAPPING.md](docs/COURSE_MAPPING.md) says more about each.
 
 | Module | Concept demonstrated | Where | Test |
 |---|---|---|---|
-| GenAI foundations | Delimited, untrusted context in prompts; Pydantic-validated structured output with a retry loop | [`format_passages`](https://github.com/rahulramachandran-labs/reconmind/blob/e8dcd0ea700d14f6544851cf466ef0851850d285/app/rag/prompts.py#L35-L41) · [`structured`](https://github.com/rahulramachandran-labs/reconmind/blob/e8dcd0ea700d14f6544851cf466ef0851850d285/app/llm/structured.py#L26-L74) | [planted injection](https://github.com/rahulramachandran-labs/reconmind/blob/e8dcd0ea700d14f6544851cf466ef0851850d285/tests/integration/test_prompt_injection.py#L55-L87) · [re-prompt on invalid JSON](https://github.com/rahulramachandran-labs/reconmind/blob/e8dcd0ea700d14f6544851cf466ef0851850d285/tests/unit/test_structured.py#L49-L56) |
-| Models and APIs | Provider abstraction and fallback across OpenAI, Anthropic, Groq, Gemini, OpenRouter and Ollama; token and cost accounting per call | [`build_providers`](https://github.com/rahulramachandran-labs/reconmind/blob/e8dcd0ea700d14f6544851cf466ef0851850d285/app/llm/providers.py#L166-L256) · [`LLMChain`](https://github.com/rahulramachandran-labs/reconmind/blob/e8dcd0ea700d14f6544851cf466ef0851850d285/app/llm/providers.py#L267-L344) | [fallback order](https://github.com/rahulramachandran-labs/reconmind/blob/e8dcd0ea700d14f6544851cf466ef0851850d285/tests/unit/test_llm_chain.py#L38-L43) · [rate-limited free tier](https://github.com/rahulramachandran-labs/reconmind/blob/e8dcd0ea700d14f6544851cf466ef0851850d285/tests/unit/test_llm_chain.py#L236-L261) |
-| LangChain | Markdown and dbt YAML loaders, section-aware splitting, retrievers, session memory in Postgres | [`load_corpus`](https://github.com/rahulramachandran-labs/reconmind/blob/e8dcd0ea700d14f6544851cf466ef0851850d285/app/retrieval/corpus.py#L28-L45) · [`chunk_docs`](https://github.com/rahulramachandran-labs/reconmind/blob/e8dcd0ea700d14f6544851cf466ef0851850d285/app/retrieval/chunking.py#L9-L40) · [`HybridRetriever`](https://github.com/rahulramachandran-labs/reconmind/blob/e8dcd0ea700d14f6544851cf466ef0851850d285/app/retrieval/hybrid.py#L35-L84) · [`SqlSessionStore`](https://github.com/rahulramachandran-labs/reconmind/blob/e8dcd0ea700d14f6544851cf466ef0851850d285/app/memory/sessions.py#L62-L98) | [chunk metadata](https://github.com/rahulramachandran-labs/reconmind/blob/e8dcd0ea700d14f6544851cf466ef0851850d285/tests/unit/test_corpus.py#L38-L44) · [LangChain retriever](https://github.com/rahulramachandran-labs/reconmind/blob/e8dcd0ea700d14f6544851cf466ef0851850d285/tests/unit/test_hybrid.py#L57-L61) · [session history](https://github.com/rahulramachandran-labs/reconmind/blob/e8dcd0ea700d14f6544851cf466ef0851850d285/tests/unit/test_sessions.py#L8-L15) |
-| RAG | Chunking, BM25 + dense hybrid, RRF, reranking, a RAGAS gate in CI | [`tokenize`](https://github.com/rahulramachandran-labs/reconmind/blob/e8dcd0ea700d14f6544851cf466ef0851850d285/app/retrieval/bm25.py#L20-L37) · [`rrf`](https://github.com/rahulramachandran-labs/reconmind/blob/e8dcd0ea700d14f6544851cf466ef0851850d285/app/retrieval/hybrid.py#L15-L32) · [reranker](https://github.com/rahulramachandran-labs/reconmind/blob/e8dcd0ea700d14f6544851cf466ef0851850d285/app/retrieval/rerank.py#L18-L32) · [offline judge](https://github.com/rahulramachandran-labs/reconmind/blob/e8dcd0ea700d14f6544851cf466ef0851850d285/evals/run_ragas.py#L116-L150) · [RAGAS job](.github/workflows/ci.yml) | [RRF](https://github.com/rahulramachandran-labs/reconmind/blob/e8dcd0ea700d14f6544851cf466ef0851850d285/tests/unit/test_hybrid.py#L38-L44) · [exact identifiers](https://github.com/rahulramachandran-labs/reconmind/blob/e8dcd0ea700d14f6544851cf466ef0851850d285/tests/unit/test_hybrid.py#L64-L71) |
-| Agentic AI | LangGraph StateGraph, conditional edges, parallel specialists, checkpoints, human-in-the-loop | [`build_graph`](https://github.com/rahulramachandran-labs/reconmind/blob/e8dcd0ea700d14f6544851cf466ef0851850d285/app/agents/graph.py#L51-L121) · [`interrupt()`](https://github.com/rahulramachandran-labs/reconmind/blob/e8dcd0ea700d14f6544851cf466ef0851850d285/app/agents/review.py#L30-L46) · [Postgres checkpointer](https://github.com/rahulramachandran-labs/reconmind/blob/e8dcd0ea700d14f6544851cf466ef0851850d285/app/agents/bootstrap.py#L43-L92) | [parallel specialists](https://github.com/rahulramachandran-labs/reconmind/blob/e8dcd0ea700d14f6544851cf466ef0851850d285/tests/integration/test_agents.py#L121-L131) · [pause and resume](https://github.com/rahulramachandran-labs/reconmind/blob/e8dcd0ea700d14f6544851cf466ef0851850d285/tests/integration/test_agents.py#L47-L70) |
-| MCP | Host, client and server; two read-only servers; stdio vs HTTP transports | [warehouse server](https://github.com/rahulramachandran-labs/reconmind/blob/e8dcd0ea700d14f6544851cf466ef0851850d285/mcp_servers/warehouse_metadata/server.py#L183-L331) · [orchestration server](https://github.com/rahulramachandran-labs/reconmind/blob/e8dcd0ea700d14f6544851cf466ef0851850d285/mcp_servers/orchestration_metadata/server.py#L82-L180) · [`MCPToolBox`](https://github.com/rahulramachandran-labs/reconmind/blob/e8dcd0ea700d14f6544851cf466ef0851850d285/app/tools/mcp_toolbox.py#L34-L88) | [inputs validated, no SQL](https://github.com/rahulramachandran-labs/reconmind/blob/e8dcd0ea700d14f6544851cf466ef0851850d285/tests/integration/test_warehouse_mcp.py#L74-L99) · [read-only tools](https://github.com/rahulramachandran-labs/reconmind/blob/e8dcd0ea700d14f6544851cf466ef0851850d285/tests/unit/test_orchestration_mcp.py#L6-L9) |
-| Observability and deployment | LangFuse tracing, FastAPI, Docker, Render and Vercel, CI/CD | [`RunTracer`](https://github.com/rahulramachandran-labs/reconmind/blob/e8dcd0ea700d14f6544851cf466ef0851850d285/app/observability/tracer.py#L120-L224) · [`TracedLLM`](https://github.com/rahulramachandran-labs/reconmind/blob/e8dcd0ea700d14f6544851cf466ef0851850d285/app/llm/traced.py#L12-L64) · [Dockerfile](Dockerfile) · [render.yaml](render.yaml) · [ci.yml](.github/workflows/ci.yml) | [LangFuse nesting](https://github.com/rahulramachandran-labs/reconmind/blob/e8dcd0ea700d14f6544851cf466ef0851850d285/tests/unit/test_tracer.py#L85-L105) · [every call traced](https://github.com/rahulramachandran-labs/reconmind/blob/e8dcd0ea700d14f6544851cf466ef0851850d285/tests/integration/test_agents.py#L97-L118) · [untraced call refused](https://github.com/rahulramachandran-labs/reconmind/blob/e8dcd0ea700d14f6544851cf466ef0851850d285/tests/unit/test_structured.py#L80-L83) |
+| GenAI foundations | Delimited, untrusted context in prompts; Pydantic-validated structured output with a retry loop | [`format_passages`](https://github.com/rahulramachandran-labs/reconmind/blob/3c192583a4961a8e63dddcb7f8bcfff6538add2c/app/rag/prompts.py#L38-L44) · [`structured`](https://github.com/rahulramachandran-labs/reconmind/blob/3c192583a4961a8e63dddcb7f8bcfff6538add2c/app/llm/structured.py#L26-L81) | [planted injection](https://github.com/rahulramachandran-labs/reconmind/blob/3c192583a4961a8e63dddcb7f8bcfff6538add2c/tests/integration/test_prompt_injection.py#L55-L87) · [re-prompt on invalid JSON](https://github.com/rahulramachandran-labs/reconmind/blob/3c192583a4961a8e63dddcb7f8bcfff6538add2c/tests/unit/test_structured.py#L49-L56) |
+| Models and APIs | Provider abstraction and fallback across OpenAI, Anthropic, Groq, Gemini, OpenRouter and Ollama; token and cost accounting per call | [`build_providers`](https://github.com/rahulramachandran-labs/reconmind/blob/3c192583a4961a8e63dddcb7f8bcfff6538add2c/app/llm/providers.py#L220-L310) · [`LLMChain`](https://github.com/rahulramachandran-labs/reconmind/blob/3c192583a4961a8e63dddcb7f8bcfff6538add2c/app/llm/providers.py#L321-L422) | [fallback order](https://github.com/rahulramachandran-labs/reconmind/blob/3c192583a4961a8e63dddcb7f8bcfff6538add2c/tests/unit/test_llm_chain.py#L38-L43) · [rate-limited free tier](https://github.com/rahulramachandran-labs/reconmind/blob/3c192583a4961a8e63dddcb7f8bcfff6538add2c/tests/unit/test_llm_chain.py#L236-L261) |
+| LangChain | Markdown and dbt YAML loaders, section-aware splitting, a `BaseRetriever`, a `ChatPromptTemplate` with a `MessagesPlaceholder`, chat memory as a `BaseChatMessageHistory` over Postgres | [`load_corpus`](https://github.com/rahulramachandran-labs/reconmind/blob/3c192583a4961a8e63dddcb7f8bcfff6538add2c/app/retrieval/corpus.py#L28-L45) · [`chunk_docs`](https://github.com/rahulramachandran-labs/reconmind/blob/3c192583a4961a8e63dddcb7f8bcfff6538add2c/app/retrieval/chunking.py#L9-L40) · [`HybridRetriever`](https://github.com/rahulramachandran-labs/reconmind/blob/3c192583a4961a8e63dddcb7f8bcfff6538add2c/app/retrieval/hybrid.py#L35-L84) · [`ANSWER_PROMPT`](https://github.com/rahulramachandran-labs/reconmind/blob/3c192583a4961a8e63dddcb7f8bcfff6538add2c/app/rag/prompts.py#L65-L78) · [`SessionHistory`](https://github.com/rahulramachandran-labs/reconmind/blob/3c192583a4961a8e63dddcb7f8bcfff6538add2c/app/memory/sessions.py#L103-L123) | [chunk metadata](https://github.com/rahulramachandran-labs/reconmind/blob/3c192583a4961a8e63dddcb7f8bcfff6538add2c/tests/unit/test_corpus.py#L38-L44) · [LangChain retriever](https://github.com/rahulramachandran-labs/reconmind/blob/3c192583a4961a8e63dddcb7f8bcfff6538add2c/tests/unit/test_hybrid.py#L57-L61) · [prompt template](https://github.com/rahulramachandran-labs/reconmind/blob/3c192583a4961a8e63dddcb7f8bcfff6538add2c/tests/unit/test_rag.py#L114-L124) · [message history](https://github.com/rahulramachandran-labs/reconmind/blob/3c192583a4961a8e63dddcb7f8bcfff6538add2c/tests/unit/test_sessions.py#L65-L75) |
+| RAG | Chunking, BM25 + dense hybrid, RRF, reranking, a RAGAS gate in CI | [`tokenize`](https://github.com/rahulramachandran-labs/reconmind/blob/3c192583a4961a8e63dddcb7f8bcfff6538add2c/app/retrieval/bm25.py#L20-L37) · [`rrf`](https://github.com/rahulramachandran-labs/reconmind/blob/3c192583a4961a8e63dddcb7f8bcfff6538add2c/app/retrieval/hybrid.py#L15-L32) · [reranker](https://github.com/rahulramachandran-labs/reconmind/blob/3c192583a4961a8e63dddcb7f8bcfff6538add2c/app/retrieval/rerank.py#L18-L32) · [offline judge](https://github.com/rahulramachandran-labs/reconmind/blob/3c192583a4961a8e63dddcb7f8bcfff6538add2c/evals/run_ragas.py#L116-L150) · [RAGAS job](.github/workflows/ci.yml) | [RRF](https://github.com/rahulramachandran-labs/reconmind/blob/3c192583a4961a8e63dddcb7f8bcfff6538add2c/tests/unit/test_hybrid.py#L38-L44) · [exact identifiers](https://github.com/rahulramachandran-labs/reconmind/blob/3c192583a4961a8e63dddcb7f8bcfff6538add2c/tests/unit/test_hybrid.py#L64-L71) |
+| Agentic AI | LangGraph StateGraph, conditional edges, parallel specialists, checkpoints, human-in-the-loop, and an Explorer where the model chooses its own tools | [`build_graph`](https://github.com/rahulramachandran-labs/reconmind/blob/3c192583a4961a8e63dddcb7f8bcfff6538add2c/app/agents/graph.py#L53-L129) · [`interrupt()`](https://github.com/rahulramachandran-labs/reconmind/blob/3c192583a4961a8e63dddcb7f8bcfff6538add2c/app/agents/review.py#L30-L46) · [Postgres checkpointer](https://github.com/rahulramachandran-labs/reconmind/blob/3c192583a4961a8e63dddcb7f8bcfff6538add2c/app/agents/bootstrap.py#L43-L92) · [Explorer (tool choice)](https://github.com/rahulramachandran-labs/reconmind/blob/3c192583a4961a8e63dddcb7f8bcfff6538add2c/app/agents/explorer.py#L37-L93) | [parallel specialists](https://github.com/rahulramachandran-labs/reconmind/blob/3c192583a4961a8e63dddcb7f8bcfff6538add2c/tests/integration/test_agents.py#L121-L131) · [pause and resume](https://github.com/rahulramachandran-labs/reconmind/blob/3c192583a4961a8e63dddcb7f8bcfff6538add2c/tests/integration/test_agents.py#L47-L70) · [model picks tools](https://github.com/rahulramachandran-labs/reconmind/blob/3c192583a4961a8e63dddcb7f8bcfff6538add2c/tests/integration/test_agents.py#L278-L302) |
+| MCP | Host, client and server; two read-only servers; stdio vs HTTP transports | [warehouse server](https://github.com/rahulramachandran-labs/reconmind/blob/3c192583a4961a8e63dddcb7f8bcfff6538add2c/mcp_servers/warehouse_metadata/server.py#L183-L331) · [orchestration server](https://github.com/rahulramachandran-labs/reconmind/blob/3c192583a4961a8e63dddcb7f8bcfff6538add2c/mcp_servers/orchestration_metadata/server.py#L82-L180) · [`MCPToolBox`](https://github.com/rahulramachandran-labs/reconmind/blob/3c192583a4961a8e63dddcb7f8bcfff6538add2c/app/tools/mcp_toolbox.py#L34-L111) | [inputs validated, no SQL](https://github.com/rahulramachandran-labs/reconmind/blob/3c192583a4961a8e63dddcb7f8bcfff6538add2c/tests/integration/test_warehouse_mcp.py#L74-L99) · [read-only tools](https://github.com/rahulramachandran-labs/reconmind/blob/3c192583a4961a8e63dddcb7f8bcfff6538add2c/tests/unit/test_orchestration_mcp.py#L6-L9) |
+| Observability and deployment | LangFuse tracing, FastAPI, Docker, Render and Vercel, CI/CD | [`RunTracer`](https://github.com/rahulramachandran-labs/reconmind/blob/3c192583a4961a8e63dddcb7f8bcfff6538add2c/app/observability/tracer.py#L120-L224) · [`TracedLLM`](https://github.com/rahulramachandran-labs/reconmind/blob/3c192583a4961a8e63dddcb7f8bcfff6538add2c/app/llm/traced.py#L14-L120) · [Dockerfile](Dockerfile) · [render.yaml](render.yaml) · [ci.yml](.github/workflows/ci.yml) | [LangFuse nesting](https://github.com/rahulramachandran-labs/reconmind/blob/3c192583a4961a8e63dddcb7f8bcfff6538add2c/tests/unit/test_tracer.py#L85-L105) · [every call traced](https://github.com/rahulramachandran-labs/reconmind/blob/3c192583a4961a8e63dddcb7f8bcfff6538add2c/tests/integration/test_agents.py#L97-L118) · [untraced call refused](https://github.com/rahulramachandran-labs/reconmind/blob/3c192583a4961a8e63dddcb7f8bcfff6538add2c/tests/unit/test_structured.py#L80-L83) |
 <!-- /evidence:course -->
 
 ## Documentation

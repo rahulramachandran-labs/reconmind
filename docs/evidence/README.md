@@ -4,21 +4,22 @@ Raw responses from a local ReconMind stack, captured by [`scripts/capture_readme
 
 | | |
 |---|---|
-| Captured | 2026-09-19T19:00:08Z |
-| Commit | `35d6309` |
+| Captured | 2026-09-19T20:33:20Z |
+| Commit | `3c19258` |
 | API | 1.1.0, providers `groq, gemini, ollama` |
 | Model calls went to | groq/openai/gpt-oss-120b |
-| Scan run | `b5444ae1-f162-41ff-8a82-28f65425be9c` (paused_review) |
-| Scan wall time | 14.8 s |
+| Scan run | `78b3d94d-58f0-4d68-a38b-599efb8f2e0a` (paused_review) |
+| Scan wall time | 13.6 s |
 | Scan steps | 5 agent nodes, 30 MCP tool calls, 4 retrievals, 5 model calls |
-| Scan cost | $0.0000 (5602 prompt + 2161 completion tokens) |
-| ask-mobile run | `08cdde6e-8acc-472b-8034-f4dff77cc71f` (completed): Did the MOBILE file have a schema problem on 2026-06-16? |
-| ask-runbook run | `dcccae9c-98fd-4806-a922-8e445a310b1c` (completed): Which file wins when a submitter resends the same day? |
-| ask-follow-up run | `49233696-56a7-4ba1-9f27-79da8dd07e59` (completed): What should we check before reprocessing that day? |
-| S1 written up again | HTTP 200, `analysis_by: model`, gemini/gemini-3.6-flash, 4239 ms |
+| Scan cost | $0.0000 (5714 prompt + 2093 completion tokens) |
+| ask-mobile run | `0caa0531-6ded-4557-8d32-9471e4d6620b` (completed): Did the MOBILE file have a schema problem on 2026-06-16? |
+| ask-runbook run | `26d664d6-562c-421e-b2e3-aac0dad43e9d` (completed): Which file wins when a submitter resends the same day? |
+| ask-follow-up run | `215045bc-36a2-4d55-bde5-b7a02d8894fa` (completed): What should we check before reprocessing that day? |
+| ask-explore run | `c81a28a9-8b01-438c-a76c-95fee33b330b` (completed): Show me which submitter sent the fewest rows on 2026-06-18, and when its file landed. |
+| S1 written up again | HTTP 200, `analysis_by: model`, groq/openai/gpt-oss-120b, 1574 ms |
 | S1 signed off | run resumed: approve -> published |
-| Second scan | `1921304f-7ef9-424a-a16a-5f4c21ff7130` (completed): S1: Missing channel_basket_id in S1003 file blocks deduplication |
-| Tests | 158 passed, 0 failed, 93.17% coverage |
+| Second scan | `a57b1822-06aa-4822-87a0-7b4394aa71ea` (completed): S1: Missing channel_basket_id in S1003 file breaks deduplication |
+| Tests | 172 passed, 0 failed, 92.58% coverage |
 
 | Severity | Finding | Status | Written by |
 |---|---|---|---|
@@ -40,6 +41,7 @@ Raw responses from a local ReconMind stack, captured by [`scripts/capture_readme
 | `ask-mobile-*.json` | Events streamed for the MOBILE question, and its run |
 | `ask-runbook-*.json` | Events streamed for a runbook question, and its run |
 | `ask-follow-up-*.json` | A follow-up in the same session, and its run |
+| `ask-explore-*.json` | A data question the Explorer answers with tools it picks |
 | `regenerate-s1.json` | `POST /incidents/{id}/regenerate` on the S1: both write-ups |
 | `review-s1.json` | The S1 approved with a note; the paused run resumes |
 | `rescan-run.json`, `incidents-after.json` | A second scan, and the feed after it |

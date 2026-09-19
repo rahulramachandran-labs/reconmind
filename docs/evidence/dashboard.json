@@ -160,19 +160,19 @@
     "day": "2026-09-19",
     "runs": 1,
     "llm_calls": 5,
-    "tokens": 7763,
+    "tokens": 7807,
     "cost_usd": 0.0,
     "providers": [
       {
         "provider": "groq",
         "model": "openai/gpt-oss-120b",
         "calls": 5,
-        "tokens": 7763,
+        "tokens": 7807,
         "cost_usd": 0.0
       }
     ],
     "last_scan": {
-      "id": "b5444ae1-f162-41ff-8a82-28f65425be9c",
+      "id": "78b3d94d-58f0-4d68-a38b-599efb8f2e0a",
       "trigger": "scan",
       "question": null,
       "adapter": "retail_recon",
@@ -192,19 +192,19 @@
         ],
         "needs_review": false
       },
-      "summary": "S1: 82 rows missing channel_basket_id prevents dedup for S1003_20260616_0216_MOBILE.txt\n\nThe most critical issue is that S1003_20260616_0216_MOBILE.txt (2026-06-16) is missing the required 'channel_basket_id' column and includes an unexpected 'basket_ref' column, causing 82 rows to land with a null dedup key, which blocks deduplication for this batch. Additionally, LOC-0517 is split across two outlet IDs (OUT-1017 and OUT-1071), affecting 251 of 8,373 deduplicated rows (3.0%) between 2026-06-01 and 2026-06-21. A resend of S1002_20260612_1120_ECOMM.txt duplicated 88 rows, with 3 rows having different qty or amount, and these superseded rows have already reached fct_daily_sales. Finally, S1001_20260618_0638_POSFEED.txt on 2026-06-18 contains only 110 rows, 40% below its 7\u2011day average of 182.6, and arrived 161 minutes after the submitter SLA.",
+      "summary": "S1: Missing channel_basket_id in S1003 file prevents deduplication\n\nThe S1003_20260616_0216_MOBILE.txt file (2026-06-16) is missing the required 'channel_basket_id' column and instead includes an unexpected 'basket_ref' column. This caused 82 rows to land with a null dedup key, blocking deduplication for the batch. Additionally, two S2 issues were found: LOC-0517 sales are split across OUT-1017 and OUT-1071 affecting 251 of 8,373 deduplicated rows (3.0%) between 2026-06-01 and 2026-06-21, and a resend of S1002_20260612_1120_ECOMM.txt duplicated 88 rows (3 with different qty/amount) after the DAG run, inserting superseded rows into fct_daily_sales. Finally, S1001_20260618_0638_POSFEED.txt had only 110 rows, 40% below its 7\u2011day average of 182.6, and arrived 161 minutes past the submitter SLA.",
       "error": null,
       "trace_url": null,
-      "prompt_tokens": 5602,
-      "completion_tokens": 2161,
+      "prompt_tokens": 5714,
+      "completion_tokens": 2093,
       "cost_usd": 0.0,
-      "latency_ms": 12771,
-      "started_at": "2026-09-19T19:00:30.274909+00:00",
-      "finished_at": "2026-09-19T19:00:43.058886+00:00"
+      "latency_ms": 11534,
+      "started_at": "2026-09-19T20:33:20.475521+00:00",
+      "finished_at": "2026-09-19T20:33:32.030102+00:00"
     }
   },
   "findings": {
-    "since": "2026-09-19T19:00:30.274909+00:00",
+    "since": "2026-09-19T20:33:20.475521+00:00",
     "by_severity": {
       "S1": 1,
       "S2": 3,
@@ -214,28 +214,28 @@
     "pending_review": 1,
     "items": [
       {
-        "id": "204a8a64-dda2-4206-951a-3ce8f0012885",
+        "id": "f2067395-d123-40cf-96db-f39a1c0e7b26",
         "severity": "S1",
         "title": "S1003_20260616_0216_MOBILE.txt renamed channel_basket_id to basket_ref",
         "status": "pending_review",
         "seen_count": 1
       },
       {
-        "id": "67bc3814-3aba-4103-85dc-c1ae69748596",
+        "id": "5564310c-b53b-4a8b-82bd-ca423be9ca48",
         "severity": "S2",
         "title": "LOC-0517 also reporting as OUT-1071 (3.0% of rows)",
         "status": "published",
         "seen_count": 1
       },
       {
-        "id": "5edc8849-0a62-4a13-9acc-7848ca9937ec",
+        "id": "220372b4-dfcb-40d6-8097-a923a838d1e5",
         "severity": "S2",
         "title": "Resent file S1002_20260612_1120_ECOMM.txt supersedes 88 rows",
         "status": "published",
         "seen_count": 1
       },
       {
-        "id": "bb191f93-c558-40f9-8708-b1e5d6442158",
+        "id": "628b4a47-3945-474d-95f0-9d9dd7a491e4",
         "severity": "S2",
         "title": "S1001 2026-06-18: 110 rows, 40% below its 7-day average",
         "status": "published",

@@ -1,36 +1,37 @@
-........................................................................ [ 45%]
-........................................................................ [ 91%]
-..............                                                           [100%]
+........................................................................ [ 41%]
+........................................................................ [ 83%]
+............................                                             [100%]
 ================================ tests coverage ================================
 ______________ coverage: platform darwin, python 3.12.13-final-0 _______________
 
 Name                                            Stmts   Miss Branch BrPart  Cover   Missing
 -------------------------------------------------------------------------------------------
-app/agents/answerer.py                             20      6      2      1    68%   25-35
+app/agents/answerer.py                             20      6      2      1    68%   20-30
 app/agents/bootstrap.py                            48      8      6      3    80%   26->28, 33-39, 75-77
-app/agents/deps.py                                 32      0      8      4    90%   20->exit, 21->exit, 24->exit, 47->55
-app/agents/graph.py                                83     11     14      1    81%   88, 92-101
-app/agents/planner.py                              44      1     14      1    97%   111
+app/agents/deps.py                                 33      0     10      5    88%   20->exit, 21->exit, 24->exit, 27->exit, 48->56
+app/agents/explorer.py                             50      9     14      5    78%   34->exit, 40, 52->85, 83-84, 86, 99, 102-103, 107-108
+app/agents/graph.py                                87     11     16      1    83%   93, 97-106
+app/agents/planner.py                              48      1     16      1    97%   136
 app/agents/review.py                               13      3      0      0    77%   18-27
 app/agents/service.py                             133      6     36      1    96%   130, 256-269
-app/agents/store/memory.py                         84     39     14      0    50%   79-83, 86-100, 105-117, 122-127, 130, 149, 152, 155-158, 166-171, 174, 177, 180-181, 192-194
-app/agents/store/sql.py                           144      4     26      6    94%   193, 224, 258, 265->exit, 336, 400->402
-app/api/agents.py                                 124      9     26      5    91%   65-66, 75, 97-98, 151, 175, 190-191
+app/agents/store/memory.py                         95     46     18      1    48%   70, 84-89, 100-104, 107-121, 126-138, 143-148, 151, 170, 173, 176-179, 187-192, 195, 198, 201-202, 213-215
+app/agents/store/sql.py                           162      4     30      6    95%   240, 271, 305, 312->exit, 383, 447->449
+app/api/agents.py                                 137      9     30      5    92%   65-66, 75, 97-98, 151, 201, 216-217
 app/api/dashboard.py                               11      3      0      0    73%   14-20
-app/api/knowledge.py                               69      2      8      0    97%   89-90
+app/api/knowledge.py                               71      2      8      0    97%   93-94
 app/db/session.py                                  34      4      6      1    88%   23, 34-36
 app/domain/example_support_triage/__init__.py      45      2     16      1    95%   100, 106
 app/domain/protocol.py                             49      1     14      7    87%   61->exit, 70->exit, 72->exit, 74->exit, 76->exit, 78->exit, 80->exit, 86
 app/domain/registry.py                              9      4      4      1    46%   9-13
-app/domain/retail_recon/adapter.py                 61      5     12      3    89%   110-113, 127, 152
+app/domain/retail_recon/adapter.py                 61      2     12      2    95%   127, 152
 app/domain/retail_recon/checks.py                  79      0     28      2    98%   214->225, 275->281
-app/domain/retail_recon/rules.py                   28      0      4      1    97%   35->33
-app/domain/retail_recon/writeups.py                51      5     28      5    87%   21, 26, 28, 75, 193
-app/llm/providers.py                              148      0     28      1    99%   68->exit
-app/llm/structured.py                              33      3     10      1    91%   22, 59-60
-app/llm/traced.py                                  25      3      2      0    89%   41-50
+app/domain/retail_recon/rules.py                   29      0      4      1    97%   44->42
+app/domain/retail_recon/writeups.py                52      5     28      5    88%   26, 31, 33, 80, 206
+app/llm/providers.py                              176     12     32      2    92%   83->exit, 114-133, 396
+app/llm/structured.py                              37      3     12      1    92%   22, 62-63
+app/llm/traced.py                                  40      7      4      1    82%   43-52, 82, 93-102
 app/main.py                                        63      3     10      1    95%   58-59, 78
-app/memory/sessions.py                             60      1     12      5    92%   30->exit, 31->exit, 32->exit, 35->exit, 87
+app/memory/sessions.py                             73      1     12      5    93%   32->exit, 33->exit, 34->exit, 37->exit, 89
 app/observability/tracer.py                       141      8     20      2    94%   52->exit, 151-152, 164-165, 187-188, 232-234
 app/pipeline/loader.py                             84      0     20      2    98%   57->60, 123->125
 app/pipeline/seed.py                                8      8      2      0     0%   6-17
@@ -41,10 +42,10 @@ app/retrieval/embeddings.py                        69      2     16      1    96
 app/retrieval/hybrid.py                            42      0     12      2    96%   12->exit, 60->76
 app/retrieval/rerank.py                            37      4     12      1    86%   15->exit, 54-58
 app/retrieval/service.py                           59      9     12      2    82%   44-47, 51-59
-app/tools/mcp_toolbox.py                           52      6     10      4    84%   51->53, 56, 64, 72-74, 77
+app/tools/mcp_toolbox.py                           62      6     14      4    87%   51->53, 56, 87, 95-97, 100
 -------------------------------------------------------------------------------------------
-TOTAL                                            3077    161    614     67    93%
+TOTAL                                            3285    190    664     75    93%
 
 34 files skipped due to complete coverage.
-Required test coverage of 80.0% reached. Total coverage: 93.17%
-158 passed in 185.79s (0:03:05)
+Required test coverage of 80.0% reached. Total coverage: 92.58%
+172 passed in 153.55s (0:02:33)
