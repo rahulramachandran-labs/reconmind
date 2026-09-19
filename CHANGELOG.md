@@ -4,6 +4,17 @@ All notable changes, grouped by build phase. Dates are UTC.
 
 ## [Unreleased]
 
+### Changed
+- README rewritten for a first-time reader: what ReconMind does and how a run flows end to end come first, then a step-by-step runbook for exploring it locally, the project structure, and production readiness (authentication, storage, knowledge retrieval, state). The detail moved to `docs/ARCHITECTURE.md`, `docs/API.md`, `docs/DEPLOYMENT.md`, `docs/EVALUATION.md` and `docs/DEVELOPMENT.md`.
+- Backend reorganised (ADR 0012): one module per agent (`planner`, `specialists`, `reporter`, `answerer`, `review`), `app/core`, `app/llm`, `app/rag` and `app/memory` packages, the run store split into Postgres and in-memory modules, and the retail domain split into `rules`, `checks`, `writeups` and `adapter`. No behaviour change.
+- `.env.example` explains every setting, and `frontend/.env.example` does the same for the web app.
+
+### Fixed
+- `/ask` strips context tags from retrieved passages, as the agents already did; the two paths now share one prompt module.
+
+### Removed
+- The `RETRIEVAL_K` setting, which nothing read.
+
 ## [1.1.0] - 2026-09-19
 
 ### Added

@@ -5,372 +5,255 @@
 [![Python 3.12](https://img.shields.io/badge/python-3.12-3776AB.svg)](pyproject.toml)
 [![Next.js](https://img.shields.io/badge/next.js-16-black.svg)](frontend/package.json)
 
-**An agentic copilot for the part of data engineering I have spent years doing by hand: working out why a pipeline's numbers are wrong, and writing it up.**
+**When a data pipeline's numbers go wrong, someone has to work out why: which file, which key, how many rows, and what to do about it. ReconMind is a multi-agent AI copilot that does that investigation.** Specialist agents inspect the live pipeline through MCP tools, look up the team's runbooks and past incidents, and hand back an incident report with record counts, a likely root cause, a fix and a confidence score. Anything serious or uncertain waits for a person to sign it off.
 
-ReconMind is a multi-agent, RAG-powered copilot that watches a synthetic data pipeline for key-mismatch, dedup, and schema-drift incidents, investigates them the way a senior data engineer would, and produces an incident write-up a human can act on. It is production RAG plus agentic orchestration applied to real data-engineering problems, not generic document Q&A.
+**[Live app](https://reconmind-labs.vercel.app)** · [Project deck (PDF)](docs/slides/Rahul_Ramachandran_ReconMind-ProjectSubmission.pdf) · [60-second demo script](docs/DEMO.md) · [Write-up](docs/blog/reconmind-writeup.md)
 
-| | |
-|---|---|
-| **Program** | Final project, IIT Patna Generative AI & Agentic AI for Developers program |
-| **Author** | Rahul Ramachandran |
-| **Live app** | [reconmind-labs.vercel.app](https://reconmind-labs.vercel.app) |
-| **API** | [reconmind-labs-api.onrender.com](https://reconmind-labs-api.onrender.com/healthz), deployed from [`render.yaml`](render.yaml) (free tier: the first request after idle takes up to a minute) |
-| **Project deck** | [PDF](docs/slides/Rahul_Ramachandran_ReconMind-ProjectSubmission.pdf) · [PPTX](docs/slides/Rahul_Ramachandran_ReconMind-ProjectSubmission.pptx) |
-| **60-second demo** | [docs/DEMO.md](docs/DEMO.md) |
-| **Write-up** | [docs/blog/reconmind-writeup.md](docs/blog/reconmind-writeup.md) |
+Final project for the IIT Patna Generative AI & Agentic AI for Developers program, by Rahul Ramachandran. All data is synthetic.
 
-![ReconMind: a scan finds four planted incidents, one S1 is signed off in the review queue, a question streams through the agents, and the run's trace shows every tool call](docs/demo.gif)
-
-[![ReconMind project deck](docs/slides/cover.png)](docs/slides/Rahul_Ramachandran_ReconMind-ProjectSubmission.pdf)
+![A scan finds four planted incidents, one S1 is signed off in the review queue, a question streams through the agents, and the run's trace shows every tool call](docs/demo.gif)
 
 ---
 
-## Contents
+## How it works
 
-**About the project:** [Overview](#overview) · [The problem](#the-problem) · [Objectives](#objectives) · [The solution](#the-solution) · [Key features](#key-features) · [Application screens](#application-screens) · [What an incident report looks like](#what-an-incident-report-looks-like) · [Course concepts applied](#course-concepts-applied) · [Scope and constraints](#scope-and-constraints) · [Challenges and learnings](#challenges-and-learnings) · [Reusability and future work](#reusability-and-future-work)
-
-**Technical details:** [Architecture](#architecture) · [Tech stack](#tech-stack) · [Quick start](#quick-start) · [Deploy](#deploy) · [Synthetic data](#synthetic-data) · [Retrieval and evaluation](#retrieval-and-evaluation) · [API](#api) · [Configuration](#configuration) · [Repository layout](#repository-layout) · [Development](#development)
-
----
-
-# About the project
-
-## Overview
-
-Data teams that ingest files from many sources spend a surprising amount of senior time on the same investigation loop: a number looks wrong, someone checks the raw tables, the orchestrator logs, the dbt contracts and the runbooks, finds the cause, and writes it up for whoever has to fix it. The reasoning is valuable, but it lives in people's heads and chat threads.
-
-ReconMind automates that loop. It watches a pipeline on a schedule, or answers questions whenever you ask. It sends specialist agents to gather evidence from live pipeline metadata and from the team's own runbooks and past incidents, and hands you a structured incident report with record counts, a likely root cause, a recommended fix and how confident it is. When it isn't sure, it stops and asks a person instead of guessing.
-
-Everything runs on a seeded synthetic dataset that mirrors the shape of real reconciliation problems. No real company, schema or business logic is referenced anywhere.
-
-## The problem
-
-Four failures keep showing up in multi-source pipelines:
-
-| Failure mode | What it looks like | Why it hurts |
-|---|---|---|
-| **Key drift** | Same store, two ids: one location reports under two `outlet_id`s | The join quietly splits the store in two; a "new" store appears with no history |
-| **Duplicate submissions** | A vendor resends a file, so the same transaction is in twice | Revenue is double counted unless "latest file wins", a rule that often exists only in someone's head |
-| **Schema drift** | Upstream renames a column on a Friday | Downstream finds out on Monday; dedup silently stops working for that batch |
-| **Volume anomalies** | A feed comes in 40% light | Nobody notices until a dashboard looks off and someone asks why |
-
-What usually gets tried, and why it isn't enough:
-
-- **Dashboards** tell you something is off, but not why.
-- **A chatbot over the runbooks** can explain an error, but it can't go and look at the pipeline.
-- **One big agent** with every job in its prompt is impossible to debug. When it fails, you can't tell which part failed.
-
-## Objectives
-
-1. Catch all four failure types on a schedule, or whenever a user asks a question.
-2. Investigate with specialist agents that read live pipeline metadata through tools, not hardcoded API clients.
-3. Ground every conclusion in the runbooks, schema docs and old incident write-ups an engineer would normally pull up.
-4. Produce a structured incident report: what broke, how many records, the likely root cause, a suggested fix.
-5. When not sure, stop and ask a human instead of guessing.
-6. Trace every LLM and tool call so any answer can be audited after the fact.
-7. Keep the agents domain-agnostic so the same system can be pointed at a different problem.
-
-## The solution
-
-A question or a scheduled scan enters an agent graph. The **Planner** decides who needs to look. Two specialists work in parallel:
-
-- **Reconciliation** applies the dedup keys and the latest-file-wins rule, and flags key drift.
-- **Data-Quality** diffs the live schema against the dbt contract and checks volume and timing against the orchestrator's run history.
-
-Both gather evidence through read-only **MCP** tool servers and retrieve relevant runbooks and past incidents through **hybrid search**. The **Reporter** turns their findings into a validated incident report. If the Planner's confidence is low, the graph pauses in a **review queue** until a person approves, rejects or annotates it. **LangFuse** keeps the record of how every answer was reached.
-
-## Key features
-
-- **Grounded answers with citations.** Hybrid retrieval (BM25 + dense embeddings, fused with reciprocal rank fusion) over runbooks, schema docs, dbt models and past incidents. Every claim links to its source passage.
-- **Four specialist agents** on LangGraph, with Pydantic-validated outputs and a capped retry loop instead of free-form text.
-- **Live pipeline evidence through MCP.** Two read-only tool servers expose the warehouse metadata (schema, dbt manifest, table stats) and the orchestrator metadata (DAG runs, task logs, timings).
-- **Human in the loop.** Low-confidence findings pause in a review queue; the graph resumes once someone approves, rejects or annotates them.
-- **Full audit trail.** An append-only ledger in Postgres (enforced by a database trigger) plus LangFuse traces for every agent step, tool call, prompt version, latency and token cost.
-- **Zero-cost demo mode.** A provider fallback chain (OpenAI, then Anthropic, then local Ollama) with `DEMO_MODE` to skip paid providers. If no model is available at all, the system still answers with the most relevant passages and citations.
-- **Measured quality.** A 46-question golden set scored with RAGAS on every push; CI fails if quality drops below the thresholds.
-- **Reproducible data.** A seeded generator plants the four failure types with exact, documented sizes, so tests assert on counts rather than on "something was found".
-
-## Application screens
-
-| Screen | What it does |
-|---|---|
-| **Dashboard** | Today's volume vs trailing average, open findings by severity, last DAG run, today's token cost |
-| **Incident feed** | Every finding, expandable into the full write-up, with a link to its LangFuse trace |
-| **Review queue** | Findings the graph paused on; approve, reject or annotate and the graph picks back up |
-| **Ask ReconMind** | Streaming chat with session memory in Postgres; every answer cites its sources and shows which model answered |
-| **Docs & runbooks** | The ingested corpus, searchable on its own, with hybrid / dense / BM25 side by side, so retrieval can be checked before the agents touch it |
-| **Traces** | Recent agent runs with cost and latency, linking into LangFuse |
-
-## What an incident report looks like
-
-The Reporter's output follows a change-request format rather than a raw agent dump. This is the target shape, filled in with the key-drift anomaly planted in the synthetic data:
-
-> **Problem.** Location `LOC-0517` is reporting sales under two outlet ids, its canonical `OUT-1017` and `OUT-1071`, which is not in `outlet_location_map`.
->
-> **Affected records.** 251 rows over 21 business days, 3.0% of deduplicated rows. Severity **S2** (drift above 2%).
->
-> **Root-cause hypothesis.** A transposed outlet id in a register export profile, the same pattern as INC-0412. Whole baskets drift together, which points at register configuration rather than row-level corruption.
->
-> **Recommended fix.** Confirm the correct id with the submitter, add `OUT-1071 → OUT-1017` to `outlet_alias` for the window, and rebuild `stg_transactions` and `fct_daily_sales`. Do not edit raw rows.
->
-> **Confidence.** Medium: the detection is certain, the cause is inferred from a past incident.
->
-> **Open questions.** Which registers carry the wrong profile? Did the drift start on 2026-06-01 or earlier?
->
-> **Evidence.** Key-drift runbook (detection, fix), INC-0412 write-up, `outlet_location_map`, LangFuse trace link.
-
-## Course concepts applied
-
-| Module | Concept | How it is used here |
-|---|---|---|
-| GenAI foundations | Prompting, structured output, context windows | Agent prompts with delimited, untrusted context; Pydantic-validated outputs with a retry loop |
-| Models & APIs | Provider abstraction, fallback, cost awareness | OpenAI → Anthropic → Ollama fallback chain; provider and token cost logged per call |
-| LangChain | Loaders, splitters, retrievers, memory | Markdown and dbt YAML ingestion, section-aware splitting, a LangChain hybrid retriever, session memory in Postgres |
-| RAG systems | Chunking, BM25 + dense hybrid, RRF, RAGAS | Hybrid retriever over FAISS / Pinecone; golden set with a RAGAS gate in CI |
-| Agentic AI | LangGraph StateGraph, conditional edges, checkpoints, multi-agent | Planner → Reconciliation ∥ Data-Quality → Reporter; human-in-the-loop checkpoint |
-| MCP | Host / client / server, JSON-RPC lifecycle, stdio vs HTTP | Two read-only MCP servers: warehouse-metadata and orchestration-metadata |
-| Observability & deployment | LangFuse tracing, FastAPI, Docker, Vercel / Render | Every step traced; containerized stack; public deployment with CI |
-
-## Scope and constraints
-
-- **Synthetic data only.** A seeded generator mimics the shape of real reconciliation problems; nothing from any employer or client.
-- **Zero-cost demo.** Local Ollama and sentence-transformers behind the provider fallback chain.
-- **Solo build, in phases,** with tests gating each phase before the next starts.
-- **Not in scope:** streaming ingestion, multi-tenant auth, production SLAs.
-
-## Challenges and learnings
-
-- **One agent vs many.** The first sketch was one agent with every job. The prompt was enormous, and when it failed I couldn't tell which part had failed. Four narrow agents fixed both problems.
-- **Embeddings blur identifiers.** Dense search kept confusing tables and columns with similar names. Adding BM25 and fusing with RRF fixed the exact-match questions without losing the conceptual ones. For example, "basket_ref ContractViolation" finds the schema-drift runbook and the rename incident only with hybrid search.
-- **Retrieved text is untrusted input.** Runbooks go straight into prompts. Once I thought about it that way, delimiting them and testing against a planted instruction stopped being optional.
-- **Observability is the trust layer.** If I can't answer "why did it say that?" without re-running everything, I won't trust it in production. A trace link on every finding makes it auditable.
-- **Reusability must be provable.** Saying it is domain-agnostic is easy. Moving every business rule into a `DomainAdapter` and booting the graph on a stub adapter in CI is what makes it true.
-
-## Reusability and future work
-
-Every retail rule lives in [`app/domain/retail_recon`](app/domain/retail_recon): the dedup key, the key-drift pair, schema-drift tolerance, the volume window, the severity rubric and the write-up wording. It sits behind a `DomainAdapter` protocol, and the agents import only the protocol. [`app/domain/example_support_triage`](app/domain/example_support_triage) is a second, deliberately small domain with different specialists and finding types, and a test boots the same graph on it in every CI run.
-
-Swap the data generator and the two MCP servers, and the retrieval layer, the agent graph, the tracing and the UI shell stay exactly as they are:
-
-- **Claims Copilot** (healthcare): claims-vs-EOB matching; coding and billing drift.
-- **Support Triage Copilot** (SaaS): route tickets; check account state and known incidents; draft the response.
-- **Signal Review Copilot** (trading): feed and tick anomalies; position and ledger drift across venues.
-
-Next steps:
-
-- Kafka ingestion so scans run when data lands, not on a timer.
-- Let the Reporter open a pull request with the fix, gated on approval.
-- Tune the Planner's routing threshold from the approve / reject history.
-- Multi-tenant auth and an adapter registry so several domains can run side by side.
-
----
-
-# Technical details
-
-## Architecture
+Four submitters send a retail pipeline a daily file each. Over 21 days of seeded, synthetic data, four things go wrong: a store starts reporting under a second id (**key drift**), a file is resent after the nightly load (**duplicate submission**), a column is renamed (**schema drift**) and one feed arrives 40% light (**volume anomaly**). This is what ReconMind does about them:
 
 ```mermaid
 flowchart LR
-    subgraph Ingest
-        GEN[Seeded generator] --> LAND[Landing files] --> PG[(Postgres<br/>transactions · audit ledger · agent runs)]
-    end
-    subgraph Knowledge
-        DOCS[Runbooks · schema docs<br/>dbt YAML · past incidents] --> IDX[Hybrid index<br/>BM25 + dense, RRF]
-    end
-    subgraph Tools["MCP servers (read-only)"]
-        WH[warehouse-metadata]
-        OR[orchestration-metadata]
-    end
-    UI[Next.js + shadcn/ui] -- REST / SSE --> API[FastAPI]
-    API --> G{{LangGraph orchestrator}}
-    G --> P[Planner]
-    P --> R[Reconciliation]
-    P --> Q[Data-Quality]
-    P -. low confidence .-> H[Human review]
-    R --> REP[Reporter]
-    Q --> REP
-    R --> WH
-    Q --> WH
-    Q --> OR
-    R & Q & REP --> IDX
-    WH & OR --> PG
-    REP --> PG
-    G -. traces .-> LF[LangFuse]
+    T["Scheduled scan<br/>or a question"] --> P[Planner agent]
+    P -- "a runbook question" --> A[Answer from the runbooks]
+    P -- "needs a look at the data" --> R[Reconciliation agent]
+    P -- "needs a look at the data" --> Q[Data-Quality agent]
+    R & Q --> M[("Warehouse and orchestrator<br/>metadata, via read-only MCP tools")]
+    R & Q --> K[("Runbooks and past incidents,<br/>via hybrid search")]
+    R & Q --> REP[Reporter agent]
+    REP -- "S1 or low confidence" --> H{{"Human review"}}
+    REP -- "otherwise" --> OUT[Incident report]
+    H --> OUT
 ```
 
-1. **Synthetic pipeline**: the seeded generator writes landing files, which a loader puts into Postgres with an append-only audit ledger and agent-run history.
-2. **MCP servers and vector store**: schema, dbt manifest, DAG runs and the document corpus.
-3. **LangGraph with four agents**: planner, specialists, reporter.
-4. **LangFuse tracing**: every call, cost and prompt version.
-5. **FastAPI backend**: REST and SSE streaming.
-6. **Next.js frontend**: dashboard, feed, chat, docs.
+1. **Something starts a run.** A scan every six hours (GitHub Actions), a click on *Run a scan*, or a question in the chat.
+2. **The Planner decides who should look.** A general question ("which file wins when a submitter resends?") is answered straight from the runbooks. A question about the data ("did the MOBILE file have a schema problem on 2026-06-16?") goes to the specialist that owns it. A scan sends both.
+3. **Specialists investigate in parallel.** *Reconciliation* checks for duplicate submissions and key drift; *Data-Quality* checks every file against the dbt contract and each day's volume against its trailing week. They get their facts by calling tools on two read-only **MCP servers** (a scan makes 30 tool calls), so every number is measured, not generated.
+4. **They look up what the team already knows.** Hybrid search (BM25 + embeddings, fused, then reranked) finds the matching runbook and any past incident with the same pattern. A model, or a template when no model is configured, turns facts plus runbooks into a root cause, fix steps and a confidence score.
+5. **The Reporter writes it up and decides who signs off.** Each finding becomes a structured incident report. S1 findings and anything below the confidence threshold **pause** the LangGraph run in a review queue; a reviewer approves, rejects or annotates, and the run resumes from its Postgres checkpoint. Every decision goes into an append-only audit ledger.
+6. **Everything is traced.** Every agent step, tool call, retrieval and model call is stored with its latency and cost, shown on the Traces page and mirrored to LangFuse.
 
-## Tech stack
+### What a scan finds in the sample data
 
-| Area | Tools |
-|---|---|
-| Frontend | Next.js (App Router), shadcn/ui, Tailwind, Vercel |
-| Backend | FastAPI, SQLAlchemy + Alembic, Postgres, APScheduler, Render / Railway |
-| Orchestration | LangGraph, LangChain, Pydantic, asyncio |
-| Retrieval | BM25 (`rank_bm25`), FAISS / Pinecone, sentence-transformers, RRF |
-| Tools and models | MCP (two servers), OpenAI / Anthropic, Ollama, provider fallback chain |
-| Ops and quality | LangFuse, RAGAS, pytest + chaos suite, Docker Compose, GitHub Actions, gitleaks, pre-commit |
+| Severity | Finding | Found by | Records | What happens |
+|---|---|---|---|---|
+| **S1** | `S1003_20260616_0216_MOBILE.txt` renamed `channel_basket_id` to `basket_ref` | Data-Quality | 82 | Waits in the review queue: it breaks the dedup key |
+| S2 | `LOC-0517` also reporting as `OUT-1071` (3.0% of rows) | Reconciliation | 251 | Published |
+| S2 | Resent file `S1002_20260612_1120_ECOMM.txt` supersedes 88 rows | Reconciliation | 88 | Published |
+| S2 | `S1001` 2026-06-18: 110 rows, 40% below its 7-day average | Data-Quality | 73 missing | Published |
 
-## Quick start
+One of those reports, as the reviewer sees it:
 
-You need Python 3.12 with [uv](https://docs.astral.sh/uv/), Node 20+, and Docker. [Ollama](https://ollama.com) is optional; without it the API answers extractively.
+> **Problem.** Location LOC-0517 is reporting sales under two outlet ids: its canonical OUT-1017 and OUT-1071, which outlet_location_map does not map to it. 251 of 8373 deduplicated rows (3.0%) between 2026-06-01 and 2026-06-21 are affected, so store-level numbers for this location are split.
+>
+> **Root-cause hypothesis.** Whole baskets (158) from 4 submitters carry OUT-1071, so the id is set at the register or export profile rather than corrupted row by row; OUT-1071 looks like a transposition of OUT-1017.
+>
+> **Recommended fix.** 1. Confirm the correct outlet id with the submitter before changing anything. 2. Add OUT-1071 → OUT-1017 to outlet_alias for 2026-06-01 to 2026-06-21; never edit raw rows. 3. Rebuild stg_transactions and fct_daily_sales for the affected dates. 4. Ask the submitter to fix the export profile at source and record the ticket.
+>
+> **Confidence** 0.60 (medium) · **Evidence** `mcp:warehouse-metadata/run_check` · **Runbooks** key drift, outlet_location_map · **Trace** link to every step
+
+### Why it is built this way
+
+- **Facts come from checks; models only write the words.** Counts, severities and evidence come from deterministic checks, so a model can't invent a number, and the whole system still works with no model at all, at zero cost. A model can lower a confidence score but can't argue its way past the calibrated one.
+- **Several narrow agents instead of one big one.** When a single all-purpose agent gets something wrong, you can't tell which part failed. Here each agent has one job, its own prompt and its own trace.
+- **Hybrid retrieval, because pipelines are full of identifiers.** Embeddings blur `channel_basket_id` and `basket_ref`; BM25 matches them exactly. Fusing both, then reranking, raised context precision from 0.66 (dense only) to 0.83.
+- **A person signs off anything serious.** S1s and low-confidence findings stop and wait, and the decision is on the record.
+- **Built to be reused.** Every retail rule sits behind a `DomainAdapter`. A second, small domain (support-ticket triage) runs on the same agent graph in every CI run.
+
+---
+
+## Try it
+
+**Online, no install:** open **[reconmind-labs.vercel.app](https://reconmind-labs.vercel.app)**, choose *Sign in* → *Continue as the demo reviewer*, then:
+
+1. **Dashboard** → *Run a scan*. The four findings appear in about 15 seconds.
+2. **Incidents** → expand a finding to read the full report.
+3. **Review queue** → approve the S1 with a note. It may already be empty, because other visitors can sign it off.
+4. **Ask ReconMind** → *Did the MOBILE file have a schema problem on 2026-06-16?*
+5. **Traces** → open the run and see every agent step and tool call.
+
+The API runs on a free instance that sleeps when idle. If the first page load fails, give it a minute and refresh.
+
+**On your machine:** you need Python 3.12 with [uv](https://docs.astral.sh/uv/), Node 20+ and Docker. [Ollama](https://ollama.com) is optional.
 
 ```bash
 git clone https://github.com/rahulramachandran-labs/reconmind && cd reconmind
-make bootstrap    # uv sync, npm ci, git hooks, .env and frontend/.env.local
-make dev          # postgres in docker, migrations, synthetic sample, then api on :8000 and web on :3000
+make bootstrap   # Python and Node dependencies, git hooks, .env and frontend/.env.local
+make dev         # Postgres, migrations and sample data, then the API on :8000 and the web app on :3000
 ```
 
-Port 5432 already taken? Set `POSTGRES_PORT` and the port in `DATABASE_URL` in `.env`.
+No keys are needed. Without a model, explanations come from templates and the runbooks. To have a model write them, add `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` to `.env`, or run `ollama pull qwen2.5:1.5b`. Every setting is explained in [`.env.example`](.env.example).
 
-Or run everything in containers, including the MCP servers over HTTP, Ollama and a self-hosted LangFuse (UI on :3001, sign in as `admin@reconmind.local` / `reconmind-local`):
+## Runbook: walk through the whole flow locally
 
+After `make dev`, these steps follow one run from raw data to a signed-off incident. Each step says what to do, what you should see, and where it happens in the code.
+
+**1. Check that everything is up.**
 ```bash
-docker compose --profile full up --build
+curl -s localhost:8000/healthz
 ```
+Expect `"status":"ok"`, `"database":true` and `"chunks":86`, the indexed runbooks, schema docs, dbt models and past incidents. *Code:* [`app/main.py`](app/main.py) builds every service at startup.
 
-Ask something:
+**2. See the data and the problems planted in it.** Open [localhost:3000](http://localhost:3000). The chart shows 14 days of volume, and 2026-06-18 is visibly short. The seeded generator wrote 85 files (8,461 rows); [`data/DATA_DICTIONARY.md`](data/DATA_DICTIONARY.md) describes them and [`expected_anomalies.json`](data/sample/expected_anomalies.json) lists the exact size of each planted problem. *Code:* [`app/pipeline/`](app/pipeline).
 
+**3. Try retrieval on its own.**
+```bash
+curl -s "localhost:8000/search?q=basket_ref%20ContractViolation&k=3"
+```
+The schema-drift runbook and incident INC-0438 come back on top. Each hit shows its BM25 rank and dense rank; the incident is only 10th on meaning alone but 1st on keywords. The **Docs & runbooks** page lets you switch between the modes. *Code:* [`app/retrieval/`](app/retrieval).
+
+**4. Ask a runbook question: RAG without the agents.**
 ```bash
 curl -s localhost:8000/ask -H 'content-type: application/json' \
-  -d '{"question": "which file wins when a submitter resends?"}' | jq '.answer, .provider'
+  -d '{"question": "which file wins when a submitter resends the same day?"}'
+```
+The answer cites passages as `[1]`, and `provider` says who wrote it (`extractive` when no model is configured). *Code:* [`app/rag/`](app/rag).
+
+**5. Run a scan: the multi-agent flow.** On the dashboard, sign in as the demo reviewer and click **Run a scan**, or `curl -s -X POST localhost:8000/scan`. Four findings appear (one S1, three S2) and the run is **paused** for review. Without a model this takes a few seconds; a local model writing the explanations adds a minute or so. The order it happens in: [`planner.py`](app/agents/planner.py) → [`specialists.py`](app/agents/specialists.py) (both at once) → the checks in [`retail_recon/checks.py`](app/domain/retail_recon/checks.py), calling the tools in [`mcp_servers/`](mcp_servers) → [`reporter.py`](app/agents/reporter.py) → [`review.py`](app/agents/review.py). [`graph.py`](app/agents/graph.py) wires them together.
+
+**6. Read a report.** Open **Incidents** and expand the key-drift finding: problem, affected records, root cause, fix steps, confidence, open questions, evidence and the runbooks consulted. The API equivalent is `curl -s localhost:8000/incidents`.
+
+**7. Be the human in the loop.** Open **Review queue**, add a note, then click **Approve with note**. The paused run resumes from its checkpoint and finishes. The decision is in the audit ledger, which can't be edited:
+```bash
+docker compose exec postgres psql -U reconmind -c \
+  "select actor, action, subject from audit_ledger order by id desc limit 3"
+docker compose exec postgres psql -U reconmind -c \
+  "update audit_ledger set action = 'x' where id = 1"   # ERROR: audit_ledger is append-only
 ```
 
-**Zero-cost demo mode.** `DEMO_MODE=true` drops the paid providers from the fallback chain, so answers come from local Ollama (`ollama pull qwen2.5:1.5b`). If no model is reachable at all, the API still returns the most relevant passages with citations and says the answer is extractive. CI and the free hosted tier both run that way.
+**8. Open the trace.** Open **Traces**, then the scan. You'll see 5 agent nodes, 30 MCP tool calls, 4 retrievals and any model calls, each with its input, output and latency. `curl -s localhost:8000/runs/<run_id>` returns the same. *Code:* [`app/observability/tracer.py`](app/observability/tracer.py).
 
-## Deploy
+**9. Scan again.** The run summary lists the same four findings as *already reported, still there*, with none new and nothing added to the review queue. Findings are fingerprinted, so repeated scans don't pile up duplicates.
 
-The web app runs on Vercel and the API (with its Postgres) on Render; a Railway config is included as the alternative.
+**10. Ask a question that needs an investigation.** In **Ask ReconMind**, try *Did the MOBILE file have a schema problem on 2026-06-16?* The Planner sends only the Data-Quality agent, and the steps stream in as they happen. `curl -N localhost:8000/chat/stream -H 'content-type: application/json' -d '{"question": "..."}'` shows the raw server-sent events.
 
-1. **API:** open [render.com/deploy?repo=…/reconmind](https://render.com/deploy?repo=https://github.com/rahulramachandran-labs/reconmind) and approve the blueprint in [`render.yaml`](render.yaml). It creates the service and a free Postgres, runs migrations and loads the synthetic sample. Fill in `WRITE_TOKEN` (any long random string) and, optionally, model and LangFuse keys.
-2. **Web:** import `frontend/` in Vercel and set `NEXT_PUBLIC_API_URL` / `RECONMIND_API_URL` to the API URL, `RECONMIND_WRITE_TOKEN` to the same token, and `AUTH_SECRET` to a random string. `AUTH_DEMO_MODE=true` lets visitors act as a shared demo reviewer. Set it to `false`, and set `AUTH_GITHUB_ID` / `AUTH_GITHUB_SECRET` / `AUTH_ALLOWED_GITHUB_LOGINS`, for real sign-in.
-3. **Scheduled scans:** add the same token as the repository secret `RECONMIND_WRITE_TOKEN`. [`scheduled-scan.yml`](.github/workflows/scheduled-scan.yml) then wakes the API and runs a scan every six hours, and you can also start one by hand from the Actions tab. A finding that an earlier scan already reported is counted again rather than written up twice, so the review queue holds one item per problem ([ADR 0011](docs/adr/0011-scheduled-scans-and-finding-fingerprints.md)).
-4. `make deploy` redeploys the web app from the CLI; the API redeploys on every push to `main`.
+**11. Break it yourself.**
+```bash
+uv run pytest -m chaos -v    # plants each anomaly with the generator; checks the right agent catches it
+uv run python scripts/generate_synthetic_pipeline.py --seed 7 --out /tmp/p --only key_drift   # a fresh dataset with one planted problem
+```
 
-Two things to know about the free tier:
+**12. Run the quality gates.** `make test` runs 145 tests at 93% coverage. `make eval` scores retrieval and answers on the 46-question golden set and fails below the thresholds.
 
-- **The database expires.** Render deletes free Postgres databases 30 days after they are created. The demo's `reconmind-db` was created on 2026-09-19, so it goes around 2026-10-19. When it does, apply the blueprint again or point `DATABASE_URL` at another Postgres; migrations and the sample load run on startup either way.
-- **The instance sleeps.** A free instance spins down after 15 minutes without traffic, which is why scheduled scans come from GitHub Actions rather than from a timer inside the API (`SCAN_INTERVAL_MINUTES`, kept for always-on deployments). [`keep-warm.yml`](.github/workflows/keep-warm.yml) pings it every ten minutes from 03:00 to 19:00 UTC until the date in the `KEEP_WARM_UNTIL` repository variable; free instance hours are shared across a Render workspace, so it doesn't run around the clock. GitHub pauses scheduled workflows in repositories with no commits for 60 days; re-enable it from the Actions tab if that happens.
+## Project structure
 
-Anyone can read. Scans and review decisions go through the web app, which checks the session and forwards the call with the server-side token, so the token never reaches the browser. Chat, ask and scan are rate limited per client.
+```
+app/                     the backend (Python, FastAPI)
+  main.py                entry point: builds the shared services, mounts the API routers
+  core/                  settings from the environment (config.py) and JSON logging
+  api/                   HTTP routes: agents and review, ask/search/corpus, dashboard, health; auth and rate limits
+  agents/                the multi-agent system (LangGraph)
+    graph.py               wiring: Planner → specialists (parallel) → Reporter → human review
+    planner.py             Planner agent: answer from runbooks, or which specialists investigate
+    specialists.py         specialist agents: run the domain's checks, then explain each finding
+    reporter.py            Reporter agent: incident reports, run summary, who needs sign-off
+    answerer.py            answers runbook questions with citations
+    review.py              human-in-the-loop checkpoints (LangGraph interrupt)
+    service.py             runs and resumes the graph, streams events to the API
+    store/                 runs, reports and decisions: Postgres (sql.py) or in memory (memory.py)
+    deps.py, schemas.py    what every node receives; Pydantic models for plans and reports
+    bootstrap.py           assembles all of the above from settings
+    scheduler.py           optional in-process scan timer
+  domain/                business rules behind the DomainAdapter protocol
+    protocol.py            the contract the agents code against
+    retail_recon/          rules.py (keys, thresholds), checks.py, writeups.py (rubric, wording), adapter.py
+    example_support_triage/  a second domain proving the agents are generic
+  llm/                   model access: fallback chain and pricing, traced client, structured output
+  rag/                   prompts and passage formatting, cited answers, extractive fallback
+  retrieval/             corpus loading, chunking, embeddings, BM25, FAISS / Pinecone, fusion, reranking
+  tools/                 MCP client the agents call tools through
+  observability/         per-run tracer: Postgres, mirrored to LangFuse
+  memory/                chat session memory
+  db/                    SQLAlchemy models and engine
+  pipeline/              synthetic data generator, dbt artifacts, loader
+mcp_servers/             two read-only MCP servers: warehouse-metadata, orchestration-metadata
+corpus/                  knowledge base: runbooks, schema docs, past incident write-ups (synthetic)
+data/  dbt/              the seeded sample and data dictionary; dbt model YAML and manifest
+evals/                   golden set, RAGAS runner, thresholds, score history
+frontend/                Next.js web app (App Router, shadcn/ui, Auth.js)
+migrations/              Alembic migrations, including the append-only ledger trigger
+tests/                   unit, integration (Postgres, MCP, agents, prompt injection), chaos
+docs/                    architecture, API, deployment, evaluation, ADRs, deck, demo script
+scripts/                 data generator CLI, container entrypoint, demo recording
+```
 
-## Synthetic data
+To read the code in the order a run executes: [`graph.py`](app/agents/graph.py) → [`planner.py`](app/agents/planner.py) → [`specialists.py`](app/agents/specialists.py) → [`retail_recon/checks.py`](app/domain/retail_recon/checks.py) → [`reporter.py`](app/agents/reporter.py) → [`review.py`](app/agents/review.py).
 
-`scripts/generate_synthetic_pipeline.py` is seeded (`--seed 42` by default) and byte-for-byte reproducible. A test regenerates the committed sample and fails if a single byte differs.
+## Production readiness
 
-It writes what a real landing zone would hold: 85 pipe-delimited submitter files over 21 business days (8,461 rows), reference data, an Airflow-style DAG run log with one failed task, dbt model YAML with a fake `manifest.json`, the [data dictionary](data/DATA_DICTIONARY.md), and [`expected_anomalies.json`](data/sample/expected_anomalies.json) with the exact size of every planted problem.
-
-| Planted anomaly | Where | Size |
+| Area | In place | Next step |
 |---|---|---|
-| Key drift | `LOC-0517` also reports as `OUT-1071` | 251 rows, 3.0% |
-| Duplicate submission | ECOMM resends 2026-06-12 after the DAG ran | 88 keys, 3 with changed values |
-| Schema drift | MOBILE 2026-06-16 renames `channel_basket_id` to `basket_ref`; `validate_schema` fails | 82 rows |
-| Volume anomaly | POSFEED 2026-06-18 lands 161 minutes late | 110 rows vs 182.6 trailing (40% below) |
+| **Authentication** | Anyone can read. Scans and review decisions need a signed-in reviewer: Auth.js with GitHub OAuth and an allow-list, or a shared demo reviewer on the public demo. The web server forwards writes with a bearer token (`WRITE_TOKEN`, compared in constant time), so the browser never sees it. Reviewer names go into the audit ledger. There are per-client rate limits and a CORS allow-list. | Roles (viewer, reviewer, admin), OIDC single sign-on, per-user tokens |
+| **Storage** | Postgres 16 through SQLAlchemy 2 and versioned Alembic migrations. The audit ledger is append-only, enforced by a database trigger. Vectors live in FAISS in memory or in managed Pinecone, switched with one setting (`VECTOR_STORE`). The Docker image runs the embedding model on ONNX to fit in 512 MB. | Managed Postgres with backups (the free demo database expires after 30 days) |
+| **Knowledge retrieval** | Live facts are fetched through MCP tools at the moment of each investigation, never from a stale copy. Documents are indexed with BM25 and embeddings, fused, then reranked. The index is fingerprinted and rebuilt automatically when documents change, and `CORPUS_DIR` points it at any folder of markdown. | Ingest from a wiki or docs repo on change; add approved incident reports to the corpus as new precedents |
+| **State management** | LangGraph checkpoints every step in Postgres, so a run paused for review survives restarts and resumes on whichever API instance receives the decision. Runs, reports, decisions and chat memory are in Postgres too, and fingerprints make repeated scans idempotent. Only rate-limit counters, the provider cooldown and the FAISS copy are per instance. | Redis for global rate limits; Pinecone to share one index |
+| **Reliability and cost** | Model fallback chain: OpenAI → Anthropic → local Ollama → extractive answers, with a cooldown for failing providers. Outputs are validated by Pydantic and retried, then fall back to a template. `DEMO_MODE` guarantees $0. A chaos suite and a 30-second latency budget run in CI. | Queue-backed scans for long windows |
+| **Observability** | Every agent step, tool call, retrieval and model call is stored with latency, tokens and cost, and mirrored to LangFuse. A model call outside a traced run raises an error instead of going unrecorded. Logs are JSON. | Alerts on failed or slow runs |
+| **Security** | Retrieved text is treated as untrusted: it is delimited, tag-sanitised and covered by a planted prompt-injection test. MCP tools are read-only with validated arguments. Secrets come only from the environment, gitleaks runs in pre-commit and in CI over the full history, and the container runs as non-root. | Secret manager instead of env vars |
 
-```bash
-uv run python scripts/generate_synthetic_pipeline.py --seed 7 --out /tmp/p --only key_drift
-```
+## Quality and evaluation
 
-## Retrieval and evaluation
-
-Documents are chunked by markdown section, then by size, with the title and section carried into every chunk ([ADR 0001](docs/adr/0001-chunk-by-markdown-section.md)). BM25 (`rank_bm25`, with an identifier-aware tokenizer) and dense search (MiniLM on FAISS, or Pinecone behind `VECTOR_STORE=pinecone`) each return 20 candidates. Reciprocal rank fusion merges them, and a MiniLM MS MARCO cross-encoder reranks the fused top 10 (same weights on onnxruntime in the container).
-
-[`evals/golden_set.jsonl`](evals/golden_set.jsonl) has 46 question, answer and context triples covering every anomaly type and every screen. [`evals/run_ragas.py`](evals/run_ragas.py) scores faithfulness, answer relevancy, context precision and context recall. CI fails if any metric drops below [`evals/thresholds.yaml`](evals/thresholds.yaml), and results are appended to `evals/history.csv`. Without an API key the context metrics come from RAGAS's non-LLM implementations, and faithfulness and relevancy come from cross-encoder judges. With `OPENAI_API_KEY` set, the LLM-judged RAGAS metrics run instead.
-
-```bash
-make eval                                                         # hybrid, gate + record
-uv run --group eval python evals/run_ragas.py --retriever dense   # dense-only baseline
-```
-
-Latest scores (offline judge, extractive answers, k=5):
+A 46-question golden set covers every anomaly type and screen. [RAGAS](evals/run_ragas.py) scores it on every push, and CI fails if any metric drops below [its threshold](evals/thresholds.yaml).
 
 | Retriever | Faithfulness | Answer relevancy | Context precision | Context recall |
 |---|---|---|---|---|
 | Dense only | 0.920 | 0.863 | 0.661 | 0.844 |
 | Hybrid (BM25 + dense, RRF) | 0.917 | 0.864 | 0.756 | 0.911 |
-| **Hybrid + cross-encoder rerank (default)** | **0.911** | **0.862** | **0.830** | **0.922** |
+| **Hybrid + reranker (default)** | **0.911** | **0.862** | **0.830** | **0.922** |
+| *Threshold* | *0.85* | *0.80* | *0.80* | *0.85* |
 
-The relevancy judge for the last row is the 12-layer MS MARCO cross-encoder, so the reranker (6-layer) isn't grading its own output.
+CI also runs ruff, black and mypy, then 145 tests with an 80% coverage gate (currently 93%), including Postgres, MCP, agent, prompt-injection and chaos tests. It finishes with gitleaks and a production build of the web app. Details are in [docs/EVALUATION.md](docs/EVALUATION.md).
 
-Quality bar: RAGAS faithfulness ≥ 0.85, answer relevancy ≥ 0.80, context precision ≥ 0.80, context recall ≥ 0.85, every planted anomaly caught, test coverage ≥ 80%, an investigation in under 30 s in demo mode, and zero untraced LLM calls.
+## Tech stack
 
-## API
+| Area | Tools |
+|---|---|
+| Agents | LangGraph (StateGraph, parallel nodes, `interrupt()`, Postgres checkpointer), LangChain, Pydantic |
+| Tools | MCP: two servers over stdio, streamable HTTP or in-process |
+| Retrieval | BM25 (`rank_bm25`), sentence-transformers / fastembed, FAISS or Pinecone, reciprocal rank fusion, cross-encoder reranker |
+| Models | OpenAI, Anthropic, Ollama, with a fallback chain and an extractive floor |
+| Backend | FastAPI (REST and server-sent events), SQLAlchemy 2, Alembic, Postgres 16 |
+| Frontend | Next.js 16 (App Router), shadcn/ui, Tailwind CSS, Auth.js |
+| Quality and ops | RAGAS, pytest, LangFuse, Docker, GitHub Actions, gitleaks, pre-commit, Render, Vercel |
 
-| Method | Path | What it does |
-|---|---|---|
-| `POST` | `/chat/stream` | `{question, session_id?}`: runs the agent graph and streams server-sent events (`session`, `run`, `plan`, `node`, `finding`, `report`, `summary`, `answer`, `paused`, `done`) |
-| `POST` | `/scan` | Starts a full scan in the background, returns the run id |
-| `GET` | `/incidents`, `/incidents/{id}` | Incident reports, filterable by `status` and `severity` |
-| `GET` | `/review` | Reports and plans waiting for a person |
-| `POST` | `/review/reports/{id}` | `{decision: approve\|reject\|annotate, note?}`; the run resumes once every paused report in it has a decision |
-| `POST` | `/review/runs/{id}` | Approve or reject a plan the Planner was unsure about |
-| `GET` | `/runs`, `/runs/{id}` | Agent runs with cost and latency, and every traced step |
-| `POST` | `/ask` | Retrieval and answer only, without the agents |
-| `GET` | `/search?q=&mode=hybrid\|dense\|bm25` | Retrieval only, with dense and BM25 ranks per hit |
-| `GET` | `/corpus`, `/corpus/{doc_id}` | The ingested documents |
-| `GET` | `/sessions/{id}/messages` | Conversation history |
-| `GET` | `/healthz` | Status, retriever, provider chain, database |
+### Course concepts applied
 
-Interactive API docs are served at `/docs` on the API host.
+| Module | Where it shows up |
+|---|---|
+| GenAI foundations | Delimited, untrusted context in prompts; Pydantic-validated structured output with a retry loop |
+| Models and APIs | Provider abstraction and fallback, token and cost accounting per call |
+| LangChain | Markdown and dbt YAML loaders, section-aware splitting, retrievers, session memory in Postgres |
+| RAG | Chunking, BM25 + dense hybrid, RRF, reranking, a RAGAS gate in CI |
+| Agentic AI | LangGraph StateGraph, conditional edges, parallel specialists, checkpoints, human-in-the-loop |
+| MCP | Host, client and server; two read-only servers; stdio vs HTTP transports |
+| Observability and deployment | LangFuse tracing, FastAPI, Docker, Render and Vercel, CI/CD |
 
-## Configuration
+## Documentation
 
-Everything comes from environment variables (see [`.env.example`](.env.example)). None are needed for a local demo.
+| Document | What's in it |
+|---|---|
+| [Architecture](docs/ARCHITECTURE.md) | Components, the agent graph, MCP tools, retrieval pipeline, data model, domain adapters |
+| [API reference](docs/API.md) | Every endpoint and the chat stream's event types |
+| [Deployment](docs/DEPLOYMENT.md) | Render and Vercel setup, scheduled scans, free-tier notes |
+| [Evaluation](docs/EVALUATION.md) | Golden set, judges, scores, the quality bar |
+| [Development](docs/DEVELOPMENT.md) | Make targets, docker compose, tests, conventions |
+| [Configuration](.env.example) | Every environment variable, explained ([web app](frontend/.env.example)) |
+| [Decision records](docs/adr/README.md) | Why LangGraph, why MCP, why hybrid search, and the rest |
 
-| Variable | Default | Notes |
-|---|---|---|
-| `DATABASE_URL` | unset | Postgres; without it chat sessions live in memory |
-| `LLM_PROVIDERS` | `["openai","anthropic","ollama"]` | Fallback order |
-| `DEMO_MODE` | `false` | Drops the paid providers |
-| `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` | unset | Providers without a key are skipped |
-| `OLLAMA_BASE_URL` / `OLLAMA_MODEL` | `http://localhost:11434` / `qwen2.5:1.5b` | An empty base URL disables Ollama |
-| `RETRIEVER` | `hybrid` | `dense` and `bm25` for comparison |
-| `EMBEDDINGS_BACKEND` | `sentence-transformers` | `fastembed` (same model on ONNX, used in the container), `openai`, `hashing` (tests) |
-| `VECTOR_STORE` | `faiss` | `pinecone` with `PINECONE_API_KEY` |
+## Limitations and next steps
 
-## Repository layout
-
-```
-app/
-  agents/         LangGraph graph, planner / specialist / reporter nodes, tracing LLM wrapper,
-                  structured-output loop, run store and the service behind the API
-  domain/         DomainAdapter protocol, retail_recon (every business rule) and the
-                  example_support_triage stub
-  tools/          MCP tool box the agents call through
-  observability/  per-run tracer: Postgres steps, mirrored to LangFuse
-  api/            FastAPI routes, including SSE chat and review
-  db/             SQLAlchemy models, engine
-  pipeline/       synthetic generator, dbt project, loader, seed
-  retrieval/      corpus loaders, chunking, embeddings, BM25, FAISS, Pinecone, hybrid RRF
-  llm.py          provider fallback chain
-mcp_servers/      warehouse-metadata and orchestration-metadata (read-only, stdio or HTTP)
-corpus/           runbooks, schema docs, past incident write-ups (synthetic)
-data/             seeded sample and data dictionary
-dbt/              model YAML and the manifest the warehouse pretends to have
-evals/            golden set, RAGAS runner, thresholds, history
-frontend/         Next.js App Router + shadcn/ui
-migrations/       Alembic, including the append-only ledger trigger
-tests/            unit, integration (Postgres, MCP, agents), prompt injection, domain-agnostic proof
-docs/             ADRs and the project deck
-```
-
-## Development
-
-```bash
-make test       # pytest with the 80% coverage gate (Postgres tests skip without a database)
-make lint       # ruff, black, mypy, eslint
-make eval       # RAGAS gate
-uv run pytest -m chaos   # plant each anomaly with the generator and check the right agent catches it
-make sync MSG="feat(scope): message"   # hooks, tests, commit, push
-```
-
-Commits follow conventional commits scoped by phase. Pre-commit runs ruff, black, mypy on changed files and gitleaks. CI runs lint, types, tests with coverage, gitleaks over full history and `next build`.
+- Scans run on a schedule, not when data lands. Next step: trigger them from the loader or a Kafka topic.
+- The Reporter proposes fixes but doesn't apply them. Next step: open a pull request with the fix, gated on approval.
+- Confidence thresholds are set by hand. Next step: tune them from the approve and reject history.
+- One domain at a time. Next step: an adapter registry and multi-tenant auth so several domains can run side by side.
 
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE) · Rahul Ramachandran
