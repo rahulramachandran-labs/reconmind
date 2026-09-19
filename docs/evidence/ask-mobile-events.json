@@ -1,0 +1,174 @@
+[
+  {
+    "event": "session",
+    "session_id": "8c82abef-6297-4843-ac05-98396bb6fd81"
+  },
+  {
+    "event": "run",
+    "type": "run",
+    "run_id": "c254aa4c-a147-4b9c-beec-dbd97ca6eaab",
+    "trace_id": "c254aa4ca1474b9cbeecdbd97ca6eaab",
+    "trace_url": null
+  },
+  {
+    "event": "node",
+    "type": "node",
+    "node": "planner"
+  },
+  {
+    "event": "plan",
+    "type": "plan",
+    "intent": "investigate",
+    "specialists": [
+      "data_quality"
+    ],
+    "confidence": 0.85,
+    "rationale": "The question specifically asks for a schema problem on 2026-06-16. The Data Quality specialist is the most qualified to investigate the specific date and schema anomaly mentioned, as it requires checking batch records against the Contract and comparing them with the DAG history. The keyword router's proposed routing also aligns with the data anomaly the question is asking for.",
+    "planned_by": "ollama",
+    "scope": {
+      "date_from": "2026-06-09",
+      "date_to": "2026-06-16"
+    },
+    "needs_review": false
+  },
+  {
+    "event": "node",
+    "type": "node",
+    "node": "data_quality"
+  },
+  {
+    "event": "finding",
+    "type": "finding",
+    "specialist": "data_quality",
+    "finding_type": "schema_drift",
+    "severity": "S1",
+    "title": "S1003_20260616_0216_MOBILE.txt renamed channel_basket_id to basket_ref",
+    "affected_records": 82
+  },
+  {
+    "event": "node",
+    "type": "node",
+    "node": "reporter"
+  },
+  {
+    "event": "report",
+    "type": "report",
+    "id": "f54b9a90-6fcf-4115-aa8e-52d55f8a4354",
+    "run_id": "d36c5c4a-d20e-4629-9b27-d433f076755d",
+    "finding_type": "schema_drift",
+    "specialist": "data_quality",
+    "severity": "S1",
+    "title": "S1003_20260616_0216_MOBILE.txt renamed channel_basket_id to basket_ref",
+    "problem_statement": "S1003_20260616_0216_MOBILE.txt (2026-06-16) does not match the raw.transactions contract: missing ['channel_basket_id'], unexpected ['basket_ref']. 82 rows landed with the missing column null; that column is part of the dedup key, so dedup cannot run for this batch.",
+    "affected_records": {
+      "count": 82,
+      "rate": null,
+      "detail": "82 records"
+    },
+    "root_cause_hypothesis": "The submitter's export renamed channel_basket_id to basket_ref: one contracted column is missing and one similarly named column appeared in the same batch. The loader maps by name, so the rows landed with the column null. This matches the pattern in INC-0438.",
+    "recommended_fix": [
+      "Do not change the contract to match the file.",
+      "Ask S1003 to resend 2026-06-16 with the contracted header.",
+      "Reprocess the day once the resend lands; latest-file-wins supersedes the null-key rows."
+    ],
+    "confidence": 0.8,
+    "confidence_label": "high",
+    "open_questions": [
+      "Did the submitter ship a new export library or config?"
+    ],
+    "evidence": [
+      {
+        "source": "mcp:warehouse-metadata/get_table_stats",
+        "summary": "S1003_20260616_0216_MOBILE.txt header is missing ['channel_basket_id'] and has unexpected ['basket_ref']; 82 rows landed with the missing column null",
+        "data": {
+          "header": [
+            "outlet_id",
+            "location_id",
+            "transaction_id",
+            "upc_code",
+            "basket_ref",
+            "qty",
+            "amount",
+            "event_ts"
+          ],
+          "null_counts": {
+            "channel_basket_id": 82
+          }
+        }
+      },
+      {
+        "source": "mcp:warehouse-metadata/get_dbt_manifest",
+        "summary": "raw.transactions contract: amount, channel_basket_id, event_ts, location_id, outlet_id, qty, transaction_id, upc_code",
+        "data": {}
+      },
+      {
+        "source": "mcp:orchestration-metadata/get_failed_tasks",
+        "summary": "validate_schema failed on 2026-06-16: ContractViolation: S1003_20260616_0216_MOBILE.txt missing ['channel_basket_id']; unexpected ['basket_ref']",
+        "data": {
+          "state": "failed",
+          "run_id": "scheduled__2026-06-17T05:15:00Z",
+          "task_id": "validate_schema",
+          "business_date": "2026-06-16",
+          "first_error_line": "ContractViolation: S1003_20260616_0216_MOBILE.txt missing ['channel_basket_id']; unexpected ['basket_ref']"
+        }
+      }
+    ],
+    "sources": [
+      {
+        "chunk_id": "incidents/INC-0438-mobile-column-rename#problem-0",
+        "doc_id": "incidents/INC-0438-mobile-column-rename",
+        "title": "INC-0438: MOBILE file renamed a dedup-key column",
+        "section": "Problem"
+      },
+      {
+        "chunk_id": "runbooks/schema-drift#detecting-a-rename-vs-a-drop-0",
+        "doc_id": "runbooks/schema-drift",
+        "title": "Schema drift against the dbt contract",
+        "section": "Detecting a rename vs a drop"
+      },
+      {
+        "chunk_id": "runbooks/schema-drift#where-to-look-0",
+        "doc_id": "runbooks/schema-drift",
+        "title": "Schema drift against the dbt contract",
+        "section": "Where to look"
+      },
+      {
+        "chunk_id": "incidents/INC-0438-mobile-column-rename#root-cause-0",
+        "doc_id": "incidents/INC-0438-mobile-column-rename",
+        "title": "INC-0438: MOBILE file renamed a dedup-key column",
+        "section": "Root cause"
+      }
+    ],
+    "analysis_by": "template",
+    "needs_review": true,
+    "review_reason": "S1 findings always get a human sign-off",
+    "trace_url": null,
+    "status": "pending_review",
+    "review_note": null,
+    "seen_count": 2,
+    "repeat": true
+  },
+  {
+    "event": "summary",
+    "type": "summary",
+    "headline": "Batch 2026-06-16 contains missing field 'channel_basket_id'",
+    "summary": "A batch file with the name 'S1003_20260616_0216_MOBILE.txt' is missing the field 'channel_basket_id', which is crucial for the deduplication process due to the existence of column 'basket_ref' in the dedup key."
+  },
+  {
+    "event": "node",
+    "type": "node",
+    "node": "finalize"
+  },
+  {
+    "event": "done",
+    "type": "done",
+    "run_id": "c254aa4c-a147-4b9c-beec-dbd97ca6eaab",
+    "latency_ms": 68354,
+    "trace_url": null,
+    "llm_calls": 4,
+    "tool_calls": 13,
+    "prompt_tokens": 3659,
+    "completion_tokens": 901,
+    "cost_usd": 0.0
+  }
+]

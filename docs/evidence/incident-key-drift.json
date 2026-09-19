@@ -1,0 +1,84 @@
+{
+  "id": "d384ed84-5858-4215-bd84-116e812e8925",
+  "title": "LOC-0517 also reporting as OUT-1071 (3.0% of rows)",
+  "repeat": false,
+  "run_id": "d36c5c4a-d20e-4629-9b27-d433f076755d",
+  "status": "published",
+  "sources": [
+    {
+      "title": "Key drift between outlet_id and location_id",
+      "doc_id": "runbooks/key-drift-outlet-location",
+      "section": "Why it matters",
+      "chunk_id": "runbooks/key-drift-outlet-location#why-it-matters-0"
+    },
+    {
+      "title": "Key drift between outlet_id and location_id",
+      "doc_id": "runbooks/key-drift-outlet-location",
+      "section": "Fix",
+      "chunk_id": "runbooks/key-drift-outlet-location#fix-0"
+    },
+    {
+      "title": "Key drift between outlet_id and location_id",
+      "doc_id": "runbooks/key-drift-outlet-location",
+      "section": "Overview",
+      "chunk_id": "runbooks/key-drift-outlet-location#overview-0"
+    },
+    {
+      "title": "Key drift between outlet_id and location_id",
+      "doc_id": "runbooks/key-drift-outlet-location",
+      "section": "Detection",
+      "chunk_id": "runbooks/key-drift-outlet-location#detection-0"
+    }
+  ],
+  "evidence": [
+    {
+      "data": {
+        "rows": 251,
+        "baskets": 158,
+        "last_seen": "2026-06-21",
+        "first_seen": "2026-06-01",
+        "submitters": 4,
+        "location_id": "LOC-0517",
+        "reported_outlet_id": "OUT-1071",
+        "canonical_outlet_id": "OUT-1017"
+      },
+      "source": "mcp:warehouse-metadata/run_check",
+      "summary": "251 deduplicated rows (158 baskets) at LOC-0517 carry OUT-1071, which outlet_location_map does not map there; canonical is OUT-1017"
+    }
+  ],
+  "severity": "S2",
+  "trace_url": null,
+  "confidence": 0.75,
+  "seen_count": 1,
+  "specialist": "reconciliation",
+  "analysis_by": "ollama",
+  "review_note": null,
+  "finding_type": "key_drift",
+  "needs_review": false,
+  "review_reason": null,
+  "open_questions": [
+    "Verify the drift continues after the fix.",
+    "Audit all records in `transactions` and `location_id` to ensure the drift is not caused by other variables."
+  ],
+  "recommended_fix": [
+    "Confirm with the submitter which outlet id is correct.",
+    "Add the drifted `OUT-1071` as an alias in `outlet_alias` with `valid_from` and `valid_to` in `outlet_location_map`.",
+    "Rebuild `stg_transactions` and `fct_daily_sales` for affected dates.",
+    "Ask the submitter to fix the header at source and record the ticket number.",
+    "Monitor the drift over time and perform audits periodically.",
+    "Review all historical data where the drift is suspected."
+  ],
+  "affected_records": {
+    "rate": 0.03,
+    "count": 251,
+    "detail": "251 records (3.0%)"
+  },
+  "confidence_label": "high",
+  "problem_statement": "Location LOC-0517 is reporting sales under two outlet ids: its canonical OUT-1017 and OUT-1071, which outlet_location_map does not map to it. 251 of 8373 deduplicated rows (3.0%) between 2026-06-01 and 2026-06-21 are affected, so store-level numbers for this location are split.",
+  "root_cause_hypothesis": "The root cause is that the `LOC-0517` location has `OUT-1071` reporting as an outlet under multiple `OUT-1017` outlet records in the `transactions` table.",
+  "last_seen_at": "2026-09-19T16:20:54.540735+00:00",
+  "review_decision": null,
+  "reviewed_by": null,
+  "reviewed_at": null,
+  "created_at": "2026-09-19T16:20:54.592648+00:00"
+}

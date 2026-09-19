@@ -1,0 +1,209 @@
+{
+  "captured_at": "2026-09-19T16:17:46Z",
+  "commit": "0cf0fff",
+  "api_version": "1.1.0",
+  "llm_providers": [
+    "ollama"
+  ],
+  "active_model": {
+    "provider": "ollama",
+    "model": "qwen2.5:1.5b",
+    "chain": [
+      "ollama"
+    ],
+    "models": {
+      "ollama": "qwen2.5:1.5b"
+    },
+    "fell_back": null,
+    "last_provider": null,
+    "last_call_at": null
+  },
+  "scan": {
+    "run_id": "d36c5c4a-d20e-4629-9b27-d433f076755d",
+    "status": "paused_review",
+    "wall_seconds": 208.7,
+    "graph_latency_ms": 206783,
+    "steps": 46,
+    "nodes": 5,
+    "tool_calls": 30,
+    "retrievals": 4,
+    "llm_calls": 7,
+    "llm_calls_failed": 0,
+    "prompt_tokens": 9585,
+    "completion_tokens": 1912,
+    "cost_usd": 0,
+    "models": [
+      "ollama/qwen2.5:1.5b"
+    ],
+    "findings": [
+      {
+        "finding_type": "schema_drift",
+        "title": "S1003_20260616_0216_MOBILE.txt renamed channel_basket_id to basket_ref",
+        "severity": "S1",
+        "status": "pending_review",
+        "affected_records": 82,
+        "analysis_by": "template",
+        "planted": {
+          "affected_rows": 82,
+          "business_date": "2026-06-16",
+          "change": "rename",
+          "expected_agent": "data_quality",
+          "expected_severity": "S1",
+          "failed_task": "validate_schema",
+          "file": "S1003_20260616_0216_MOBILE.txt",
+          "missing_columns": [
+            "channel_basket_id"
+          ],
+          "submitter_id": "S1003",
+          "unexpected_columns": [
+            "basket_ref"
+          ]
+        }
+      },
+      {
+        "finding_type": "key_drift",
+        "title": "LOC-0517 also reporting as OUT-1071 (3.0% of rows)",
+        "severity": "S2",
+        "status": "published",
+        "affected_records": 251,
+        "analysis_by": "ollama",
+        "planted": {
+          "canonical_outlet_id": "OUT-1017",
+          "drift_rate": 0.03,
+          "drifted_outlet_id": "OUT-1071",
+          "drifted_rows": 251,
+          "expected_agent": "reconciliation",
+          "expected_severity": "S2",
+          "location_id": "LOC-0517",
+          "rows_in_window": 8373
+        }
+      },
+      {
+        "finding_type": "duplicate_submission",
+        "title": "Resent file S1002_20260612_1120_ECOMM.txt supersedes 88 rows",
+        "severity": "S2",
+        "status": "published",
+        "affected_records": 88,
+        "analysis_by": "ollama",
+        "planted": {
+          "business_date": "2026-06-12",
+          "changed_rows": 3,
+          "duplicate_keys": 88,
+          "expected_agent": "reconciliation",
+          "expected_severity": "S2",
+          "original_file": "S1002_20260612_0304_ECOMM.txt",
+          "resend_file": "S1002_20260612_1120_ECOMM.txt",
+          "resend_landed_after_dag": true,
+          "submitter_id": "S1002",
+          "superseded_rows": 88
+        }
+      },
+      {
+        "finding_type": "volume_anomaly",
+        "title": "S1001 2026-06-18: 110 rows, 40% below its 7-day average",
+        "severity": "S2",
+        "status": "published",
+        "affected_records": 73,
+        "analysis_by": "ollama",
+        "planted": {
+          "business_date": "2026-06-18",
+          "expected_agent": "data_quality",
+          "expected_severity": "S2",
+          "file": "S1001_20260618_0638_POSFEED.txt",
+          "landed_at": "2026-06-19T06:41:00Z",
+          "minutes_after_sla": 161,
+          "pct_below_trailing": 0.397,
+          "rows": 110,
+          "submitter_id": "S1001",
+          "trailing_avg_7d": 182.6
+        }
+      }
+    ]
+  },
+  "questions": {
+    "ask-mobile": {
+      "question": "Did the MOBILE file have a schema problem on 2026-06-16?",
+      "run_id": "c254aa4c-a147-4b9c-beec-dbd97ca6eaab",
+      "steps": 22,
+      "nodes": 4,
+      "tool_calls": 13,
+      "retrievals": 1,
+      "llm_calls": 4,
+      "llm_calls_failed": 0,
+      "prompt_tokens": 3659,
+      "completion_tokens": 901,
+      "cost_usd": 0,
+      "models": [
+        "ollama/qwen2.5:1.5b"
+      ],
+      "status": "completed"
+    },
+    "ask-runbook": {
+      "question": "Which file wins when a submitter resends the same day?",
+      "run_id": "e3b621c1-1e09-4d94-b6fd-9584e3488c6d",
+      "steps": 4,
+      "nodes": 2,
+      "tool_calls": 1,
+      "retrievals": 0,
+      "llm_calls": 1,
+      "llm_calls_failed": 0,
+      "prompt_tokens": 371,
+      "completion_tokens": 57,
+      "cost_usd": 0,
+      "models": [
+        "ollama/qwen2.5:1.5b"
+      ],
+      "status": "paused_plan"
+    }
+  },
+  "ragas": [
+    {
+      "timestamp": "2026-09-18T19:14:38Z",
+      "commit": "17a5997+dirty",
+      "retriever": "dense",
+      "judge": "offline",
+      "answerer": "extractive",
+      "n": "46",
+      "faithfulness": "0.9203",
+      "answer_relevancy": "0.8629",
+      "context_precision": "0.6606",
+      "context_recall": "0.8442",
+      "gate": "fail"
+    },
+    {
+      "timestamp": "2026-09-18T20:28:42Z",
+      "commit": "0f0678f+dirty",
+      "retriever": "hybrid",
+      "judge": "offline",
+      "answerer": "extractive",
+      "n": "46",
+      "faithfulness": "0.9112",
+      "answer_relevancy": "0.8622",
+      "context_precision": "0.8302",
+      "context_recall": "0.9221",
+      "gate": "pass"
+    }
+  ],
+  "ci": {
+    "conclusion": "success",
+    "createdAt": "2026-09-19T08:46:32Z",
+    "databaseId": 35432908516,
+    "headSha": "0cf0fffd1229dedd9696534c1730a24720b1a62c",
+    "url": "https://github.com/rahulramachandran-labs/reconmind/actions/runs/35432908516"
+  },
+  "tests": {
+    "command": "make test",
+    "exit_code": 0,
+    "passed": 152,
+    "failed": 0,
+    "skipped": 0,
+    "coverage_percent": 93.27,
+    "layers": {
+      "unit": 101,
+      "integration": 45,
+      "chaos": 6,
+      "prompt injection": 1,
+      "domain-agnostic proof": 2
+    }
+  }
+}

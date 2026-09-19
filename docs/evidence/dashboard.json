@@ -1,0 +1,247 @@
+{
+  "pipeline": {
+    "as_of": "2026-06-21",
+    "volume": {
+      "rows": 393,
+      "trailing_avg_7d": 396.6,
+      "pct_change": -0.009,
+      "series": [
+        {
+          "date": "2026-06-08",
+          "rows": 396,
+          "by_submitter": {
+            "S1001": 175,
+            "S1002": 92,
+            "S1003": 77,
+            "S1004": 52
+          }
+        },
+        {
+          "date": "2026-06-09",
+          "rows": 392,
+          "by_submitter": {
+            "S1001": 178,
+            "S1002": 85,
+            "S1003": 79,
+            "S1004": 50
+          }
+        },
+        {
+          "date": "2026-06-10",
+          "rows": 400,
+          "by_submitter": {
+            "S1001": 187,
+            "S1002": 84,
+            "S1003": 79,
+            "S1004": 50
+          }
+        },
+        {
+          "date": "2026-06-11",
+          "rows": 391,
+          "by_submitter": {
+            "S1001": 173,
+            "S1002": 84,
+            "S1003": 80,
+            "S1004": 54
+          }
+        },
+        {
+          "date": "2026-06-12",
+          "rows": 401,
+          "by_submitter": {
+            "S1001": 176,
+            "S1002": 88,
+            "S1003": 83,
+            "S1004": 54
+          }
+        },
+        {
+          "date": "2026-06-13",
+          "rows": 405,
+          "by_submitter": {
+            "S1001": 185,
+            "S1002": 88,
+            "S1003": 81,
+            "S1004": 51
+          }
+        },
+        {
+          "date": "2026-06-14",
+          "rows": 404,
+          "by_submitter": {
+            "S1001": 184,
+            "S1002": 88,
+            "S1003": 80,
+            "S1004": 52
+          }
+        },
+        {
+          "date": "2026-06-15",
+          "rows": 411,
+          "by_submitter": {
+            "S1001": 186,
+            "S1002": 91,
+            "S1003": 82,
+            "S1004": 52
+          }
+        },
+        {
+          "date": "2026-06-16",
+          "rows": 409,
+          "by_submitter": {
+            "S1001": 187,
+            "S1002": 89,
+            "S1003": 82,
+            "S1004": 51
+          }
+        },
+        {
+          "date": "2026-06-17",
+          "rows": 405,
+          "by_submitter": {
+            "S1001": 187,
+            "S1002": 85,
+            "S1003": 82,
+            "S1004": 51
+          }
+        },
+        {
+          "date": "2026-06-18",
+          "rows": 330,
+          "by_submitter": {
+            "S1001": 110,
+            "S1002": 86,
+            "S1003": 81,
+            "S1004": 53
+          }
+        },
+        {
+          "date": "2026-06-19",
+          "rows": 406,
+          "by_submitter": {
+            "S1001": 183,
+            "S1002": 86,
+            "S1003": 84,
+            "S1004": 53
+          }
+        },
+        {
+          "date": "2026-06-20",
+          "rows": 411,
+          "by_submitter": {
+            "S1001": 189,
+            "S1002": 91,
+            "S1003": 77,
+            "S1004": 54
+          }
+        },
+        {
+          "date": "2026-06-21",
+          "rows": 393,
+          "by_submitter": {
+            "S1001": 176,
+            "S1002": 88,
+            "S1003": 78,
+            "S1004": 51
+          }
+        }
+      ]
+    },
+    "last_run": {
+      "business_date": "2026-06-21",
+      "state": "success",
+      "duration_s": 1191,
+      "failed_tasks": [],
+      "runs_failed_14d": 1
+    }
+  },
+  "usage": {
+    "day": "2026-09-19",
+    "runs": 1,
+    "llm_calls": 7,
+    "tokens": 11497,
+    "cost_usd": 0.0,
+    "providers": [
+      {
+        "provider": "ollama",
+        "model": "qwen2.5:1.5b",
+        "calls": 7,
+        "tokens": 11497,
+        "cost_usd": 0.0
+      }
+    ],
+    "last_scan": {
+      "id": "d36c5c4a-d20e-4629-9b27-d433f076755d",
+      "trigger": "scan",
+      "question": null,
+      "adapter": "retail_recon",
+      "status": "paused_review",
+      "plan": {
+        "scope": {
+          "date_to": "2026-06-21",
+          "date_from": "2026-06-01"
+        },
+        "intent": "investigate",
+        "rationale": "Scheduled scan.",
+        "confidence": 1.0,
+        "planned_by": "rules",
+        "specialists": [
+          "reconciliation",
+          "data_quality"
+        ],
+        "needs_review": false
+      },
+      "summary": "S2: S1003_20260616_0216_MOBILE.txt renames channel_basket_id to basket_ref, resulting in null column retention and dedup failure.\n\nA file named S1003_20260616_0216_MOBILE.txt in S1 category contains a change that violates the raw.transactions contract. This caused rows with the 'channel_basket_id' column with null values. Deduplication cannot run because the 'basket_ref' column is part of the dedup key. A total of 82 affected rows landed with null columns, resulting in deduplication failure. The incident report is marked as S1.",
+      "error": null,
+      "trace_url": null,
+      "prompt_tokens": 9585,
+      "completion_tokens": 1912,
+      "cost_usd": 0.0,
+      "latency_ms": 206783,
+      "started_at": "2026-09-19T16:17:46.841809+00:00",
+      "finished_at": "2026-09-19T16:21:13.652424+00:00"
+    }
+  },
+  "findings": {
+    "since": "2026-09-19T16:17:46.841809+00:00",
+    "by_severity": {
+      "S1": 1,
+      "S2": 3,
+      "S3": 0,
+      "S4": 0
+    },
+    "pending_review": 1,
+    "items": [
+      {
+        "id": "f54b9a90-6fcf-4115-aa8e-52d55f8a4354",
+        "severity": "S1",
+        "title": "S1003_20260616_0216_MOBILE.txt renamed channel_basket_id to basket_ref",
+        "status": "pending_review",
+        "seen_count": 1
+      },
+      {
+        "id": "d384ed84-5858-4215-bd84-116e812e8925",
+        "severity": "S2",
+        "title": "LOC-0517 also reporting as OUT-1071 (3.0% of rows)",
+        "status": "published",
+        "seen_count": 1
+      },
+      {
+        "id": "0df2495f-cb41-443f-a8a3-cc78a7d70daa",
+        "severity": "S2",
+        "title": "Resent file S1002_20260612_1120_ECOMM.txt supersedes 88 rows",
+        "status": "published",
+        "seen_count": 1
+      },
+      {
+        "id": "daf9b573-dea4-49d3-b1d4-5339c1e52e97",
+        "severity": "S2",
+        "title": "S1001 2026-06-18: 110 rows, 40% below its 7-day average",
+        "status": "published",
+        "seen_count": 1
+      }
+    ]
+  },
+  "adapter": "Retail transaction reconciliation"
+}

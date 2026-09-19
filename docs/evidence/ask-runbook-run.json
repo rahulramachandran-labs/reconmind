@@ -1,0 +1,134 @@
+{
+  "id": "e3b621c1-1e09-4d94-b6fd-9584e3488c6d",
+  "trigger": "question",
+  "question": "Which file wins when a submitter resends the same day?",
+  "adapter": "retail_recon",
+  "status": "paused_plan",
+  "plan": {
+    "scope": {
+      "date_to": "2026-06-21",
+      "date_from": "2026-06-01"
+    },
+    "intent": "investigate",
+    "rationale": "The question requires investigation into the specific file submission process within the application, including checking the runbooks directly for the criteria for resending the same day.",
+    "confidence": 0.3,
+    "planned_by": "ollama",
+    "specialists": [
+      "data_quality",
+      "reconciliation"
+    ],
+    "needs_review": true
+  },
+  "summary": null,
+  "error": null,
+  "trace_url": null,
+  "prompt_tokens": 371,
+  "completion_tokens": 57,
+  "cost_usd": 0.0,
+  "latency_ms": 5564,
+  "started_at": "2026-09-19T16:22:24.529537+00:00",
+  "finished_at": "2026-09-19T16:22:30.103101+00:00",
+  "steps": [
+    {
+      "node": "planner",
+      "kind": "llm",
+      "name": "planner",
+      "provider": "ollama",
+      "model": "qwen2.5:1.5b",
+      "prompt_version": "planner@2",
+      "latency_ms": 5421,
+      "prompt_tokens": 371,
+      "completion_tokens": 57,
+      "cost_usd": 0.0,
+      "error": null,
+      "started_at": "2026-09-19T16:22:29.979438+00:00",
+      "input": {
+        "system": "You route questions about a data pipeline to specialist agents.\nintent=answer when the runbooks alone can answer it (how/what/why in general);\nintent=investigate when it needs a look at the actual data or runs;\nintent=unclear when you cannot tell. Only use the specialists listed.",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Specialists:\n- reconciliation: Applies the dedup key and the latest-file-wins rule, and flags outlet / location key drift. (finds: duplicate_submission, key_drift)\n- data_quality: Diffs each batch against the dbt contract and checks volume and timing against DAG history. (finds: schema_drift, volume_anomaly)\n\nQuestion: Which file wins when a submitter resends the same day?\n\nA keyword router suggested: {\"intent\":\"answer\",\"specialists\":[],\"confidence\":0.8,\"rationale\":\"A how/what question the runbooks can answer without touching the data.\"}\n\nReply with one JSON object matching this JSON schema and nothing else:\n{\"properties\": {\"intent\": {\"enum\": [\"investigate\", \"answer\", \"unclear\"], \"title\": \"Intent\", \"type\": \"string\"}, \"specialists\": {\"items\": {\"type\": \"string\"}, \"maxItems\": 6, \"title\": \"Specialists\", \"type\": \"array\"}, \"confidence\": {\"maximum\": 1.0, \"minimum\": 0.0, \"title\": \"Confidence\", \"type\": \"number\"}, \"rationale\": {\"maxLength\": 400, \"minLength\": 3, \"title\": \"Rationale\", \"type\": \"string\"}}, \"required\": [\"intent\", \"confidence\", \"rationale\"], \"title\": \"PlannerDecision\", \"type\": \"object\"}"
+          }
+        ]
+      },
+      "output": {
+        "text": "{\"intent\": \"investigate\", \"specialists\": [], \"confidence\": 0.3, \"rationale\": \"The question requires investigation into the specific file submission process within the application, including checking the runbooks directly for the criteria for resending the same day.\"}",
+        "fallbacks": []
+      }
+    },
+    {
+      "node": "planner",
+      "kind": "tool",
+      "name": "orchestration-metadata/list_dag_runs",
+      "provider": null,
+      "model": null,
+      "prompt_version": null,
+      "latency_ms": 78,
+      "prompt_tokens": 0,
+      "completion_tokens": 0,
+      "cost_usd": 0.0,
+      "error": null,
+      "started_at": "2026-09-19T16:22:30.058233+00:00",
+      "input": {
+        "dag_id": "retail_txn_daily"
+      },
+      "output": {
+        "truncated": "{\"dag_id\": \"retail_txn_daily\", \"runs\": [{\"run_id\": \"scheduled__2026-06-02T05:15:00Z\", \"business_date\": \"2026-06-01\", \"state\": \"success\", \"start\": \"2026-06-02T05:15:00Z\", \"end\": \"2026-06-02T05:38:21Z\", \"duration_s\": 1401, \"failed_tasks\": []}, {\"run_id\": \"scheduled__2026-06-03T05:15:00Z\", \"business_date\": \"2026-06-02\", \"state\": \"success\", \"start\": \"2026-06-03T05:15:00Z\", \"end\": \"2026-06-03T05:34:00Z\", \"duration_s\": 1140, \"failed_tasks\": []}, {\"run_id\": \"scheduled__2026-06-04T05:15:00Z\", \"business_date\": \"2026-06-03\", \"state\": \"success\", \"start\": \"2026-06-04T05:15:00Z\", \"end\": \"2026-06-04T05:35:51Z\", \"duration_s\": 1251, \"failed_tasks\": []}, {\"run_id\": \"scheduled__2026-06-05T05:15:00Z\", \"business_date\": \"2026-06-04\", \"state\": \"success\", \"start\": \"2026-06-05T05:15:00Z\", \"end\": \"2026-06-05T05:35:50Z\", \"duration_s\": 1250, \"failed_tasks\": []}, {\"run_id\": \"scheduled__2026-06-06T05:15:00Z\", \"business_date\": \"2026-06-05\", \"state\": \"success\", \"start\": \"2026-06-06T05:15:00Z\", \"end\": \"2026-06-06T05:35:22Z\", \"duration_s\": 1222, \"failed_tasks\": []}, {\"run_id\": \"scheduled__2026-06-07T05:15:00Z\", \"business_date\": \"2026-06-06\", \"state\": \"success\", \"start\": \"2026-06-07T05:15:00Z\", \"end\": \"2026-06-07T05:38:01Z\", \"duration_s\": 1381, \"failed_tasks\": []}, {\"run_id\": \"scheduled__2026-06-08T05:15:00Z\", \"business_date\": \"2026-06-07\", \"state\": \"success\", \"start\": \"2026-06-08T05:15:00Z\", \"end\": \"2026-06-08T05:34:36Z\", \"duration_s\": 1176, \"failed_tasks\": []}, {\"run_id\": \"scheduled__2026-06-09T05:15:00Z\", \"business_date\": \"2026-06-08\", \"state\": \"success\", \"start\": \"2026-06-09T05:15:00Z\", \"end\": \"2026-06-09T05:36:16Z\", \"duration_s\": 1276, \"failed_tasks\": []}, {\"run_id\": \"scheduled__2026-06-10T05:15:00Z\", \"business_date\": \"2026-06-09\", \"state\": \"success\", \"start\": \"2026-06-10T05:15:00Z\", \"end\": \"2026-06-10T05:38:42Z\", \"duration_s\": 1422, \"failed_tasks\": []}, {\"run_id\": \"scheduled__2026-06-11T05:15:00Z\", \"business_date\": \"2026-06-10\", \"state\": \"success\", \"start\": \"2026-06-11T05:15:00Z\", \"end\": \"2026-06-11T05:36:52Z\", \"duration_s\": 1312, \"failed_tasks\": []}, {\"run_id\": \"scheduled__2026-06-12T05:15:00Z\", \"business_date\": \"2026-06-11\", \"state\": \"success\", \"start\": \"2026-06-12T05:15:00Z\", \"end\": \"2026-06-12T05:34:08Z\", \"duration_s\": 1148, \"failed_tasks\": []}, {\"run_id\": \"scheduled__2026-06-13T05:15:00Z\", \"business_date\": \"2026-06-12\", \"state\": \"success\", \"start\": \"2026-06-13T05:15:00Z\", \"end\": \"2026-06-13T05:36:38Z\", \"duration_s\": 1298, \"failed_tasks\": []}, {\"run_id\": \"scheduled__2026-06-14T05:15:00Z\", \"business_date\": \"2026-06-13\", \"state\": \"success\", \"start\": \"2026-06-14T05:15:00Z\", \"end\": \"2026-06-14T05:35:59Z\", \"duration_s\": 1259, \"failed_tasks\": []}, {\"run_id\": \"scheduled__2026-06-15T05:15:00Z\", \"business_date\": \"2026-06-14\", \"state\": \"success\", \"start\": \"2026-06-15T05:15:00Z\", \"end\": \"2026-06-15T05:31:54Z\", \"duration_s\": 1014, \"failed_tasks\": []}, {\"run_id\": \"scheduled__2026-06-16T05:15:00Z\", \"business_date\": \"2026-06-15\", \"state\": \"success\", \"start\": \"2026-06-16T05:15:00Z\", \"end\": \"2026-06-16T05:39:31Z\", \"duration_s\": 1471, \"failed_tasks\": []}, {\"run_id\": \"scheduled__2026-06-17T05:15:00Z\", \"business_date\": \"2026-06-16\", \"state\": \"failed\", \"start\": \"2026-06-17T05:15:00Z\", \"end\": \"2026-06-17T05:19:59Z\", \"duration_s\": 299, \"failed_tasks\": [\"validate_schema\"]}, {\"run_id\": \"scheduled__2026-06-18T05:15:00Z\", \"business_date\": \"2026-06-17\", \"state\": \"success\", \"start\": \"2026-06-18T05:15:00Z\", \"end\": \"2026-06-18T05:36:48Z\", \"duration_s\": 1308, \"failed_tasks\": []}, {\"run_id\": \"scheduled__2026-06-19T05:15:00Z\", \"business_date\": \"2026-06-18\", \"state\": \"success\", \"start\": \"2026-06-19T05:15:00Z\", \"end\": \"2026-06-19T07:05:10Z\", \"duration_s\": 6610, \"failed_tasks\": []}, {\"run_id\": \"scheduled__2026-06-20T05:15:00Z\", \"business_date\": \"2026-06-19\", \"state\": \"success\", \"start\": \"2026-06-20T05:15:00Z\", \"end\": \"2026-06-20T05:35:56Z\", \"duration_s\": 1256, \"failed_tasks\": []}, {\"run_id\": \"scheduled__2026-06-21T05:15:00Z\", \"business_date\": \"2026-06-20\", \"state\": \"success\", \"start\": \""
+      }
+    },
+    {
+      "node": "planner",
+      "kind": "node",
+      "name": "planner",
+      "provider": null,
+      "model": null,
+      "prompt_version": null,
+      "latency_ms": 5515,
+      "prompt_tokens": 0,
+      "completion_tokens": 0,
+      "cost_usd": 0.0,
+      "error": null,
+      "started_at": "2026-09-19T16:22:24.553252+00:00",
+      "input": {
+        "keys": [
+          "findings",
+          "history",
+          "question",
+          "run_id",
+          "trigger"
+        ]
+      },
+      "output": {
+        "keys": [
+          "plan"
+        ]
+      }
+    },
+    {
+      "node": "plan_review",
+      "kind": "node",
+      "name": "plan_review",
+      "provider": null,
+      "model": null,
+      "prompt_version": null,
+      "latency_ms": 0,
+      "prompt_tokens": 0,
+      "completion_tokens": 0,
+      "cost_usd": 0.0,
+      "error": "GraphInterrupt: (Interrupt(value={'kind': 'plan', 'question': 'Which file wins when a submitter resends the same day?', 'proposed': {'intent': 'investigate', 'specialists': ['data_quality', 'reconciliation'], 'confidence': 0.3, 'rationale': 'The question requires investigation into the specific file submission process within the application, including checking the runbooks directly for the criteria for resending the same day.'}, 'options': ['reconciliation', 'data_quality']}, id='b8faaa91ab4510c3a2f3d691177cea04'),)",
+      "started_at": "2026-09-19T16:22:30.080729+00:00",
+      "input": {
+        "keys": [
+          "findings",
+          "history",
+          "plan",
+          "question",
+          "run_id",
+          "trigger"
+        ]
+      },
+      "output": {}
+    }
+  ],
+  "reports": []
+}

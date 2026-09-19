@@ -1,0 +1,13 @@
+{
+  "provider": "ollama",
+  "model": "qwen2.5:1.5b",
+  "chain": [
+    "ollama"
+  ],
+  "models": {
+    "ollama": "qwen2.5:1.5b"
+  },
+  "fell_back": null,
+  "last_provider": null,
+  "last_call_at": null
+}

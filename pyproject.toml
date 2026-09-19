@@ -99,7 +99,7 @@ ignore = ["S101", "RUF001", "RUF002", "RUF003", "RUF012", "SIM905"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S", "B011"]
-"scripts/**" = ["S311"]
+"scripts/**" = ["S311", "S603", "S607"]
 "app/pipeline/synthetic.py" = ["S311"]
 "evals/**" = ["S603", "S607", "E402"]
 # SQL there is assembled only from constants and allow-listed table names; values are bound

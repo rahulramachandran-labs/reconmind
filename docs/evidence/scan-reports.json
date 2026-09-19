@@ -1,0 +1,353 @@
+[
+  {
+    "id": "f54b9a90-6fcf-4115-aa8e-52d55f8a4354",
+    "title": "S1003_20260616_0216_MOBILE.txt renamed channel_basket_id to basket_ref",
+    "repeat": false,
+    "run_id": "d36c5c4a-d20e-4629-9b27-d433f076755d",
+    "status": "pending_review",
+    "sources": [
+      {
+        "title": "INC-0438: MOBILE file renamed a dedup-key column",
+        "doc_id": "incidents/INC-0438-mobile-column-rename",
+        "section": "Problem",
+        "chunk_id": "incidents/INC-0438-mobile-column-rename#problem-0"
+      },
+      {
+        "title": "Schema drift against the dbt contract",
+        "doc_id": "runbooks/schema-drift",
+        "section": "Detecting a rename vs a drop",
+        "chunk_id": "runbooks/schema-drift#detecting-a-rename-vs-a-drop-0"
+      },
+      {
+        "title": "Schema drift against the dbt contract",
+        "doc_id": "runbooks/schema-drift",
+        "section": "Where to look",
+        "chunk_id": "runbooks/schema-drift#where-to-look-0"
+      },
+      {
+        "title": "INC-0438: MOBILE file renamed a dedup-key column",
+        "doc_id": "incidents/INC-0438-mobile-column-rename",
+        "section": "Root cause",
+        "chunk_id": "incidents/INC-0438-mobile-column-rename#root-cause-0"
+      }
+    ],
+    "evidence": [
+      {
+        "data": {
+          "header": [
+            "outlet_id",
+            "location_id",
+            "transaction_id",
+            "upc_code",
+            "basket_ref",
+            "qty",
+            "amount",
+            "event_ts"
+          ],
+          "null_counts": {
+            "channel_basket_id": 82
+          }
+        },
+        "source": "mcp:warehouse-metadata/get_table_stats",
+        "summary": "S1003_20260616_0216_MOBILE.txt header is missing ['channel_basket_id'] and has unexpected ['basket_ref']; 82 rows landed with the missing column null"
+      },
+      {
+        "data": {},
+        "source": "mcp:warehouse-metadata/get_dbt_manifest",
+        "summary": "raw.transactions contract: amount, channel_basket_id, event_ts, location_id, outlet_id, qty, transaction_id, upc_code"
+      },
+      {
+        "data": {
+          "state": "failed",
+          "run_id": "scheduled__2026-06-17T05:15:00Z",
+          "task_id": "validate_schema",
+          "business_date": "2026-06-16",
+          "first_error_line": "ContractViolation: S1003_20260616_0216_MOBILE.txt missing ['channel_basket_id']; unexpected ['basket_ref']"
+        },
+        "source": "mcp:orchestration-metadata/get_failed_tasks",
+        "summary": "validate_schema failed on 2026-06-16: ContractViolation: S1003_20260616_0216_MOBILE.txt missing ['channel_basket_id']; unexpected ['basket_ref']"
+      }
+    ],
+    "severity": "S1",
+    "trace_url": null,
+    "confidence": 0.8,
+    "seen_count": 1,
+    "specialist": "data_quality",
+    "analysis_by": "template",
+    "review_note": null,
+    "finding_type": "schema_drift",
+    "needs_review": true,
+    "review_reason": "S1 findings always get a human sign-off",
+    "open_questions": [
+      "Did the submitter ship a new export library or config?"
+    ],
+    "recommended_fix": [
+      "Do not change the contract to match the file.",
+      "Ask S1003 to resend 2026-06-16 with the contracted header.",
+      "Reprocess the day once the resend lands; latest-file-wins supersedes the null-key rows."
+    ],
+    "affected_records": {
+      "rate": null,
+      "count": 82,
+      "detail": "82 records"
+    },
+    "confidence_label": "high",
+    "problem_statement": "S1003_20260616_0216_MOBILE.txt (2026-06-16) does not match the raw.transactions contract: missing ['channel_basket_id'], unexpected ['basket_ref']. 82 rows landed with the missing column null; that column is part of the dedup key, so dedup cannot run for this batch.",
+    "root_cause_hypothesis": "The submitter's export renamed channel_basket_id to basket_ref: one contracted column is missing and one similarly named column appeared in the same batch. The loader maps by name, so the rows landed with the column null. This matches the pattern in INC-0438.",
+    "last_seen_at": "2026-09-19T16:20:54.540735+00:00",
+    "review_decision": null,
+    "reviewed_by": null,
+    "reviewed_at": null,
+    "created_at": "2026-09-19T16:20:54.592648+00:00"
+  },
+  {
+    "id": "d384ed84-5858-4215-bd84-116e812e8925",
+    "title": "LOC-0517 also reporting as OUT-1071 (3.0% of rows)",
+    "repeat": false,
+    "run_id": "d36c5c4a-d20e-4629-9b27-d433f076755d",
+    "status": "published",
+    "sources": [
+      {
+        "title": "Key drift between outlet_id and location_id",
+        "doc_id": "runbooks/key-drift-outlet-location",
+        "section": "Why it matters",
+        "chunk_id": "runbooks/key-drift-outlet-location#why-it-matters-0"
+      },
+      {
+        "title": "Key drift between outlet_id and location_id",
+        "doc_id": "runbooks/key-drift-outlet-location",
+        "section": "Fix",
+        "chunk_id": "runbooks/key-drift-outlet-location#fix-0"
+      },
+      {
+        "title": "Key drift between outlet_id and location_id",
+        "doc_id": "runbooks/key-drift-outlet-location",
+        "section": "Overview",
+        "chunk_id": "runbooks/key-drift-outlet-location#overview-0"
+      },
+      {
+        "title": "Key drift between outlet_id and location_id",
+        "doc_id": "runbooks/key-drift-outlet-location",
+        "section": "Detection",
+        "chunk_id": "runbooks/key-drift-outlet-location#detection-0"
+      }
+    ],
+    "evidence": [
+      {
+        "data": {
+          "rows": 251,
+          "baskets": 158,
+          "last_seen": "2026-06-21",
+          "first_seen": "2026-06-01",
+          "submitters": 4,
+          "location_id": "LOC-0517",
+          "reported_outlet_id": "OUT-1071",
+          "canonical_outlet_id": "OUT-1017"
+        },
+        "source": "mcp:warehouse-metadata/run_check",
+        "summary": "251 deduplicated rows (158 baskets) at LOC-0517 carry OUT-1071, which outlet_location_map does not map there; canonical is OUT-1017"
+      }
+    ],
+    "severity": "S2",
+    "trace_url": null,
+    "confidence": 0.75,
+    "seen_count": 1,
+    "specialist": "reconciliation",
+    "analysis_by": "ollama",
+    "review_note": null,
+    "finding_type": "key_drift",
+    "needs_review": false,
+    "review_reason": null,
+    "open_questions": [
+      "Verify the drift continues after the fix.",
+      "Audit all records in `transactions` and `location_id` to ensure the drift is not caused by other variables."
+    ],
+    "recommended_fix": [
+      "Confirm with the submitter which outlet id is correct.",
+      "Add the drifted `OUT-1071` as an alias in `outlet_alias` with `valid_from` and `valid_to` in `outlet_location_map`.",
+      "Rebuild `stg_transactions` and `fct_daily_sales` for affected dates.",
+      "Ask the submitter to fix the header at source and record the ticket number.",
+      "Monitor the drift over time and perform audits periodically.",
+      "Review all historical data where the drift is suspected."
+    ],
+    "affected_records": {
+      "rate": 0.03,
+      "count": 251,
+      "detail": "251 records (3.0%)"
+    },
+    "confidence_label": "high",
+    "problem_statement": "Location LOC-0517 is reporting sales under two outlet ids: its canonical OUT-1017 and OUT-1071, which outlet_location_map does not map to it. 251 of 8373 deduplicated rows (3.0%) between 2026-06-01 and 2026-06-21 are affected, so store-level numbers for this location are split.",
+    "root_cause_hypothesis": "The root cause is that the `LOC-0517` location has `OUT-1071` reporting as an outlet under multiple `OUT-1017` outlet records in the `transactions` table.",
+    "last_seen_at": "2026-09-19T16:20:54.540735+00:00",
+    "review_decision": null,
+    "reviewed_by": null,
+    "reviewed_at": null,
+    "created_at": "2026-09-19T16:20:54.592648+00:00"
+  },
+  {
+    "id": "0df2495f-cb41-443f-a8a3-cc78a7d70daa",
+    "title": "Resent file S1002_20260612_1120_ECOMM.txt supersedes 88 rows",
+    "repeat": false,
+    "run_id": "d36c5c4a-d20e-4629-9b27-d433f076755d",
+    "status": "published",
+    "sources": [
+      {
+        "title": "Duplicate submissions and the latest-file-wins rule",
+        "doc_id": "runbooks/duplicate-submissions",
+        "section": "Overview",
+        "chunk_id": "runbooks/duplicate-submissions#overview-0"
+      },
+      {
+        "title": "INC-0438: MOBILE file renamed a dedup-key column",
+        "doc_id": "incidents/INC-0438-mobile-column-rename",
+        "section": "Fix",
+        "chunk_id": "incidents/INC-0438-mobile-column-rename#fix-0"
+      },
+      {
+        "title": "Backfills and reprocessing",
+        "doc_id": "runbooks/backfills-and-reprocessing",
+        "section": "Reprocessing a day",
+        "chunk_id": "runbooks/backfills-and-reprocessing#reprocessing-a-day-0"
+      },
+      {
+        "title": "Duplicate submissions and the latest-file-wins rule",
+        "doc_id": "runbooks/duplicate-submissions",
+        "section": "Things to check",
+        "chunk_id": "runbooks/duplicate-submissions#things-to-check-0"
+      }
+    ],
+    "evidence": [
+      {
+        "data": {
+          "changed_rows": 3,
+          "winning_file": "S1002_20260612_1120_ECOMM.txt",
+          "business_date": "2026-06-12",
+          "superseded_file": "S1002_20260612_0304_ECOMM.txt",
+          "superseded_rows": 88
+        },
+        "source": "mcp:warehouse-metadata/run_check",
+        "summary": "88 keys in S1002_20260612_0304_ECOMM.txt are superseded by S1002_20260612_1120_ECOMM.txt; 3 changed qty or amount"
+      },
+      {
+        "data": {},
+        "source": "mcp:orchestration-metadata/list_dag_runs",
+        "summary": "retail_txn_daily for 2026-06-12 finished at 2026-06-13T05:36:38Z; the resend landed after it"
+      }
+    ],
+    "severity": "S2",
+    "trace_url": null,
+    "confidence": 0.85,
+    "seen_count": 1,
+    "specialist": "reconciliation",
+    "analysis_by": "ollama",
+    "review_note": null,
+    "finding_type": "duplicate_submission",
+    "needs_review": false,
+    "review_reason": null,
+    "open_questions": [
+      "Could the submission be related to a mobile column rename incident that occurred earlier in the same day?",
+      "Was there any discrepancy in the dedupe logic in the DAG (`dedupe_transactions`)?",
+      "Are there any other files that could be related to this resubmit that need to be reviewed for duplicate submission?",
+      "Have there been any instances of incorrect resubmission that did not follow the latest-file-wins rule, potentially due to typos or misunderstandings?",
+      "Was there a discrepancy in the dedupe step's implementation that resulted in missed duplicates, and could it have been triggered by this resubmission?"
+    ],
+    "recommended_fix": [
+      "Ensure that resubmitted files are not confused with the most recently submitted file. This can be done by renaming, modifying, or filtering resubmitted files appropriately.",
+      "Trigger the `retail_txn_daily` job for the business date after the resubmitting, ensuring that only the resubmitted file is processed and the original, potentially truncated, file is superseded.",
+      "Verify that no dedupe step in the DAG (`dedupe_transactions`) has run since the resubmit landed, ensuring that duplicate identifiers are handled correctly."
+    ],
+    "affected_records": {
+      "rate": null,
+      "count": 88,
+      "detail": "88 records"
+    },
+    "confidence_label": "high",
+    "problem_statement": "S1002 resent its 2026-06-12 file. S1002_20260612_1120_ECOMM.txt repeats 88 dedup keys from S1002_20260612_0304_ECOMM.txt, and 3 of them carry a different qty or amount. The resend landed after that night's DAG run, so the superseded rows reached fct_daily_sales.",
+    "root_cause_hypothesis": "The resend was conducted due to an operator's mistake or incorrect submission, leading to double-counting of affected records.",
+    "last_seen_at": "2026-09-19T16:20:54.540735+00:00",
+    "review_decision": null,
+    "reviewed_by": null,
+    "reviewed_at": null,
+    "created_at": "2026-09-19T16:20:54.592648+00:00"
+  },
+  {
+    "id": "daf9b573-dea4-49d3-b1d4-5339c1e52e97",
+    "title": "S1001 2026-06-18: 110 rows, 40% below its 7-day average",
+    "repeat": false,
+    "run_id": "d36c5c4a-d20e-4629-9b27-d433f076755d",
+    "status": "published",
+    "sources": [
+      {
+        "title": "Finding severity rubric and escalation",
+        "doc_id": "runbooks/severity-and-escalation",
+        "section": "Overview",
+        "chunk_id": "runbooks/severity-and-escalation#overview-0"
+      },
+      {
+        "title": "INC-0451: POSFEED file truncated in transfer",
+        "doc_id": "incidents/INC-0451-posfeed-truncated-file",
+        "section": "Problem",
+        "chunk_id": "incidents/INC-0451-posfeed-truncated-file#problem-0"
+      },
+      {
+        "title": "Volume anomalies",
+        "doc_id": "runbooks/volume-anomalies",
+        "section": "Fix",
+        "chunk_id": "runbooks/volume-anomalies#fix-0"
+      },
+      {
+        "title": "Volume anomalies",
+        "doc_id": "runbooks/volume-anomalies",
+        "section": "Method",
+        "chunk_id": "runbooks/volume-anomalies#method-0"
+      }
+    ],
+    "evidence": [
+      {
+        "data": {},
+        "source": "mcp:warehouse-metadata/get_table_stats",
+        "summary": "S1001_20260618_0638_POSFEED.txt has 110 rows against a trailing average of 182.6"
+      },
+      {
+        "data": {},
+        "source": "mcp:orchestration-metadata/get_timing_history",
+        "summary": "wait_for_submitter_files took 5400s on 2026-06-18 (median 120.0s); file landed 161 minutes after the 04:00 SLA"
+      }
+    ],
+    "severity": "S2",
+    "trace_url": null,
+    "confidence": 0.8,
+    "seen_count": 1,
+    "specialist": "data_quality",
+    "analysis_by": "ollama",
+    "review_note": null,
+    "finding_type": "volume_anomaly",
+    "needs_review": false,
+    "review_reason": null,
+    "open_questions": [
+      "What specific error messages or failure points could be triggering this volume anomaly?",
+      "Is there an underlying issue with how the file data is being ingested, leading to this discrepancy in the SLA?",
+      "Has the deduplication process been updated to allow for more nuanced handling of duplicate submissions, which could explain the difference in volume?",
+      "Are there any known issues with the previous version of the system that potentially could affect the processing timestamps, affecting the SLA?",
+      "Was the SLA updated or set to generate metrics in a way that is no longer achievable?"
+    ],
+    "recommended_fix": [
+      "Check the file processing pipeline to ensure it is correctly handling the files and generating the expected SLA times.",
+      "Verify that the duplicate-submissions logic is correctly handling resubmissions that should not count.",
+      "Ensure the deduplication process is functioning as expected and that the drop threshold is correct."
+    ],
+    "affected_records": {
+      "rate": -0.397,
+      "count": 73,
+      "detail": "73 records (39.7%)"
+    },
+    "confidence_label": "high",
+    "problem_statement": "S1001's 2026-06-18 file S1001_20260618_0638_POSFEED.txt has 110 rows, 40% below its trailing 7-day average of 182.6, and it landed 161 minutes after the submitter SLA.",
+    "root_cause_hypothesis": "The most likely cause is that the files are not being properly processed or are failing to meet the expected 7-day average, possibly due to issues with the data quality or ingestion.",
+    "last_seen_at": "2026-09-19T16:20:54.540735+00:00",
+    "review_decision": null,
+    "reviewed_by": null,
+    "reviewed_at": null,
+    "created_at": "2026-09-19T16:20:54.592648+00:00"
+  }
+]

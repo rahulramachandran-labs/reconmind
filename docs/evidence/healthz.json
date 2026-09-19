@@ -1,0 +1,13 @@
+{
+  "status": "ok",
+  "version": "1.1.0",
+  "chunks": 86,
+  "retriever": "hybrid",
+  "llm_providers": [
+    "ollama"
+  ],
+  "llm_models": {
+    "ollama": "qwen2.5:1.5b"
+  },
+  "database": true
+}

@@ -1,0 +1,55 @@
+[
+  {
+    "event": "session",
+    "session_id": "f3c28737-d095-4d5e-8def-78e92745c6f1"
+  },
+  {
+    "event": "run",
+    "type": "run",
+    "run_id": "e3b621c1-1e09-4d94-b6fd-9584e3488c6d",
+    "trace_id": "e3b621c11e094d94b6fd9584e3488c6d",
+    "trace_url": null
+  },
+  {
+    "event": "node",
+    "type": "node",
+    "node": "planner"
+  },
+  {
+    "event": "plan",
+    "type": "plan",
+    "intent": "investigate",
+    "specialists": [
+      "data_quality",
+      "reconciliation"
+    ],
+    "confidence": 0.3,
+    "rationale": "The question requires investigation into the specific file submission process within the application, including checking the runbooks directly for the criteria for resending the same day.",
+    "planned_by": "ollama",
+    "scope": {
+      "date_from": "2026-06-01",
+      "date_to": "2026-06-21"
+    },
+    "needs_review": true
+  },
+  {
+    "event": "paused",
+    "type": "paused",
+    "run_id": "e3b621c1-1e09-4d94-b6fd-9584e3488c6d",
+    "kind": "plan",
+    "question": "Which file wins when a submitter resends the same day?",
+    "proposed": {
+      "intent": "investigate",
+      "specialists": [
+        "data_quality",
+        "reconciliation"
+      ],
+      "confidence": 0.3,
+      "rationale": "The question requires investigation into the specific file submission process within the application, including checking the runbooks directly for the criteria for resending the same day."
+    },
+    "options": [
+      "reconciliation",
+      "data_quality"
+    ]
+  }
+]
