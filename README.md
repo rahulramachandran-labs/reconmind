@@ -141,6 +141,24 @@ Run `d36c5c4a-d20e-4629-9b27-d433f076755d`, captured 2026-09-19 16:20:54 UTC · 
 - **A person signs off anything serious.** S1s and low-confidence findings stop and wait, and the decision is on the record.
 - **Built to be reused.** Every retail rule sits behind a `DomainAdapter`. A second, small domain (support-ticket triage) runs on the same agent graph in every CI run.
 
+## Results
+
+From the last captured scan, run `d36c5c4a` on 2026-09-19, against the seeded sample ([`docs/evidence/`](docs/evidence/README.md)). Planted sizes are from [`expected_anomalies.json`](data/sample/expected_anomalies.json).
+
+| Planted anomaly | Planted size | Finding produced | Severity (expected) | Outcome | Written by |
+|---|---|---|---|---|---|
+| Schema drift | `S1003_20260616_0216_MOBILE.txt` renames `channel_basket_id` to `basket_ref`: 82 rows | S1003_20260616_0216_MOBILE.txt renamed channel_basket_id to basket_ref (82 records) | S1 (S1) | held for review | template |
+| Key drift | `LOC-0517` also reports as `OUT-1071`: 251 of 8,373 rows | LOC-0517 also reporting as OUT-1071 (3.0% of rows) (251 records) | S2 (S2) | published | ollama |
+| Duplicate submission | `S1002_20260612_1120_ECOMM.txt` supersedes 88 rows, 3 with changed values, after the DAG ran | Resent file S1002_20260612_1120_ECOMM.txt supersedes 88 rows (88 records) | S2 (S2) | published | ollama |
+| Volume anomaly | `S1001_20260618_0638_POSFEED.txt`: 110 rows vs 182.6 trailing, 161 min late | S1001 2026-06-18: 110 rows, 40% below its 7-day average (73 records) | S2 (S2) | published | ollama |
+
+- **Every planted anomaly found**, each by the expected specialist at the expected severity, and nothing else flagged.
+- **Scan wall time:** 208.7 s on a laptop CPU, with a local model writing the explanations: 5 agent nodes, 30 MCP tool calls, 4 retrievals.
+- **Model calls:** 7 to `ollama/qwen2.5:1.5b`, 9,585 prompt and 1,912 completion tokens, $0.00. The S1 write-up fell back to its template after all three of the model's replies failed schema validation, and the report says so (`analysis_by: template`).
+- **Tests:** 152 passed, 0 failed, 93.27% line and branch coverage ([`tests.txt`](docs/evidence/tests.txt)).
+- **RAGAS gate:** pass (faithfulness 0.911, answer relevancy 0.862, context precision 0.830, context recall 0.922; hybrid retrieval, extractive answers, offline judges).
+- **CI:** [run 35432908516](https://github.com/rahulramachandran-labs/reconmind/actions/runs/35432908516) on `0cf0fff`, success.
+
 ---
 
 ## Try it
