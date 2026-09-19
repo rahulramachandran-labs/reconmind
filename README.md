@@ -166,6 +166,21 @@ From the last captured scan, run `d36c5c4a` on 2026-09-19, against the seeded sa
 - **RAGAS gate:** pass (faithfulness 0.911, answer relevancy 0.862, context precision 0.830, context recall 0.922; hybrid retrieval, extractive answers, offline judges).
 - **CI:** [run 35432908516](https://github.com/rahulramachandran-labs/reconmind/actions/runs/35432908516) on `0cf0fff`, success.
 
+## Screens
+
+Captured at 1440×900 from the same local stack as the evidence, with `qwen2.5:1.5b` writing the explanations (`uv run --with playwright python scripts/record_demo.py --screenshots docs/screenshots`).
+
+| Screen | |
+|---|---|
+| **Dashboard**<br><br>Latest business date against its trailing week, open findings by severity, the last DAG run, and today's model calls, tokens and cost. The chart flags POSFEED's light day. | <img src="docs/screenshots/dashboard.png" width="560" alt="Dashboard screen"> |
+| **Incident feed**<br><br>Every finding with its severity, status, how many scans have seen it, and who wrote it up: `ollama` for the three the model wrote, `template only` for the S1. | <img src="docs/screenshots/incidents.png" width="560" alt="Incident feed screen"> |
+| **Incident detail**<br><br>The key-drift report quoted above. *Deterministic checks* and *Model analysis* switch between the template and the model's write-up; the counts are the same in both. | <img src="docs/screenshots/incident-detail.png" width="560" alt="Incident detail screen"> |
+| **Review queue**<br><br>The S1 waits with the reason it paused. Above it, the small model routed a runbook question with 30% confidence, so the Planner parked that too for a person to route. | <img src="docs/screenshots/review.png" width="560" alt="Review queue screen"> |
+| **Ask ReconMind**<br><br>The MOBILE question goes to Data-Quality only, and the steps stream in. From the captured run, the first two sentences of the answer, written by `ollama/qwen2.5:1.5b`: *“Batch 2026-06-16 contains missing field 'channel_basket_id'. A batch file with the name 'S1003_20260616_0216_MOBILE.txt' is missing the field 'channel_basket_id', which is crucial for the deduplication process due to the existence of column 'basket_ref' in the dedup key.”* The footer says plainly when a write-up came from a template. | <img src="docs/screenshots/ask.png" width="560" alt="Ask ReconMind screen"> |
+| **Traces**<br><br>The captured scan: 206.8 s, 7 LLM calls, 30 tool calls, $0, every step with its latency. The summary at the top is the model's, and it calls the S1 an S2; the report's severity comes from the check, not from this text. | <img src="docs/screenshots/trace.png" width="560" alt="Traces screen"> |
+| **Docs & runbooks, hybrid**<br><br>`basket_ref ContractViolation` with hybrid search: the schema-drift runbook and incident INC-0438 come first. The badges show each hit's dense and BM25 rank; INC-0438 is 10th on meaning alone and 1st on keywords. | <img src="docs/screenshots/docs-hybrid.png" width="560" alt="Docs & runbooks, hybrid screen"> |
+| **Docs & runbooks, dense only**<br><br>The same query with embeddings only: docs and dbt models for the transactions table fill the top four, the runbook is 5th and the incident isn't in the top five. | <img src="docs/screenshots/docs-dense.png" width="560" alt="Docs & runbooks, dense only screen"> |
+
 ---
 
 ## Try it

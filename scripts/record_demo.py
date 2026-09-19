@@ -103,7 +103,16 @@ async def screenshots(base: str, api: str, out: Path) -> None:
         browser = await p.chromium.launch()
         page = await browser.new_page(viewport={"width": 1440, "height": 900})
 
+        # the Next.js dev-mode badge isn't part of the app
+        await page.add_init_script(
+            "document.addEventListener('DOMContentLoaded', () => {"
+            " const s = document.createElement('style');"
+            " s.textContent = 'nextjs-portal { display: none !important; }';"
+            " document.head.appendChild(s); });"
+        )
+
         async def still(name: str) -> None:
+            await page.mouse.move(1435, 895)  # park the pointer where it triggers no tooltip
             await page.wait_for_timeout(600)
             await page.screenshot(path=out / f"{name}.png")
 
@@ -127,7 +136,7 @@ async def screenshots(base: str, api: str, out: Path) -> None:
         await page.goto(f"{base}/ask")
         await page.fill("textarea", MOBILE_QUESTION)
         await page.keyboard.press("Enter")
-        await page.wait_for_selector("text=trace", timeout=600_000)
+        await page.wait_for_selector("text=/^\\d+ LLM calls$/", timeout=600_000)
         await still("ask")
 
         await page.goto(f"{base}/traces/{scan['id']}")
@@ -136,10 +145,10 @@ async def screenshots(base: str, api: str, out: Path) -> None:
 
         query = "q=basket_ref+ContractViolation"
         await page.goto(f"{base}/docs?{query}")
-        await page.wait_for_selector("text=bm25")
+        await page.wait_for_selector("text=/^#1$/")
         await still("docs-hybrid")
         await page.goto(f"{base}/docs?{query}&mode=dense")
-        await page.wait_for_selector("text=/^dense \\d+$/")
+        await page.wait_for_selector("text=/^#1$/")
         await still("docs-dense")
         await browser.close()
 
