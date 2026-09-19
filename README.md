@@ -299,14 +299,17 @@ To read the code in the order a run executes: [`graph.py`](app/agents/graph.py) 
 
 ## Quality and evaluation
 
-A 46-question golden set covers every anomaly type and screen. [RAGAS](evals/run_ragas.py) scores it on every push, and CI fails if any metric drops below [its threshold](evals/thresholds.yaml).
+A 46-question golden set covers every anomaly type and screen. [RAGAS](evals/run_ragas.py) scores it on every push, and CI fails if any metric drops below [its threshold](evals/thresholds.yaml). Each row names who wrote the answers and who judged them; every row is in [`evals/history.csv`](evals/history.csv).
 
-| Retriever | Faithfulness | Answer relevancy | Context precision | Context recall |
-|---|---|---|---|---|
-| Dense only | 0.920 | 0.863 | 0.661 | 0.844 |
-| Hybrid (BM25 + dense, RRF) | 0.917 | 0.864 | 0.756 | 0.911 |
-| **Hybrid + reranker (default)** | **0.911** | **0.862** | **0.830** | **0.922** |
-| *Threshold* | *0.85* | *0.80* | *0.80* | *0.85* |
+| Retriever | Answers written by | Judged by | Faithfulness | Answer relevancy | Context precision | Context recall |
+|---|---|---|---|---|---|---|
+| Dense only | extractive (no model) | offline | 0.920 | 0.863 | 0.661 | 0.844 |
+| Hybrid (BM25 + dense, RRF) | extractive (no model) | offline | 0.917 | 0.864 | 0.756 | 0.911 |
+| **Hybrid + reranker (default, the CI gate)** | **extractive (no model)** | **offline** | **0.911** | **0.862** | **0.830** | **0.922** |
+| Hybrid + reranker | `qwen2.5:1.5b`, local, through Ollama | offline | 0.427 | 0.624 | 0.830 | 0.922 |
+| *Threshold* | | | *0.85* | *0.80* | *0.80* | *0.85* |
+
+*Offline* means no language model grades anything: RAGAS's non-LLM context precision and recall against the reference passages, an NLI cross-encoder for faithfulness and an MS MARCO cross-encoder for relevancy ([ADR 0006](docs/adr/0006-offline-eval-judges.md)). The last row keeps retrieval identical and lets a 1.5-billion-parameter local model write the answers: on average the judge finds fewer than half of its sentences supported by the passages it was given, so that row fails the gate, which is why CI gates on extractive answers and why the hosted demo is set up for a larger free-tier model (`--judge llm` re-scores any row with LLM judges).
 
 CI also runs ruff, black and mypy, then 152 tests with an 80% coverage gate (currently 93.27%), including Postgres, MCP, agent, prompt-injection and chaos tests. It finishes with gitleaks and a production build of the web app. Details are in [docs/EVALUATION.md](docs/EVALUATION.md).
 

@@ -23,13 +23,16 @@ uv run --group eval python evals/run_ragas.py --judge llm       # LLM judges ins
 
 ## Scores
 
-Offline judges, extractive answers, k = 5:
+Each row names who wrote the answers and who judged them, k = 5:
 
-| Retriever | Faithfulness | Answer relevancy | Context precision | Context recall |
-|---|---|---|---|---|
-| Dense only | 0.920 | 0.863 | 0.661 | 0.844 |
-| Hybrid (BM25 + dense, RRF) | 0.917 | 0.864 | 0.756 | 0.911 |
-| **Hybrid + cross-encoder rerank (default)** | **0.911** | **0.862** | **0.830** | **0.922** |
+| Retriever | Answers written by | Judged by | Faithfulness | Answer relevancy | Context precision | Context recall | Gate |
+|---|---|---|---|---|---|---|---|
+| Dense only | extractive | offline | 0.920 | 0.863 | 0.661 | 0.844 | fail |
+| Hybrid (BM25 + dense, RRF) | extractive | offline | 0.917 | 0.864 | 0.756 | 0.911 | fail |
+| **Hybrid + cross-encoder rerank (default, the CI gate)** | **extractive** | **offline** | **0.911** | **0.862** | **0.830** | **0.922** | **pass** |
+| Hybrid + cross-encoder rerank | `qwen2.5:1.5b` via Ollama | offline | 0.427 | 0.624 | 0.830 | 0.922 | fail |
+
+The model row keeps retrieval identical, so context precision and recall don't move; only the answers change. A 1.5-billion-parameter local model paraphrases loosely and adds detail the passages don't support, and the NLI judge scores that as low faithfulness. That is why the gate runs on extractive answers, which can't claim more than the passages say, and why the hosted demo is set up for a larger model. To score another model, set its key and run `make eval`; add `--judge llm` for LLM judges.
 
 Hybrid search is what moves precision and recall: pipeline questions are full of exact identifiers (`basket_ref`, `OUT-1071`, `validate_schema`) that embeddings blur and BM25 matches. The reranker then puts the best of the fused candidates first.
 
