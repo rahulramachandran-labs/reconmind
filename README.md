@@ -7,6 +7,13 @@
 
 **When a data pipeline's numbers go wrong, someone has to work out why: which file, which key, how many rows, and what to do about it. ReconMind is a multi-agent AI copilot that does that investigation.** Specialist agents inspect the live pipeline through MCP tools, look up the team's runbooks and past incidents, and hand back an incident report with record counts, a likely root cause, a fix and a confidence score. Anything serious or uncertain waits for a person to sign it off.
 
+> **Evaluate this in five minutes**
+> 1. Open the [API health check](https://reconmind-labs-api.onrender.com/healthz) first: the free tier can take up to a minute to wake.
+> 2. Open **[reconmind-labs.vercel.app](https://reconmind-labs.vercel.app)** and choose *Sign in* → *Continue as the demo reviewer*.
+> 3. Click **Run a scan**: the dashboard counts four open findings, one of them an S1 waiting in the **Review queue**.
+> 4. In **Ask ReconMind**, ask *Did the MOBILE file have a schema problem on 2026-06-16?*, then open the run on **Traces**.
+> 5. Narrated version: [docs/DEMO.md](docs/DEMO.md). Full checklist: [docs/REVIEWER_GUIDE.md](docs/REVIEWER_GUIDE.md).
+
 **[Live app](https://reconmind-labs.vercel.app)** · [Project deck (PDF)](docs/slides/Rahul_Ramachandran_ReconMind-ProjectSubmission.pdf) · [60-second demo script](docs/DEMO.md) · [Write-up](docs/blog/reconmind-writeup.md)
 
 Final project for the IIT Patna Generative AI & Agentic AI for Developers program, by Rahul Ramachandran. All data is synthetic.
