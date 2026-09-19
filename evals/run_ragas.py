@@ -13,9 +13,16 @@ offline (default, no API key needed)
                        scored by an NLI cross-encoder
     answer_relevancy   MS MARCO cross-encoder relevance of the answer to the question
 
-llm (--judge llm, needs OPENAI_API_KEY or a reachable Ollama)
-    the LLM-judged ragas metrics: Faithfulness, ResponseRelevancy,
-    LLMContextPrecisionWithReference, LLMContextRecall
+llm (--judge llm, needs a key for OpenAI, Gemini or Groq, or a reachable Ollama)
+    faithfulness       ragas Faithfulness: the judge model splits the answer into claims
+                       and checks each against the retrieved passages
+    answer_relevancy   ragas ResponseRelevancy
+    context_*          the same reference-based metrics as offline: retrieval is scored
+                       against the labelled chunks, which is stricter than a model's opinion
+
+    The judge is --judge-model if given (for example groq/qwen/qwen3.8-27b), else the
+    first of OpenAI, Gemini, Groq and Ollama that is configured and is not the answering
+    provider, so a model doesn't grade its own answers.
 
 The reference contexts are the exact chunks listed in golden_set.jsonl, so the
 context metrics use a 0.9 string-similarity threshold: a retrieved chunk counts
@@ -143,40 +150,101 @@ class OfflineJudge:
         return 1 / (1 + math.exp(-logit))
 
 
-def llm_judge_metrics(settings: Settings) -> list[Any]:
-    from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+def pick_judge(
+    settings: Settings, answering: str | None, override: str | None = None
+) -> tuple[str, Any]:
+    """(label, chat model) for the judge: ``override`` ("groq/qwen/qwen3.8-27b") if
+    given, else the first configured provider that isn't the answerer."""
+    from langchain_openai import ChatOpenAI
+
+    if override:
+        provider, model = override.split("/", 1)
+        key = getattr(settings, f"{provider}_api_key", None)
+        base = getattr(settings, f"{provider}_base_url", None)
+        chat = ChatOpenAI(
+            model=model,
+            base_url=base,
+            api_key=key.get_secret_value() if key else "none",
+            max_tokens=4096,
+            max_retries=6,
+            reasoning_effort="none" if "qwen3" in model else None,
+        )
+        return f"llm:{override}", chat
+
+    options: list[tuple[str, Any]] = []
+    if settings.openai_api_key:
+        options.append(
+            (
+                "openai",
+                lambda: ChatOpenAI(
+                    model=settings.openai_model, api_key=settings.openai_api_key.get_secret_value()
+                ),
+            )
+        )
+    if settings.gemini_api_key:
+        options.append(
+            (
+                "gemini",
+                lambda: ChatOpenAI(
+                    model=settings.gemini_model,
+                    base_url=settings.gemini_base_url,
+                    api_key=settings.gemini_api_key.get_secret_value(),
+                    max_tokens=4096,
+                    reasoning_effort="none",
+                    max_retries=6,
+                ),
+            )
+        )
+    if settings.groq_api_key:
+        options.append(
+            (
+                "groq",
+                lambda: ChatOpenAI(
+                    model=settings.groq_model,
+                    base_url=settings.groq_base_url,
+                    api_key=settings.groq_api_key.get_secret_value(),
+                    max_tokens=4096,
+                    max_retries=6,
+                ),
+            )
+        )
+    options.append(
+        (
+            "ollama",
+            lambda: ChatOpenAI(
+                model=settings.ollama_model,
+                base_url=settings.ollama_base_url.rstrip("/") + "/v1",
+                api_key="ollama",
+            ),
+        )
+    )
+    name, make = next(((n, m) for n, m in options if n != answering), options[-1])
+    chat = make()
+    return f"llm:{name}/{chat.model_name}", chat
+
+
+def llm_judge_metrics(settings: Settings, chat: Any) -> list[Any]:
+    from langchain_openai import OpenAIEmbeddings
     from ragas.embeddings import LangchainEmbeddingsWrapper
     from ragas.llms import LangchainLLMWrapper
-    from ragas.metrics import (
-        Faithfulness,
-        LLMContextPrecisionWithReference,
-        LLMContextRecall,
-        ResponseRelevancy,
-    )
+    from ragas.metrics import Faithfulness, ResponseRelevancy
 
     from app.retrieval.embeddings import build_embeddings
 
-    if settings.openai_api_key:
-        key = settings.openai_api_key.get_secret_value()
-        chat = ChatOpenAI(model=settings.openai_model, api_key=key)
-        emb: Any = LangchainEmbeddingsWrapper(
-            OpenAIEmbeddings(model=settings.openai_embeddings_model, api_key=key)
+    emb: Any = LangchainEmbeddingsWrapper(
+        OpenAIEmbeddings(
+            model=settings.openai_embeddings_model,
+            api_key=settings.openai_api_key.get_secret_value(),
         )
-    else:
-        chat = ChatOpenAI(
-            model=settings.ollama_model,
-            base_url=settings.ollama_base_url.rstrip("/") + "/v1",
-            api_key="ollama",
-        )
-        emb = LangchainEmbeddingsWrapper(
-            build_embeddings("sentence-transformers", settings.embeddings_model)
-        )
+        if settings.openai_api_key
+        else build_embeddings("sentence-transformers", settings.embeddings_model)
+    )
     llm = LangchainLLMWrapper(chat)
+    # Gemini and Groq return one completion per request, so relevancy asks for one question
+    strictness = 3 if settings.openai_api_key and "openai" in str(type(chat)).lower() else 1
     return [
         Faithfulness(llm=llm),
-        ResponseRelevancy(llm=llm, embeddings=emb),
-        LLMContextPrecisionWithReference(llm=llm),
-        LLMContextRecall(llm=llm),
+        ResponseRelevancy(llm=llm, embeddings=emb, strictness=strictness),
     ]
 
 
@@ -216,7 +284,12 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         raise SystemExit(f"golden set points at chunks that no longer exist: {missing}")
 
     judge = OfflineJudge() if args.judge == "offline" else None
-    llm_metrics = llm_judge_metrics(settings) if args.judge == "llm" else []
+    judge_label, llm_metrics = args.judge, []
+    if args.judge == "llm":
+        judge_label, chat = pick_judge(
+            settings, llm.names[0] if llm.names else None, args.judge_model
+        )
+        llm_metrics = llm_judge_metrics(settings, chat)
     rows = []
     providers: set[str] = set()
     start = time.perf_counter()
@@ -245,11 +318,11 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             row["faithfulness"] = judge.faithfulness(ans.answer, contexts)
             row["answer_relevancy"] = judge.answer_relevancy(it.question, ans.answer)
         else:
-            f, r, p, c = llm_metrics
+            f, r = llm_metrics
+            row["context_precision"], row["context_recall"] = asyncio.run(score_context(sample))
             row["faithfulness"] = float(asyncio.run(f.single_turn_ascore(sample)))
             row["answer_relevancy"] = float(asyncio.run(r.single_turn_ascore(sample)))
-            row["context_precision"] = float(asyncio.run(p.single_turn_ascore(sample)))
-            row["context_recall"] = float(asyncio.run(c.single_turn_ascore(sample)))
+            time.sleep(args.pause)  # free-tier judges limit requests per minute
         rows.append(row)
 
     scores = {
@@ -259,7 +332,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         "timestamp": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "commit": git_sha(),
         "retriever": args.retriever,
-        "judge": args.judge,
+        "judge": judge_label,
         "answerer": "+".join(sorted(providers)),
         "n": len(rows),
         "seconds": round(time.perf_counter() - start, 1),
@@ -333,6 +406,10 @@ def main() -> None:
     ap.add_argument("--golden", type=Path, default=EVALS / "golden_set.jsonl")
     ap.add_argument("--retriever", choices=["hybrid", "dense", "bm25"], default="hybrid")
     ap.add_argument("--judge", choices=["offline", "llm"], default="offline")
+    ap.add_argument("--pause", type=float, default=0, help="seconds between LLM-judged samples")
+    ap.add_argument(
+        "--judge-model", help="provider/model for --judge llm, e.g. groq/qwen/qwen3.8-27b"
+    )
     ap.add_argument("--answerer", choices=["chain", "extractive"], default="chain")
     ap.add_argument("--k", type=int, default=5)
     ap.add_argument("--limit", type=int, default=0)

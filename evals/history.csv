@@ -3,3 +3,4 @@ timestamp,commit,retriever,judge,answerer,n,faithfulness,answer_relevancy,contex
 2026-09-18T19:17:45Z,17a5997+dirty,hybrid,offline,extractive,46,0.9167,0.864,0.7562,0.9112,pass
 2026-09-18T20:28:42Z,0f0678f+dirty,hybrid,offline,extractive,46,0.9112,0.8622,0.8302,0.9221,pass
 2026-09-19T16:40:03Z,c621b62,hybrid,offline,ollama/qwen2.5:1.5b,46,0.427,0.6237,0.8302,0.9221,fail
+2026-09-19T19:08:06Z,35d6309+dirty,hybrid,offline,groq/openai/gpt-oss-120b,46,0.5657,0.9433,0.8302,0.9221,fail
