@@ -1,6 +1,6 @@
 # 60-second demo
 
-For showing ReconMind live, on [reconmind-labs.vercel.app](https://reconmind-labs.vercel.app) or locally after `make bootstrap && make db seed && make dev`. The free-tier API sleeps; open the dashboard a minute early so the first request has warmed it up.
+For showing ReconMind live, on [reconmind-labs.vercel.app](https://reconmind-labs.vercel.app) or locally after `make bootstrap && make dev`. A recorded version of this walkthrough, with captions, is [demo.mp4](demo.mp4) (`uv run --with playwright python scripts/record_demo.py --video docs/demo.mp4` re-records it against a freshly seeded stack). The free-tier API sleeps; open the dashboard a minute early so the first request has warmed it up.
 
 | Time | Screen | Do | Say |
 |---|---|---|---|
