@@ -1,0 +1,72 @@
+name: Reseed the demo
+
+# Render deletes a free Postgres 30 days after it is created (the demo's goes around
+# 2026-10-19). After the blueprint recreates it, run this by hand: it loads the
+# synthetic sample again, then scans and has the model write the findings up.
+#
+# With the RENDER_DATABASE_URL secret (the database's external URL) it migrates and
+# seeds directly; otherwise it asks Render to redeploy through RENDER_DEPLOY_HOOK_URL,
+# and the container migrates and seeds itself on start (scripts/start.sh).
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: refresh-demo
+  cancel-in-progress: false
+
+jobs:
+  reseed:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      API: ${{ vars.RECONMIND_API_URL || 'https://reconmind-labs-api.onrender.com' }}
+      DATABASE_URL: ${{ secrets.RENDER_DATABASE_URL }}
+      HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+      TOKEN: ${{ secrets.RECONMIND_WRITE_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.1.0
+        if: env.DATABASE_URL != ''
+        with:
+          python-version: "3.12"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      - name: Migrate and load the sample
+        if: env.DATABASE_URL != ''
+        env:
+          UV_NO_SYNC: "1"
+        run: |
+          uv sync --frozen --no-default-groups
+          make reseed
+      - name: Or let the API reseed itself on a redeploy
+        if: env.DATABASE_URL == ''
+        run: |
+          if [ -z "$HOOK" ]; then
+            echo "::error::set RENDER_DATABASE_URL or RENDER_DEPLOY_HOOK_URL as a repository secret"
+            exit 1
+          fi
+          curl -fsS -X POST "$HOOK" > /dev/null
+          echo "redeploy requested; waiting for it to come up"
+          sleep 240
+      - name: Wake the API
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf --max-time 60 "$API/healthz" > /dev/null; then exit 0; fi
+            sleep 10
+          done
+          echo "::error::API did not wake up"
+          exit 1
+      - name: Scan and write up
+        env:
+          WRITE_TOKEN: ${{ secrets.RECONMIND_WRITE_TOKEN }}
+        run: |
+          run_id=$(curl -sf -X POST "$API/scan" -H "Authorization: Bearer $TOKEN" \
+            -H "X-Reviewer: reseed" | jq -r .run_id)
+          for i in $(seq 1 60); do
+            [ "$(curl -sf "$API/runs/$run_id" | jq -r .status)" != "running" ] && break
+            sleep 5
+          done
+          python3 scripts/regenerate_reports.py --api "$API" | tee -a "$GITHUB_STEP_SUMMARY"

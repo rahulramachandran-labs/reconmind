@@ -1,0 +1,38 @@
+name: Keep alive
+
+# A free Render instance spins down after 15 minutes without traffic, and the first
+# request after that takes up to a minute. While the project is being evaluated this
+# pings /healthz every ten minutes, 03:00-19:00 UTC (08:30-00:30 in India, the US East
+# Coast morning), for fourteen days: until KEEP_ALIVE_UNTIL, a repository variable that
+# defaults to 2026-10-03. Free instance hours (750 a month) are shared by every free
+# service in the Render workspace, which is why it doesn't run around the clock.
+#
+# To stop it early: set KEEP_ALIVE_UNTIL to a past date (Settings -> Secrets and
+# variables -> Actions -> Variables), or disable the workflow from the Actions tab.
+on:
+  schedule:
+    - cron: "*/10 3-18 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: keepalive
+  cancel-in-progress: true
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      API: ${{ vars.RECONMIND_API_URL || 'https://reconmind-labs-api.onrender.com' }}
+      UNTIL: ${{ vars.KEEP_ALIVE_UNTIL || vars.KEEP_WARM_UNTIL || '2026-10-03' }}
+    steps:
+      - name: Ping the API
+        run: |
+          if [[ "$(date -u +%F)" > "$UNTIL" ]]; then
+            echo "past $UNTIL, not pinging"
+            exit 0
+          fi
+          curl -sf --retry 4 --retry-delay 15 --retry-all-errors --max-time 90 "$API/healthz"

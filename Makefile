@@ -4,7 +4,7 @@ SHELL := /bin/bash
 API_PORT ?= 8000
 WEB_PORT ?= 3000
 
-.PHONY: help bootstrap dev api web test test-fast lint fmt eval index deck sync deploy clean db seed regenerate-reports
+.PHONY: help bootstrap dev api web test test-fast lint fmt eval index deck sync deploy clean db seed regenerate-reports reseed
 
 help: ## list targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
@@ -35,6 +35,10 @@ db: ## start postgres and apply migrations
 	uv run alembic upgrade head
 
 seed: ## load the committed synthetic sample into DATABASE_URL
+	uv run python -m app.pipeline.seed
+
+reseed: ## migrate DATABASE_URL (e.g. a recreated Render database) and load the sample into it
+	uv run alembic upgrade head
 	uv run python -m app.pipeline.seed
 
 test: ## full test suite with coverage gate

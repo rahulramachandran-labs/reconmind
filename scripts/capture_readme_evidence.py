@@ -9,7 +9,8 @@ the S1 written up again by the model and signed off by a person, and a second
 scan that must not duplicate anything. Saves what came back to docs/evidence/,
 runs the test suite for its counts and coverage, and writes
 docs/evidence/README.md saying when, on which commit and with which model it
-was captured. Every number in the README's Results section comes from here.
+was captured, then rewrites the parts of README.md, docs/VERIFY.md and
+docs/COURSE_MAPPING.md that quote it (scripts/update_docs_from_evidence.py).
 
 Use a freshly seeded database, so the scan reports the planted anomalies as new
 findings instead of repeats of an earlier scan. `--skip-tests` leaves the test
@@ -89,6 +90,15 @@ def usage(run: dict[str, Any]) -> dict[str, Any]:
         "cost_usd": round(sum(s["cost_usd"] or 0 for s in llm), 6),
         "models": sorted({f"{s['provider']}/{s['model']}" for s in llm if s["provider"]}),
     }
+
+
+def update_docs() -> None:
+    """Rewrite the README blocks, VERIFY.md and COURSE_MAPPING.md from this capture."""
+    subprocess.run(
+        [sys.executable, str(ROOT / "scripts" / "update_docs_from_evidence.py")],
+        cwd=ROOT,
+        check=True,
+    )
 
 
 def written_by(report: dict[str, Any]) -> str:
@@ -184,6 +194,7 @@ def main() -> None:
         captured["tests"] = run_tests(out)
         save(out, "summary.json", captured)
         write_readme(out, captured)
+        update_docs()
         print(json.dumps(captured["tests"], indent=1), file=sys.stderr)
         return
     headers = {"Authorization": f"Bearer {args.token}"} if args.token else {}
@@ -305,6 +316,7 @@ def main() -> None:
         summary["tests"] = run_tests(out)
     save(out, "summary.json", summary)
     write_readme(out, summary)
+    update_docs()
     print(json.dumps({k: summary[k] for k in ("scan", "questions")}, indent=1), file=sys.stderr)
 
 
