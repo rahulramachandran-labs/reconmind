@@ -21,12 +21,12 @@ export function SiteNav({ user }: { user?: React.ReactNode }) {
   const pathname = usePathname();
   return (
     <header className="sticky top-0 z-20 border-b bg-background/85 backdrop-blur">
-      <div className="mx-auto flex w-full max-w-5xl items-center gap-6 overflow-x-auto px-4 py-3">
+      <div className="mx-auto flex w-full max-w-7xl items-center gap-6 overflow-x-auto px-4 py-3">
         <Link href="/" className="shrink-0 font-mono text-sm font-semibold tracking-wider">
           <span className="text-amber">Recon</span>
           <span className="text-teal">Mind</span>
         </Link>
-        <nav className="flex gap-1 text-sm">
+        <nav className="flex shrink-0 gap-1 text-sm">
           {LINKS.map((l) => {
             const active = l.href === "/" ? pathname === "/" : pathname.startsWith(l.href);
             return (

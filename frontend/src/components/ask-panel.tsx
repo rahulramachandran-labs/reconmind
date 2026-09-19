@@ -69,7 +69,7 @@ function AnsweredBy({ turn }: { turn: Turn }) {
   if (!turn.writtenBy.length) return null;
   const models = [...new Set(turn.writtenBy.filter((w) => w !== "template"))];
   if (!models.length) {
-    return <p className="text-xs text-amber">No model was reachable, so the write-ups come from templates.</p>;
+    return <p className="text-xs text-amber">These write-ups came from templates: no model answered, or its replies failed validation.</p>;
   }
   return (
     <Badge variant="outline" className="font-mono">
