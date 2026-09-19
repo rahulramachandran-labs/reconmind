@@ -294,8 +294,10 @@ evals/                   golden set, RAGAS runner, thresholds, score history
 frontend/                Next.js web app (App Router, shadcn/ui, Auth.js)
 migrations/              Alembic migrations, including the append-only ledger trigger
 tests/                   unit, integration (Postgres, MCP, agents, prompt injection), chaos
-docs/                    architecture, API, deployment, evaluation, ADRs, deck, demo script
-scripts/                 data generator CLI, container entrypoint, demo recording
+docs/                    architecture, API, deployment, evaluation, ADRs, deck, demo script,
+                         reviewer guide, captured evidence and screenshots
+scripts/                 data generator CLI, container entrypoint, demo recording and screenshots,
+                         evidence capture for the README
 ```
 
 To read the code in the order a run executes: [`graph.py`](app/agents/graph.py) → [`planner.py`](app/agents/planner.py) → [`specialists.py`](app/agents/specialists.py) → [`retail_recon/checks.py`](app/domain/retail_recon/checks.py) → [`reporter.py`](app/agents/reporter.py) → [`review.py`](app/agents/review.py).
@@ -308,7 +310,7 @@ To read the code in the order a run executes: [`graph.py`](app/agents/graph.py) 
 | **Storage** | Postgres 16 through SQLAlchemy 2 and versioned Alembic migrations. The audit ledger is append-only, enforced by a database trigger. Vectors live in FAISS in memory or in managed Pinecone, switched with one setting (`VECTOR_STORE`). The Docker image runs the embedding model on ONNX to fit in 512 MB. | Managed Postgres with backups (the free demo database expires after 30 days) |
 | **Knowledge retrieval** | Live facts are fetched through MCP tools at the moment of each investigation, never from a stale copy. Documents are indexed with BM25 and embeddings, fused, then reranked. The index is fingerprinted and rebuilt automatically when documents change, and `CORPUS_DIR` points it at any folder of markdown. | Ingest from a wiki or docs repo on change; add approved incident reports to the corpus as new precedents |
 | **State management** | LangGraph checkpoints every step in Postgres, so a run paused for review survives restarts and resumes on whichever API instance receives the decision. Runs, reports, decisions and chat memory are in Postgres too, and fingerprints make repeated scans idempotent. Only rate-limit counters, the provider cooldown and the FAISS copy are per instance. | Redis for global rate limits; Pinecone to share one index |
-| **Reliability and cost** | Model fallback chain: OpenAI → Anthropic → local Ollama → extractive answers, with a cooldown for failing providers. Outputs are validated by Pydantic and retried, then fall back to a template. `DEMO_MODE` guarantees $0. A chaos suite and a 30-second latency budget run in CI. | Queue-backed scans for long windows |
+| **Reliability and cost** | Model fallback chain: OpenAI → Anthropic → the free tiers of Groq, Gemini and OpenRouter → local Ollama → extractive answers, with a cooldown for failing providers. Outputs are validated by Pydantic and retried, then fall back to a template. `DEMO_MODE` guarantees $0. A chaos suite and a 30-second latency budget run in CI. | Queue-backed scans for long windows |
 | **Observability** | Every agent step, tool call, retrieval and model call is stored with latency, tokens and cost, and mirrored to LangFuse. A model call outside a traced run raises an error instead of going unrecorded. Logs are JSON. | Alerts on failed or slow runs |
 | **Security** | Retrieved text is treated as untrusted: it is delimited, tag-sanitised and covered by a planted prompt-injection test. MCP tools are read-only with validated arguments. Secrets come only from the environment, gitleaks runs in pre-commit and in CI over the full history, and the container runs as non-root. | Secret manager instead of env vars |
 
@@ -347,7 +349,7 @@ From the last captured run of `make test` ([`docs/evidence/tests.txt`](docs/evid
 | Agents | LangGraph (StateGraph, parallel nodes, `interrupt()`, Postgres checkpointer), LangChain, Pydantic |
 | Tools | MCP: two servers over stdio, streamable HTTP or in-process |
 | Retrieval | BM25 (`rank_bm25`), sentence-transformers / fastembed, FAISS or Pinecone, reciprocal rank fusion, cross-encoder reranker |
-| Models | OpenAI, Anthropic, Ollama, with a fallback chain and an extractive floor |
+| Models | OpenAI, Anthropic, Groq, Google Gemini, OpenRouter, Ollama, with a fallback chain and an extractive floor |
 | Backend | FastAPI (REST and server-sent events), SQLAlchemy 2, Alembic, Postgres 16 |
 | Frontend | Next.js 16 (App Router), shadcn/ui, Tailwind CSS, Auth.js |
 | Quality and ops | RAGAS, pytest, LangFuse, Docker, GitHub Actions, gitleaks, pre-commit, Render, Vercel |
@@ -377,6 +379,8 @@ Links in *Where* and *Test* point at the exact lines, pinned to commit `ecd0ee3`
 | [Development](docs/DEVELOPMENT.md) | Make targets, docker compose, tests, conventions |
 | [Configuration](.env.example) | Every environment variable, explained ([web app](frontend/.env.example)) |
 | [Decision records](docs/adr/README.md) | Why LangGraph, why MCP, why hybrid search, and the rest |
+| [Reviewer guide](docs/REVIEWER_GUIDE.md) | A checklist for evaluating the project, with where to check each claim |
+| [Captured evidence](docs/evidence/README.md) | The raw API responses and test output behind this README's numbers |
 
 ## Limitations and next steps
 
