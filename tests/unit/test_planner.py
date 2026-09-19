@@ -36,3 +36,39 @@ def test_scan_uses_every_specialist_with_full_confidence() -> None:
 
 def test_unclear_questions_fall_below_the_review_threshold() -> None:
     assert heuristic_plan(A, "question", "penguins").confidence < 0.5
+
+
+def test_a_template_cites_only_a_matching_past_incident() -> None:
+    from app.domain.protocol import Finding
+    from app.retrieval.types import RetrievedChunk
+
+    def incident(title: str) -> RetrievedChunk:
+        return RetrievedChunk(
+            chunk_id=title,
+            doc_id=title,
+            title=title,
+            path="",
+            section="Problem",
+            doc_type="incident",
+            text="",
+            score=1.0,
+            rank=1,
+        )
+
+    resend = Finding(
+        finding_type="duplicate_submission",
+        specialist="reconciliation",
+        subject="f",
+        title="Resent file",
+        affected_records=88,
+        metrics={
+            "changed_rows": 3,
+            "landed_after_dag_run": True,
+            "business_date": "d",
+            "submitter_id": "S1002",
+        },
+    )
+    unrelated = [incident("INC-0438: MOBILE file renamed a dedup-key column")]
+    matching = [*unrelated, incident("INC-0427: ECOMM resend double counted web revenue")]
+    assert "INC-0438" not in A.fallback_analysis(resend, unrelated).root_cause_hypothesis
+    assert "INC-0427" in A.fallback_analysis(resend, matching).root_cause_hypothesis

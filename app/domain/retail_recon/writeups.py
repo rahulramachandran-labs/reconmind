@@ -6,7 +6,12 @@ capped against.
 """
 
 from app.domain.protocol import Finding, FindingAnalysis, Severity
-from app.domain.retail_recon.rules import KEY_DRIFT_S2_RATE, VOLUME_DROP, VOLUME_DROP_S1
+from app.domain.retail_recon.rules import (
+    KEY_DRIFT_S2_RATE,
+    PRECEDENT_WORDS,
+    VOLUME_DROP,
+    VOLUME_DROP_S1,
+)
 from app.retrieval.types import RetrievedChunk
 
 
@@ -90,7 +95,15 @@ def retrieval_query(finding: Finding) -> str:
 
 def fallback_analysis(finding: Finding, sources: list[RetrievedChunk]) -> FindingAnalysis:
     m = finding.metrics
-    precedent = next((s.title.split(":")[0] for s in sources if s.doc_type == "incident"), None)
+    words = PRECEDENT_WORDS.get(finding.finding_type, ())
+    precedent = next(
+        (
+            s.title.split(":")[0]
+            for s in sources
+            if s.doc_type == "incident" and any(w in s.title.lower() for w in words)
+        ),
+        None,
+    )
     like = f" This matches the pattern in {precedent}." if precedent else ""
     if finding.finding_type == "key_drift":
         return FindingAnalysis(

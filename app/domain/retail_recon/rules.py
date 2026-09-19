@@ -14,6 +14,15 @@ DEDUP_KEY = ("transaction_id", "channel_basket_id", "upc_code")
 KEY_DRIFT_PAIR = ("outlet_id", "location_id")
 KEY_DRIFT_S2_RATE = 0.02
 
+# words in a past incident's title that make it a precedent for a finding type; an
+# unrelated incident that happens to be retrieved is not cited
+PRECEDENT_WORDS = {
+    "key_drift": ("outlet id", "two outlet"),
+    "duplicate_submission": ("resend", "double"),
+    "schema_drift": ("renamed", "column"),
+    "volume_anomaly": ("truncated", "light", "volume"),
+}
+
 VOLUME_WINDOW_DAYS = 7
 VOLUME_DROP = 0.25
 VOLUME_DROP_S1 = 0.50
