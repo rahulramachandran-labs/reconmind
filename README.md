@@ -40,6 +40,70 @@ flowchart LR
 5. **The Reporter writes it up and decides who signs off.** Each finding becomes a structured incident report. S1 findings and anything below the confidence threshold **pause** the LangGraph run in a review queue; a reviewer approves, rejects or annotates, and the run resumes from its Postgres checkpoint. Every decision goes into an append-only audit ledger.
 6. **Everything is traced.** Every agent step, tool call, retrieval and model call is stored with its latency and cost, shown on the Traces page and mirrored to LangFuse.
 
+### What a run looks like
+
+An excerpt from the trace of one captured run, the question *Did the MOBILE file have a schema problem on 2026-06-16?*, answered in 68.4 s by `qwen2.5:1.5b` on a laptop:
+
+```
+run c254aa4c  "Did the MOBILE file have a schema problem on 2026-06-16?"  completed
+
+planner       llm   planner                  ollama/qwen2.5:1.5b   10,608 ms   383 + 111 tokens   $0
+              -> {"intent": "investigate", "specialists": ["data_quality"], "confidence": 0.85,
+                  "rationale": "The question specifically asks for a schema problem on 2026-06-16. ..."}
+planner       tool  orchestration-metadata/list_dag_runs      20 ms   {"dag_id": "retail_txn_daily"}
+data_quality  tool  orchestration-metadata/get_failed_tasks   27 ms
+              <- {"since": "2026-06-09"}
+              -> {"failures": [{"task_id": "validate_schema", "business_date": "2026-06-16",
+                   "first_error_line": "ContractViolation: S1003_20260616_0216_MOBILE.txt missing
+                   ['channel_basket_id']; unexpected ['basket_ref']", ...}]}
+data_quality  tool  warehouse-metadata/get_dbt_manifest, get_table_stats x 9   57-88 ms each
+data_quality  retrieval  hybrid search      1,101 ms
+data_quality  llm   analyse:schema_drift     ollama/qwen2.5:1.5b   22,509 ms   1,244 + 348 tokens
+data_quality  llm   analyse:schema_drift#1   ollama/qwen2.5:1.5b   25,190 ms   1,686 + 344 tokens
+              (the first reply failed schema validation; the re-prompt with the error passed)
+reporter      llm   reporter:summary         ollama/qwen2.5:1.5b    8,621 ms   346 + 98 tokens    $0
+              -> {"headline": "Batch 2026-06-16 contains missing field 'channel_basket_id'", ...}
+```
+
+The full trace, 22 steps with every input and output, is [`docs/evidence/ask-mobile-run.json`](docs/evidence/ask-mobile-run.json).
+
+Every report is validated against this model before it is stored ([`app/agents/schemas.py`](https://github.com/rahulramachandran-labs/reconmind/blob/5315d5bc97e8bf162c0671e7daf4c92b27dec651/app/agents/schemas.py#L29-L60)):
+
+```python
+class IncidentReport(BaseModel):
+    """What a person reads: modelled on a change request, not an agent transcript."""
+
+    id: UUID
+    run_id: UUID
+    finding_type: str
+    specialist: str
+    severity: Severity
+    title: str
+    problem_statement: str
+    affected_records: AffectedRecords
+    root_cause_hypothesis: str
+    recommended_fix: list[str]
+    confidence: float = Field(ge=0.0, le=1.0)
+    confidence_label: Literal["low", "medium", "high"]
+    open_questions: list[str]
+    evidence: list[Evidence]
+    sources: list[SourceRef]
+    analysis_by: str
+    needs_review: bool
+    review_reason: str | None = None
+    trace_url: str | None = None
+    status: Literal["pending_review", "published", "rejected"] = "published"
+    review_note: str | None = None
+    seen_count: int = 1
+    repeat: bool = Field(
+        default=False, description="Already reported by an earlier scan; not written up again"
+    )
+
+    @property
+    def fingerprint(self) -> str:
+        return fingerprint(self.finding_type, self.title)
+```
+
 ### What a scan finds in the sample data
 
 | Severity | Finding | Found by | Records | What happens |
