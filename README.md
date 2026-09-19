@@ -49,15 +49,25 @@ flowchart LR
 | S2 | Resent file `S1002_20260612_1120_ECOMM.txt` supersedes 88 rows | Reconciliation | 88 | Published |
 | S2 | `S1001` 2026-06-18: 110 rows, 40% below its 7-day average | Data-Quality | 73 missing | Published |
 
-One of those reports, as the reviewer sees it:
+The key-drift report from that scan, exactly as the API returned it:
 
 > **Problem.** Location LOC-0517 is reporting sales under two outlet ids: its canonical OUT-1017 and OUT-1071, which outlet_location_map does not map to it. 251 of 8373 deduplicated rows (3.0%) between 2026-06-01 and 2026-06-21 are affected, so store-level numbers for this location are split.
 >
-> **Root-cause hypothesis.** Whole baskets (158) from 4 submitters carry OUT-1071, so the id is set at the register or export profile rather than corrupted row by row; OUT-1071 looks like a transposition of OUT-1017.
+> **Affected records.** 251 records (3.0%) · **Severity** S2 · **Status** published
 >
-> **Recommended fix.** 1. Confirm the correct outlet id with the submitter before changing anything. 2. Add OUT-1071 → OUT-1017 to outlet_alias for 2026-06-01 to 2026-06-21; never edit raw rows. 3. Rebuild stg_transactions and fct_daily_sales for the affected dates. 4. Ask the submitter to fix the export profile at source and record the ticket.
+> **Root-cause hypothesis.** The root cause is that the `LOC-0517` location has `OUT-1071` reporting as an outlet under multiple `OUT-1017` outlet records in the `transactions` table.
 >
-> **Confidence** 0.60 (medium) · **Evidence** `mcp:warehouse-metadata/run_check` · **Runbooks** key drift, outlet_location_map · **Trace** link to every step
+> **Recommended fix.** 1. Confirm with the submitter which outlet id is correct. 2. Add the drifted `OUT-1071` as an alias in `outlet_alias` with `valid_from` and `valid_to` in `outlet_location_map`. 3. Rebuild `stg_transactions` and `fct_daily_sales` for affected dates. 4. Ask the submitter to fix the header at source and record the ticket number. 5. Monitor the drift over time and perform audits periodically. 6. Review all historical data where the drift is suspected.
+>
+> **Confidence.** 0.75 (high)
+>
+> **Open questions.** Verify the drift continues after the fix. Audit all records in `transactions` and `location_id` to ensure the drift is not caused by other variables.
+>
+> **Evidence.** `mcp:warehouse-metadata/run_check`: 251 deduplicated rows (158 baskets) at LOC-0517 carry OUT-1071, which outlet_location_map does not map there; canonical is OUT-1017
+>
+> **Runbooks consulted.** Key drift between outlet_id and location_id: *Why it matters*, *Fix*, *Overview*, *Detection*
+
+Run `d36c5c4a-d20e-4629-9b27-d433f076755d`, captured 2026-09-19 16:20:54 UTC · `analysis_by: ollama` · model `qwen2.5:1.5b`, a 1.5-billion-parameter model running locally through Ollama, at $0. The problem statement and counts come from the deterministic check; the root cause, fix, confidence and open questions are the model's, with confidence capped at the template's 0.60 plus 0.15. Raw JSON: [`docs/evidence/incident-key-drift.json`](docs/evidence/incident-key-drift.json).
 
 ### Why it is built this way
 
