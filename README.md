@@ -14,11 +14,11 @@
 > 4. In **Ask ReconMind**, ask *Did the MOBILE file have a schema problem on 2026-06-16?*, then open the run on **Traces**.
 > 5. Narrated version: [docs/DEMO.md](docs/DEMO.md). Full checklist: [docs/REVIEWER_GUIDE.md](docs/REVIEWER_GUIDE.md).
 
-**[Live app](https://reconmind-labs.vercel.app)** · [Project deck (PDF)](docs/slides/Rahul_Ramachandran_ReconMind-ProjectSubmission.pdf) · [60-second demo script](docs/DEMO.md) · [Write-up](docs/blog/reconmind-writeup.md)
+**[Live app](https://reconmind-labs.vercel.app)** · [2-minute demo video](docs/demo.mp4) · [Project deck (PDF)](docs/slides/Rahul_Ramachandran_ReconMind-ProjectSubmission.pdf) · [60-second demo script](docs/DEMO.md) · [Write-up](docs/blog/reconmind-writeup.md)
 
 Final project for the IIT Patna Generative AI & Agentic AI for Developers program, by Rahul Ramachandran, submitted 18 September 2026. All data is synthetic.
 
-![A scan finds four planted incidents, one S1 is signed off in the review queue, a question streams through the agents, and the run's trace shows every tool call](docs/demo.gif)
+![A scan finds the four planted incidents with Groq writing the reports, the S1 is signed off, two questions are answered with citations, then the trace, hybrid search and the Verify page](docs/demo.gif)
 
 ---
 
@@ -49,32 +49,34 @@ flowchart LR
 
 ### What a run looks like
 
-An excerpt from the trace of one captured run, the question *Did the MOBILE file have a schema problem on 2026-06-16?*, answered in 68.4 s by `qwen2.5:1.5b` on a laptop:
+An excerpt from the trace of one captured run, the question *Did the MOBILE file have a schema problem on 2026-06-16?*, answered in 16.6 s by `openai/gpt-oss-120b` on Groq's free tier:
 
 ```
-run c254aa4c  "Did the MOBILE file have a schema problem on 2026-06-16?"  completed
+run 08cdde6e  "Did the MOBILE file have a schema problem on 2026-06-16?"  completed
 
-planner       llm   planner                  ollama/qwen2.5:1.5b   10,608 ms   383 + 111 tokens   $0
+planner       llm   planner                groq/openai/gpt-oss-120b      482 ms   436 + 113 tokens   $0
               -> {"intent": "investigate", "specialists": ["data_quality"], "confidence": 0.85,
-                  "rationale": "The question specifically asks for a schema problem on 2026-06-16. ..."}
-planner       tool  orchestration-metadata/list_dag_runs      20 ms   {"dag_id": "retail_txn_daily"}
-data_quality  tool  orchestration-metadata/get_failed_tasks   27 ms
+                  "rationale": "Checking for a schema problem requires diffing the MOBILE file
+                   against the dbt contract, which is the responsibility of the data_quality specialist."}
+planner       tool  orchestration-metadata/list_dag_runs      6 ms   {"dag_id": "retail_txn_daily"}
+data_quality  tool  orchestration-metadata/get_failed_tasks   14 ms
               <- {"since": "2026-06-09"}
               -> {"failures": [{"task_id": "validate_schema", "business_date": "2026-06-16",
                    "first_error_line": "ContractViolation: S1003_20260616_0216_MOBILE.txt missing
                    ['channel_basket_id']; unexpected ['basket_ref']", ...}]}
-data_quality  tool  warehouse-metadata/get_dbt_manifest, get_table_stats x 9   57-88 ms each
-data_quality  retrieval  hybrid search      1,101 ms
-data_quality  llm   analyse:schema_drift     ollama/qwen2.5:1.5b   22,509 ms   1,244 + 348 tokens
-data_quality  llm   analyse:schema_drift#1   ollama/qwen2.5:1.5b   25,190 ms   1,686 + 344 tokens
-              (the first reply failed schema validation; the re-prompt with the error passed)
-reporter      llm   reporter:summary         ollama/qwen2.5:1.5b    8,621 ms   346 + 98 tokens    $0
-              -> {"headline": "Batch 2026-06-16 contains missing field 'channel_basket_id'", ...}
+data_quality  tool  get_dbt_manifest, get_timing_history, get_table_stats x 9   14-60 ms each
+data_quality  retrieval  hybrid search    554 ms
+data_quality  llm   analyse:schema_drift   groq/openai/gpt-oss-120b    9,440 ms   1,228 + 468 tokens   $0
+              -> {"root_cause_hypothesis": "The Mobile team deployed a new export library that renamed
+                  the deduplication key column from `channel_basket_id` to `basket_ref`. ...", ...}
+reporter      llm   reporter:summary       groq/openai/gpt-oss-120b    5,983 ms   382 + 200 tokens   $0
+              -> {"headline": "S1: Missing channel_basket_id prevents dedup in
+                  S1003_20260616_0216_MOBILE batch", ...}
 ```
 
-The full trace, 22 steps with every input and output, is [`docs/evidence/ask-mobile-run.json`](docs/evidence/ask-mobile-run.json).
+The full trace, 21 steps with every input and output, is [`docs/evidence/ask-mobile-run.json`](docs/evidence/ask-mobile-run.json).
 
-Every report is validated against this model before it is stored ([`app/agents/schemas.py`](https://github.com/rahulramachandran-labs/reconmind/blob/5315d5bc97e8bf162c0671e7daf4c92b27dec651/app/agents/schemas.py#L29-L60)):
+Every report is validated against this model before it is stored ([`app/agents/schemas.py`](https://github.com/rahulramachandran-labs/reconmind/blob/35d6309714fd6086fdff527fe53b4b3bab1a0c79/app/agents/schemas.py#L53-L88)):
 
 ```python
 class IncidentReport(BaseModel):
@@ -105,6 +107,10 @@ class IncidentReport(BaseModel):
     repeat: bool = Field(
         default=False, description="Already reported by an earlier scan; not written up again"
     )
+    # both versions are kept so a reader can compare them; the fields above show the model's
+    # when there is one ("model" in analysis_by), otherwise the template's
+    template: WriteUp | None = None
+    model_analysis: ModelWriteUp | None = None
 
     @property
     def fingerprint(self) -> str:
@@ -126,19 +132,19 @@ The key-drift report from that scan, exactly as the API returned it:
 >
 > **Affected records.** 251 records (3.0%) · **Severity** S2 · **Status** published
 >
-> **Root-cause hypothesis.** The root cause is that the `LOC-0517` location has `OUT-1071` reporting as an outlet under multiple `OUT-1017` outlet records in the `transactions` table.
+> **Root-cause hypothesis.** The source system that feeds LOC-0517 transmitted transactions with an incorrect outlet header, using OUT-1071 instead of the canonical OUT-1017. This created a key‑drift condition where the same location_id appears under two outlet_ids in the immutable transactions layer, which is not reflected in the outlet_location_map.
 >
-> **Recommended fix.** 1. Confirm with the submitter which outlet id is correct. 2. Add the drifted `OUT-1071` as an alias in `outlet_alias` with `valid_from` and `valid_to` in `outlet_location_map`. 3. Rebuild `stg_transactions` and `fct_daily_sales` for affected dates. 4. Ask the submitter to fix the header at source and record the ticket number. 5. Monitor the drift over time and perform audits periodically. 6. Review all historical data where the drift is suspected.
+> **Recommended fix.** 1. Contact the 4 submitters (see metrics) to confirm which outlet_id (OUT-1017 or OUT-1071) is correct for LOC-0517. 2. Insert an alias record for the drifted id (OUT-1071) into the `outlet_alias` table with appropriate `valid_from` and `valid_to` timestamps. 3. Trigger a backfill of the staging model `stg_transactions` for the window 2026-06-01 to 2026-06-21, then rebuild `fct_daily_sales` for the same dates (follow the backfill runbook). 4. Ask the source system owner to correct the outlet header in future extracts and log the ticket number in the incident documentation.
 >
 > **Confidence.** 0.75 (high)
 >
-> **Open questions.** Verify the drift continues after the fix. Audit all records in `transactions` and `location_id` to ensure the drift is not caused by other variables.
+> **Open questions.** Was the incorrect outlet_id ever introduced intentionally as a temporary alias, or is it purely a data entry error? Are there any other locations that share the same drifted outlet_id (OUT-1071) in the same window? What is the timeline for the source team to deploy the header fix, and does it require a schema change? Do we need to adjust any downstream alert thresholds now that the alias will be added?
 >
 > **Evidence.** `mcp:warehouse-metadata/run_check`: 251 deduplicated rows (158 baskets) at LOC-0517 carry OUT-1071, which outlet_location_map does not map there; canonical is OUT-1017
 >
 > **Runbooks consulted.** Key drift between outlet_id and location_id: *Why it matters*, *Fix*, *Overview*, *Detection*
 
-Run `d36c5c4a-d20e-4629-9b27-d433f076755d`, captured 2026-09-19 16:20:54 UTC · `analysis_by: ollama` · model `qwen2.5:1.5b`, a 1.5-billion-parameter model running locally through Ollama, at $0. The problem statement and counts come from the deterministic check; the root cause, fix, confidence and open questions are the model's, with confidence capped at the template's 0.60 plus 0.15. Raw JSON: [`docs/evidence/incident-key-drift.json`](docs/evidence/incident-key-drift.json).
+Run `b5444ae1-f162-41ff-8a82-28f65425be9c`, captured 2026-09-19 19:00:42 UTC · `analysis_by: model` · written by `openai/gpt-oss-120b` on Groq's free tier in 1,221 ms (1,177 prompt + 400 completion tokens, $0). The problem statement and counts come from the deterministic check; the root cause, fix, confidence and open questions are the model's, with confidence capped at the template's 0.60 plus 0.15. The template's own version is stored beside it, and its hypothesis reads: *"Whole baskets (158) from 4 submitter(s) carry OUT-1071, so the id is set at the register or export profile rather than corrupted row by row; OUT-1071 looks like a transposition of OUT-1017."* Raw JSON: [`docs/evidence/incident-key-drift.json`](docs/evidence/incident-key-drift.json).
 
 ### Why it is built this way
 
@@ -150,36 +156,43 @@ Run `d36c5c4a-d20e-4629-9b27-d433f076755d`, captured 2026-09-19 16:20:54 UTC · 
 
 ## Results
 
-From the last captured scan, run `d36c5c4a` on 2026-09-19, against the seeded sample ([`docs/evidence/`](docs/evidence/README.md)). Planted sizes are from [`expected_anomalies.json`](data/sample/expected_anomalies.json).
+From the last captured run of every scenario, on 2026-09-19 against a freshly seeded local stack with Groq's free tier first in the fallback chain ([`docs/evidence/`](docs/evidence/README.md)). Planted sizes are from [`expected_anomalies.json`](data/sample/expected_anomalies.json).
 
 | Planted anomaly | Planted size | Finding produced | Severity (expected) | Outcome | Written by |
 |---|---|---|---|---|---|
-| Schema drift | `S1003_20260616_0216_MOBILE.txt` renames `channel_basket_id` to `basket_ref`: 82 rows | S1003_20260616_0216_MOBILE.txt renamed channel_basket_id to basket_ref (82 records) | S1 (S1) | held for review | template |
-| Key drift | `LOC-0517` also reports as `OUT-1071`: 251 of 8,373 rows | LOC-0517 also reporting as OUT-1071 (3.0% of rows) (251 records) | S2 (S2) | published | ollama |
-| Duplicate submission | `S1002_20260612_1120_ECOMM.txt` supersedes 88 rows, 3 with changed values, after the DAG ran | Resent file S1002_20260612_1120_ECOMM.txt supersedes 88 rows (88 records) | S2 (S2) | published | ollama |
-| Volume anomaly | `S1001_20260618_0638_POSFEED.txt`: 110 rows vs 182.6 trailing, 161 min late | S1001 2026-06-18: 110 rows, 40% below its 7-day average (73 records) | S2 (S2) | published | ollama |
+| Schema drift | `S1003_20260616_0216_MOBILE.txt` renames `channel_basket_id` to `basket_ref`: 82 rows | S1003_20260616_0216_MOBILE.txt renamed channel_basket_id to basket_ref (82 records) | S1 (S1) | held for review | `groq/openai/gpt-oss-120b` |
+| Key drift | `LOC-0517` also reports as `OUT-1071`: 251 of 8,373 rows | LOC-0517 also reporting as OUT-1071 (3.0% of rows) (251 records) | S2 (S2) | published | `groq/openai/gpt-oss-120b` |
+| Duplicate submission | `S1002_20260612_1120_ECOMM.txt` supersedes 88 rows, 3 with changed values, after the DAG ran | Resent file S1002_20260612_1120_ECOMM.txt supersedes 88 rows (88 records) | S2 (S2) | published | `groq/openai/gpt-oss-120b` |
+| Volume anomaly | `S1001_20260618_0638_POSFEED.txt`: 110 rows vs 182.6 trailing, 161 min late | S1001 2026-06-18: 110 rows, 40% below its 7-day average (73 records) | S2 (S2) | published | `groq/openai/gpt-oss-120b` |
 
 - **Every planted anomaly found**, each by the expected specialist at the expected severity, and nothing else flagged.
-- **Scan wall time:** 208.7 s on a laptop CPU, with a local model writing the explanations: 5 agent nodes, 30 MCP tool calls, 4 retrievals.
-- **Model calls:** 7 to `ollama/qwen2.5:1.5b`, 9,585 prompt and 1,912 completion tokens, $0.00. The S1 write-up fell back to its template after all three of the model's replies failed schema validation, and the report says so (`analysis_by: template`).
-- **Tests:** 152 passed, 0 failed, 93.27% line and branch coverage ([`tests.txt`](docs/evidence/tests.txt)).
+- **Scan:** 14.8 s from the request to four written-up findings: 5 agent nodes, 30 MCP tool calls, 4 retrievals, 5 model calls (5,602 prompt and 2,161 completion tokens, $0.00 on the free tier).
+- **Investigation question:** *Did the MOBILE file have a schema problem on 2026-06-16?* went to Data-Quality only; 3 model calls.
+- **Runbook question and follow-up:** *Which file wins when a submitter resends the same day?* was answered from the runbooks with a citation; the follow-up in the same session, *What should we check before reprocessing that day?*, used 6 model calls across gemini/gemini-3.6-flash and groq/openai/gpt-oss-120b, because Groq's per-minute limit pushed some calls to the next provider.
+- **Written up again:** `POST /incidents/{id}/regenerate` on the S1 returned HTTP 200 with `analysis_by: model`, written by `gemini/gemini-3.6-flash` in 4,239 ms, the template's version kept beside it.
+- **Signed off:** approving the S1 with a note resumed its paused run and published it.
+- **Scanned again:** the second scan completed without pausing, and the feed still holds four findings, each seen again (the S1 4 times, counting the two questions that looked at it).
+- **Tests:** 158 passed, 0 failed, 93.17% line and branch coverage ([`tests.txt`](docs/evidence/tests.txt)).
 - **RAGAS gate:** pass (faithfulness 0.911, answer relevancy 0.862, context precision 0.830, context recall 0.922; hybrid retrieval, extractive answers, offline judges).
-- **CI:** [run 35432908516](https://github.com/rahulramachandran-labs/reconmind/actions/runs/35432908516) on `0cf0fff`, success.
+- **CI:** [run 35462138190](https://github.com/rahulramachandran-labs/reconmind/actions/runs/35462138190) on `0487a57`, success.
 
 ## Screens
 
-Captured at 1440×900 from the same local stack as the evidence, with `qwen2.5:1.5b` writing the explanations (`uv run --with playwright python scripts/record_demo.py --screenshots docs/screenshots`).
+Captured at 1440×900 from a freshly seeded local stack with Groq's free tier writing the explanations (`uv run --with playwright python scripts/record_demo.py --screenshots docs/screenshots`). The same walkthrough as a two-minute video with captions: **[docs/demo.mp4](docs/demo.mp4)**.
 
 | Screen | |
 |---|---|
-| **Dashboard**<br><br>Latest business date against its trailing week, open findings by severity, the last DAG run, and today's model calls, tokens and cost. The chart flags POSFEED's light day. | <img src="docs/screenshots/dashboard.png" width="560" alt="Dashboard screen"> |
-| **Incident feed**<br><br>Every finding with its severity, status, how many scans have seen it, and who wrote it up: `ollama` for the three the model wrote, `template only` for the S1. | <img src="docs/screenshots/incidents.png" width="560" alt="Incident feed screen"> |
-| **Incident detail**<br><br>The key-drift report quoted above. *Deterministic checks* and *Model analysis* switch between the template and the model's write-up; the counts are the same in both. | <img src="docs/screenshots/incident-detail.png" width="560" alt="Incident detail screen"> |
-| **Review queue**<br><br>The S1 waits with the reason it paused. Above it, the small model routed a runbook question with 30% confidence, so the Planner parked that too for a person to route. | <img src="docs/screenshots/review.png" width="560" alt="Review queue screen"> |
-| **Ask ReconMind**<br><br>The MOBILE question goes to Data-Quality only, and the steps stream in. From the captured run, the first two sentences of the answer, written by `ollama/qwen2.5:1.5b`: *“Batch 2026-06-16 contains missing field 'channel_basket_id'. A batch file with the name 'S1003_20260616_0216_MOBILE.txt' is missing the field 'channel_basket_id', which is crucial for the deduplication process due to the existence of column 'basket_ref' in the dedup key.”* The footer says plainly when a write-up came from a template. | <img src="docs/screenshots/ask.png" width="560" alt="Ask ReconMind screen"> |
-| **Traces**<br><br>The captured scan: 206.8 s, 7 LLM calls, 30 tool calls, $0, every step with its latency. The summary at the top is the model's, and it calls the S1 an S2; the report's severity comes from the check, not from this text. | <img src="docs/screenshots/trace.png" width="560" alt="Traces screen"> |
-| **Docs & runbooks, hybrid**<br><br>`basket_ref ContractViolation` with hybrid search: the schema-drift runbook and incident INC-0438 come first. The badges show each hit's dense and BM25 rank; INC-0438 is 10th on meaning alone and 1st on keywords. | <img src="docs/screenshots/docs-hybrid.png" width="560" alt="Docs & runbooks, hybrid screen"> |
-| **Docs & runbooks, dense only**<br><br>The same query with embeddings only: docs and dbt models for the transactions table fill the top four, the runbook is 5th and the incident isn't in the top five. | <img src="docs/screenshots/docs-dense.png" width="560" alt="Docs & runbooks, dense only screen"> |
+| **Dashboard**<br><br>Latest business date against its trailing week, four open findings with one S1 waiting for review, the last DAG run, and today's model calls, tokens and cost. The chart flags POSFEED's light day. | <img src="docs/screenshots/dashboard.png" width="560" alt="Dashboard"> |
+| **Incident feed**<br><br>One row per finding, with who wrote it up and how many scans have seen it. | <img src="docs/screenshots/incidents.png" width="560" alt="Incident feed"> |
+| **Incident detail: model analysis**<br><br>The key-drift report as Groq wrote it. The chip names the model, its latency, tokens and cost. | <img src="docs/screenshots/incident-detail.png" width="560" alt="Incident detail: model analysis"> |
+| **Incident detail: deterministic checks**<br><br>The template the model's answer is held against: the same problem and counts, and a calibrated 60% confidence. *Side by side* shows both at once. | <img src="docs/screenshots/incident-template.png" width="560" alt="Incident detail: deterministic checks"> |
+| **Review queue**<br><br>The S1 waits for a person, with the reason it paused. | <img src="docs/screenshots/review.png" width="560" alt="Review queue"> |
+| **Ask ReconMind: an investigation**<br><br>The MOBILE question goes to Data-Quality only, and the steps stream in. From the captured run, the first two sentences of the answer, written by `groq/openai/gpt-oss-120b`: *“S1: Missing channel_basket_id prevents dedup in S1003_20260616_0216_MOBILE batch. The S1003_20260616_0216_MOBILE.txt file from 2026-06-16 was renamed, replacing the required 'channel_basket_id' column with 'basket_ref'.”* | <img src="docs/screenshots/ask.png" width="560" alt="Ask ReconMind: an investigation"> |
+| **Ask ReconMind: a runbook question**<br><br>Answered from the runbooks with numbered citations, and the footer names the model that answered. | <img src="docs/screenshots/ask-runbook.png" width="560" alt="Ask ReconMind: a runbook question"> |
+| **Traces**<br><br>The scan's trace: each agent, then its MCP tool calls, retrievals and model calls with their latency. The headline and summary at the top are the model's. | <img src="docs/screenshots/trace.png" width="560" alt="Traces"> |
+| **Docs & runbooks, hybrid**<br><br>`basket_ref ContractViolation` with hybrid search: the schema-drift runbook and incident INC-0438 come first. The badges show each hit's dense and BM25 rank; INC-0438 is 10th on meaning alone and 1st on keywords. | <img src="docs/screenshots/docs-hybrid.png" width="560" alt="Docs & runbooks, hybrid"> |
+| **Docs & runbooks, dense only**<br><br>The same query with embeddings only: docs and dbt models for the transactions table fill the top four, the runbook is 5th and the incident isn't in the top five. | <img src="docs/screenshots/docs-dense.png" width="560" alt="Docs & runbooks, dense only"> |
+| **Verify**<br><br>Each planted anomaly beside the finding this deployment produced, the chaos test that proves it, and the template's and the model's root causes side by side. | <img src="docs/screenshots/verify.png" width="560" alt="Verify"> |
 
 ---
 
@@ -254,7 +267,7 @@ uv run pytest -m chaos -v    # plants each anomaly with the generator; checks th
 uv run python scripts/generate_synthetic_pipeline.py --seed 7 --out /tmp/p --only key_drift   # a fresh dataset with one planted problem
 ```
 
-**12. Run the quality gates.** `make test` runs 152 tests at 93% coverage. `make eval` scores retrieval and answers on the 46-question golden set and fails below the thresholds.
+**12. Run the quality gates.** `make test` runs 158 tests at 93% coverage. `make eval` scores retrieval and answers on the 46-question golden set and fails below the thresholds.
 
 ## Project structure
 
@@ -328,16 +341,16 @@ A 46-question golden set covers every anomaly type and screen. [RAGAS](evals/run
 
 *Offline* means no language model grades anything: RAGAS's non-LLM context precision and recall against the reference passages, an NLI cross-encoder for faithfulness and an MS MARCO cross-encoder for relevancy ([ADR 0006](docs/adr/0006-offline-eval-judges.md)). The last row keeps retrieval identical and lets a 1.5-billion-parameter local model write the answers: on average the judge finds fewer than half of its sentences supported by the passages it was given, so that row fails the gate, which is why CI gates on extractive answers and why the hosted demo is set up for a larger free-tier model (`--judge llm` re-scores any row with LLM judges).
 
-CI also runs ruff, black and mypy, then 152 tests with an 80% coverage gate (currently 93.27%), including Postgres, MCP, agent, prompt-injection and chaos tests. It finishes with gitleaks and a production build of the web app. Details are in [docs/EVALUATION.md](docs/EVALUATION.md).
+CI also runs ruff, black and mypy, then 158 tests with an 80% coverage gate (currently 93.17%), including Postgres, MCP, agent, prompt-injection and chaos tests. It finishes with gitleaks and a production build of the web app. Details are in [docs/EVALUATION.md](docs/EVALUATION.md).
 
 ### Testing
 
-From the last captured run of `make test` ([`docs/evidence/tests.txt`](docs/evidence/tests.txt)): 152 passed, 0 failed, 93.27% coverage.
+From the last captured run of `make test` ([`docs/evidence/tests.txt`](docs/evidence/tests.txt)): 158 passed, 0 failed, 93.17% coverage.
 
 | Layer | Tests | What it covers |
 |---|---|---|
-| Unit | 101 | Retrieval (tokenizer, RRF, reranker), the model fallback chain, structured output, prompts, tracing, the synthetic generator, rate limits |
-| Integration | 45 | Postgres and the append-only ledger, both MCP servers through a real client, the agent graph end to end, the API |
+| Unit | 103 | Retrieval (tokenizer, RRF, reranker), the model fallback chain, structured output, prompts, tracing, the synthetic generator, rate limits |
+| Integration | 49 | Postgres and the append-only ledger, both MCP servers through a real client, the agent graph end to end, the API |
 | of which prompt injection | 1 | A runbook carrying planted instructions can't change a severity or approve anything ([test](tests/integration/test_prompt_injection.py)) |
 | of which domain-agnostic proof | 2 | The same graph runs on the support-triage domain, and no agent module imports a domain ([test](tests/integration/test_domain_agnostic.py)) |
 | Chaos | 6 | Each anomaly planted on its own is caught by the right agent at the right severity, a clean pipeline raises nothing, and a scan fits the 30-second budget ([tests](tests/chaos/test_injected_anomalies.py)) |
@@ -384,7 +397,7 @@ Links in *Where* and *Test* point at the exact lines, pinned to commit `ecd0ee3`
 
 ## Limitations and next steps
 
-- The hosted demo runs without a model unless a key is set on the server: explanations then come from templates and answers are extractive, which `/healthz` shows as `"llm_providers": ["extractive"]`. The captured results above used a local model.
+- The hosted demo runs without a model unless a key is set on the server: explanations then come from templates and answers are extractive, which `/healthz` shows as `"llm_providers": ["extractive"]`. The captured results above ran on a local stack with the same free-tier keys.
 - The hosted API is on a free tier that sleeps after 15 idle minutes; the first request after that takes up to a minute.
 - The demo's free Postgres expires around 2026-10-19; applying the Render blueprint again recreates it, and the sample reloads on startup ([docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)).
 - Scans run on a schedule, not when data lands. Next step: trigger them from the loader or a Kafka topic.

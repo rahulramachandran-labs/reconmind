@@ -1,17 +1,23 @@
 {
-  "captured_at": "2026-09-19T16:17:46Z",
-  "commit": "0cf0fff",
+  "captured_at": "2026-09-19T19:00:08Z",
+  "commit": "35d6309",
   "api_version": "1.1.0",
   "llm_providers": [
+    "groq",
+    "gemini",
     "ollama"
   ],
   "active_model": {
-    "provider": "ollama",
-    "model": "qwen2.5:1.5b",
+    "provider": "groq",
+    "model": "openai/gpt-oss-120b",
     "chain": [
+      "groq",
+      "gemini",
       "ollama"
     ],
     "models": {
+      "groq": "openai/gpt-oss-120b",
+      "gemini": "gemini-3.6-flash",
       "ollama": "qwen2.5:1.5b"
     },
     "fell_back": null,
@@ -19,21 +25,21 @@
     "last_call_at": null
   },
   "scan": {
-    "run_id": "d36c5c4a-d20e-4629-9b27-d433f076755d",
+    "run_id": "b5444ae1-f162-41ff-8a82-28f65425be9c",
     "status": "paused_review",
-    "wall_seconds": 208.7,
-    "graph_latency_ms": 206783,
-    "steps": 46,
+    "wall_seconds": 14.8,
+    "graph_latency_ms": 12771,
+    "steps": 44,
     "nodes": 5,
     "tool_calls": 30,
     "retrievals": 4,
-    "llm_calls": 7,
+    "llm_calls": 5,
     "llm_calls_failed": 0,
-    "prompt_tokens": 9585,
-    "completion_tokens": 1912,
+    "prompt_tokens": 5602,
+    "completion_tokens": 2161,
     "cost_usd": 0,
     "models": [
-      "ollama/qwen2.5:1.5b"
+      "groq/openai/gpt-oss-120b"
     ],
     "findings": [
       {
@@ -42,7 +48,7 @@
         "severity": "S1",
         "status": "pending_review",
         "affected_records": 82,
-        "analysis_by": "template",
+        "analysis_by": "model",
         "planted": {
           "affected_rows": 82,
           "business_date": "2026-06-16",
@@ -58,7 +64,8 @@
           "unexpected_columns": [
             "basket_ref"
           ]
-        }
+        },
+        "written_by": "groq/openai/gpt-oss-120b"
       },
       {
         "finding_type": "key_drift",
@@ -66,7 +73,7 @@
         "severity": "S2",
         "status": "published",
         "affected_records": 251,
-        "analysis_by": "ollama",
+        "analysis_by": "model",
         "planted": {
           "canonical_outlet_id": "OUT-1017",
           "drift_rate": 0.03,
@@ -76,7 +83,8 @@
           "expected_severity": "S2",
           "location_id": "LOC-0517",
           "rows_in_window": 8373
-        }
+        },
+        "written_by": "groq/openai/gpt-oss-120b"
       },
       {
         "finding_type": "duplicate_submission",
@@ -84,7 +92,7 @@
         "severity": "S2",
         "status": "published",
         "affected_records": 88,
-        "analysis_by": "ollama",
+        "analysis_by": "model",
         "planted": {
           "business_date": "2026-06-12",
           "changed_rows": 3,
@@ -96,7 +104,8 @@
           "resend_landed_after_dag": true,
           "submitter_id": "S1002",
           "superseded_rows": 88
-        }
+        },
+        "written_by": "groq/openai/gpt-oss-120b"
       },
       {
         "finding_type": "volume_anomaly",
@@ -104,7 +113,7 @@
         "severity": "S2",
         "status": "published",
         "affected_records": 73,
-        "analysis_by": "ollama",
+        "analysis_by": "model",
         "planted": {
           "business_date": "2026-06-18",
           "expected_agent": "data_quality",
@@ -116,46 +125,136 @@
           "rows": 110,
           "submitter_id": "S1001",
           "trailing_avg_7d": 182.6
-        }
+        },
+        "written_by": "groq/openai/gpt-oss-120b"
       }
     ]
   },
   "questions": {
     "ask-mobile": {
       "question": "Did the MOBILE file have a schema problem on 2026-06-16?",
-      "run_id": "c254aa4c-a147-4b9c-beec-dbd97ca6eaab",
-      "steps": 22,
+      "run_id": "08cdde6e-8acc-472b-8034-f4dff77cc71f",
+      "status": "completed",
+      "steps": 21,
       "nodes": 4,
       "tool_calls": 13,
       "retrievals": 1,
-      "llm_calls": 4,
+      "llm_calls": 3,
       "llm_calls_failed": 0,
-      "prompt_tokens": 3659,
-      "completion_tokens": 901,
+      "prompt_tokens": 2046,
+      "completion_tokens": 781,
       "cost_usd": 0,
       "models": [
-        "ollama/qwen2.5:1.5b"
-      ],
-      "status": "completed"
+        "groq/openai/gpt-oss-120b"
+      ]
     },
     "ask-runbook": {
       "question": "Which file wins when a submitter resends the same day?",
-      "run_id": "e3b621c1-1e09-4d94-b6fd-9584e3488c6d",
-      "steps": 4,
-      "nodes": 2,
+      "run_id": "dcccae9c-98fd-4806-a922-8e445a310b1c",
+      "status": "completed",
+      "steps": 7,
+      "nodes": 3,
       "tool_calls": 1,
-      "retrievals": 0,
-      "llm_calls": 1,
+      "retrievals": 1,
+      "llm_calls": 2,
       "llm_calls_failed": 0,
-      "prompt_tokens": 371,
-      "completion_tokens": 57,
+      "prompt_tokens": 1312,
+      "completion_tokens": 200,
       "cost_usd": 0,
       "models": [
-        "ollama/qwen2.5:1.5b"
-      ],
-      "status": "paused_plan"
+        "groq/openai/gpt-oss-120b"
+      ]
+    },
+    "ask-follow-up": {
+      "question": "What should we check before reprocessing that day?",
+      "run_id": "49233696-56a7-4ba1-9f27-79da8dd07e59",
+      "status": "completed",
+      "steps": 45,
+      "nodes": 5,
+      "tool_calls": 30,
+      "retrievals": 4,
+      "llm_calls": 6,
+      "llm_calls_failed": 0,
+      "prompt_tokens": 6419,
+      "completion_tokens": 2243,
+      "cost_usd": 0,
+      "models": [
+        "gemini/gemini-3.6-flash",
+        "groq/openai/gpt-oss-120b"
+      ]
     }
   },
+  "regenerate_s1": {
+    "status_code": 200,
+    "analysis_by": "model",
+    "model_analysis": {
+      "provider": "gemini",
+      "model": "gemini-3.6-flash",
+      "latency_ms": 4239,
+      "prompt_tokens": 1344,
+      "completion_tokens": 630
+    }
+  },
+  "review_s1": {
+    "status": "resumed",
+    "run_id": "b5444ae1-f162-41ff-8a82-28f65425be9c",
+    "outcome": [
+      {
+        "id": "204a8a64-dda2-4206-951a-3ce8f0012885",
+        "status": "published",
+        "decision": "approve"
+      }
+    ]
+  },
+  "rescan": {
+    "run_id": "1921304f-7ef9-424a-a16a-5f4c21ff7130",
+    "status": "completed",
+    "summary": "S1: Missing channel_basket_id in S1003 file blocks deduplication",
+    "steps": 44,
+    "nodes": 5,
+    "tool_calls": 30,
+    "retrievals": 4,
+    "llm_calls": 5,
+    "llm_calls_failed": 1,
+    "prompt_tokens": 4535,
+    "completion_tokens": 1395,
+    "cost_usd": 0,
+    "models": [
+      "gemini/gemini-3.6-flash",
+      "groq/openai/gpt-oss-120b",
+      "ollama/qwen2.5:1.5b"
+    ]
+  },
+  "feed_after": [
+    {
+      "severity": "S2",
+      "title": "LOC-0517 also reporting as OUT-1071 (3.0% of rows)",
+      "status": "published",
+      "seen_count": 3,
+      "analysis_by": "model"
+    },
+    {
+      "severity": "S2",
+      "title": "Resent file S1002_20260612_1120_ECOMM.txt supersedes 88 rows",
+      "status": "published",
+      "seen_count": 3,
+      "analysis_by": "model"
+    },
+    {
+      "severity": "S2",
+      "title": "S1001 2026-06-18: 110 rows, 40% below its 7-day average",
+      "status": "published",
+      "seen_count": 3,
+      "analysis_by": "model"
+    },
+    {
+      "severity": "S1",
+      "title": "S1003_20260616_0216_MOBILE.txt renamed channel_basket_id to basket_ref",
+      "status": "published",
+      "seen_count": 4,
+      "analysis_by": "model"
+    }
+  ],
   "ragas": [
     {
       "timestamp": "2026-09-18T19:14:38Z",
@@ -182,25 +281,38 @@
       "context_precision": "0.8302",
       "context_recall": "0.9221",
       "gate": "pass"
+    },
+    {
+      "timestamp": "2026-09-19T16:40:03Z",
+      "commit": "c621b62",
+      "retriever": "hybrid",
+      "judge": "offline",
+      "answerer": "ollama/qwen2.5:1.5b",
+      "n": "46",
+      "faithfulness": "0.427",
+      "answer_relevancy": "0.6237",
+      "context_precision": "0.8302",
+      "context_recall": "0.9221",
+      "gate": "fail"
     }
   ],
   "ci": {
     "conclusion": "success",
-    "createdAt": "2026-09-19T08:46:32Z",
-    "databaseId": 35432908516,
-    "headSha": "0cf0fffd1229dedd9696534c1730a24720b1a62c",
-    "url": "https://github.com/rahulramachandran-labs/reconmind/actions/runs/35432908516"
+    "createdAt": "2026-09-19T18:44:03Z",
+    "databaseId": 35462138190,
+    "headSha": "0487a57df446865e354ea79c92e69fa7a9b24984",
+    "url": "https://github.com/rahulramachandran-labs/reconmind/actions/runs/35462138190"
   },
   "tests": {
     "command": "make test",
     "exit_code": 0,
-    "passed": 152,
+    "passed": 158,
     "failed": 0,
     "skipped": 0,
-    "coverage_percent": 93.27,
+    "coverage_percent": 93.17,
     "layers": {
-      "unit": 101,
-      "integration": 45,
+      "unit": 103,
+      "integration": 49,
       "chaos": 6,
       "prompt injection": 1,
       "domain-agnostic proof": 2

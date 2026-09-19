@@ -159,20 +159,20 @@
   "usage": {
     "day": "2026-09-19",
     "runs": 1,
-    "llm_calls": 7,
-    "tokens": 11497,
+    "llm_calls": 5,
+    "tokens": 7763,
     "cost_usd": 0.0,
     "providers": [
       {
-        "provider": "ollama",
-        "model": "qwen2.5:1.5b",
-        "calls": 7,
-        "tokens": 11497,
+        "provider": "groq",
+        "model": "openai/gpt-oss-120b",
+        "calls": 5,
+        "tokens": 7763,
         "cost_usd": 0.0
       }
     ],
     "last_scan": {
-      "id": "d36c5c4a-d20e-4629-9b27-d433f076755d",
+      "id": "b5444ae1-f162-41ff-8a82-28f65425be9c",
       "trigger": "scan",
       "question": null,
       "adapter": "retail_recon",
@@ -192,19 +192,19 @@
         ],
         "needs_review": false
       },
-      "summary": "S2: S1003_20260616_0216_MOBILE.txt renames channel_basket_id to basket_ref, resulting in null column retention and dedup failure.\n\nA file named S1003_20260616_0216_MOBILE.txt in S1 category contains a change that violates the raw.transactions contract. This caused rows with the 'channel_basket_id' column with null values. Deduplication cannot run because the 'basket_ref' column is part of the dedup key. A total of 82 affected rows landed with null columns, resulting in deduplication failure. The incident report is marked as S1.",
+      "summary": "S1: 82 rows missing channel_basket_id prevents dedup for S1003_20260616_0216_MOBILE.txt\n\nThe most critical issue is that S1003_20260616_0216_MOBILE.txt (2026-06-16) is missing the required 'channel_basket_id' column and includes an unexpected 'basket_ref' column, causing 82 rows to land with a null dedup key, which blocks deduplication for this batch. Additionally, LOC-0517 is split across two outlet IDs (OUT-1017 and OUT-1071), affecting 251 of 8,373 deduplicated rows (3.0%) between 2026-06-01 and 2026-06-21. A resend of S1002_20260612_1120_ECOMM.txt duplicated 88 rows, with 3 rows having different qty or amount, and these superseded rows have already reached fct_daily_sales. Finally, S1001_20260618_0638_POSFEED.txt on 2026-06-18 contains only 110 rows, 40% below its 7\u2011day average of 182.6, and arrived 161 minutes after the submitter SLA.",
       "error": null,
       "trace_url": null,
-      "prompt_tokens": 9585,
-      "completion_tokens": 1912,
+      "prompt_tokens": 5602,
+      "completion_tokens": 2161,
       "cost_usd": 0.0,
-      "latency_ms": 206783,
-      "started_at": "2026-09-19T16:17:46.841809+00:00",
-      "finished_at": "2026-09-19T16:21:13.652424+00:00"
+      "latency_ms": 12771,
+      "started_at": "2026-09-19T19:00:30.274909+00:00",
+      "finished_at": "2026-09-19T19:00:43.058886+00:00"
     }
   },
   "findings": {
-    "since": "2026-09-19T16:17:46.841809+00:00",
+    "since": "2026-09-19T19:00:30.274909+00:00",
     "by_severity": {
       "S1": 1,
       "S2": 3,
@@ -214,28 +214,28 @@
     "pending_review": 1,
     "items": [
       {
-        "id": "f54b9a90-6fcf-4115-aa8e-52d55f8a4354",
+        "id": "204a8a64-dda2-4206-951a-3ce8f0012885",
         "severity": "S1",
         "title": "S1003_20260616_0216_MOBILE.txt renamed channel_basket_id to basket_ref",
         "status": "pending_review",
         "seen_count": 1
       },
       {
-        "id": "d384ed84-5858-4215-bd84-116e812e8925",
+        "id": "67bc3814-3aba-4103-85dc-c1ae69748596",
         "severity": "S2",
         "title": "LOC-0517 also reporting as OUT-1071 (3.0% of rows)",
         "status": "published",
         "seen_count": 1
       },
       {
-        "id": "0df2495f-cb41-443f-a8a3-cc78a7d70daa",
+        "id": "5edc8849-0a62-4a13-9acc-7848ca9937ec",
         "severity": "S2",
         "title": "Resent file S1002_20260612_1120_ECOMM.txt supersedes 88 rows",
         "status": "published",
         "seen_count": 1
       },
       {
-        "id": "daf9b573-dea4-49d3-b1d4-5339c1e52e97",
+        "id": "bb191f93-c558-40f9-8708-b1e5d6442158",
         "severity": "S2",
         "title": "S1001 2026-06-18: 110 rows, 40% below its 7-day average",
         "status": "published",

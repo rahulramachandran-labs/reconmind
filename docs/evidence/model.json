@@ -1,10 +1,14 @@
 {
-  "provider": "ollama",
-  "model": "qwen2.5:1.5b",
+  "provider": "groq",
+  "model": "openai/gpt-oss-120b",
   "chain": [
+    "groq",
+    "gemini",
     "ollama"
   ],
   "models": {
+    "groq": "openai/gpt-oss-120b",
+    "gemini": "gemini-3.6-flash",
     "ollama": "qwen2.5:1.5b"
   },
   "fell_back": null,

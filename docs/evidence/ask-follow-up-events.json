@@ -1,0 +1,621 @@
+[
+  {
+    "event": "session",
+    "session_id": "2b056d02-1b71-4685-8dff-1c7e84bccaa7"
+  },
+  {
+    "event": "run",
+    "type": "run",
+    "run_id": "49233696-56a7-4ba1-9f27-79da8dd07e59",
+    "trace_id": "4923369656a74ba19f2779da8dd07e59",
+    "trace_url": null
+  },
+  {
+    "event": "node",
+    "type": "node",
+    "node": "planner"
+  },
+  {
+    "event": "plan",
+    "type": "plan",
+    "intent": "investigate",
+    "specialists": [
+      "reconciliation",
+      "data_quality"
+    ],
+    "confidence": 0.65,
+    "rationale": "The question asks what to verify before reprocessing a day's data, which requires examining both deduplication/key drift and schema/volume checks, so both reconciliation and data_quality specialists are needed.",
+    "planned_by": "groq",
+    "scope": {
+      "date_from": "2026-06-01",
+      "date_to": "2026-06-21"
+    },
+    "needs_review": false
+  },
+  {
+    "event": "node",
+    "type": "node",
+    "node": "data_quality"
+  },
+  {
+    "event": "finding",
+    "type": "finding",
+    "specialist": "data_quality",
+    "finding_type": "schema_drift",
+    "severity": "S1",
+    "title": "S1003_20260616_0216_MOBILE.txt renamed channel_basket_id to basket_ref",
+    "affected_records": 82
+  },
+  {
+    "event": "finding",
+    "type": "finding",
+    "specialist": "data_quality",
+    "finding_type": "volume_anomaly",
+    "severity": "S2",
+    "title": "S1001 2026-06-18: 110 rows, 40% below its 7-day average",
+    "affected_records": 73
+  },
+  {
+    "event": "node",
+    "type": "node",
+    "node": "reconciliation"
+  },
+  {
+    "event": "finding",
+    "type": "finding",
+    "specialist": "reconciliation",
+    "finding_type": "duplicate_submission",
+    "severity": "S2",
+    "title": "Resent file S1002_20260612_1120_ECOMM.txt supersedes 88 rows",
+    "affected_records": 88
+  },
+  {
+    "event": "finding",
+    "type": "finding",
+    "specialist": "reconciliation",
+    "finding_type": "key_drift",
+    "severity": "S2",
+    "title": "LOC-0517 also reporting as OUT-1071 (3.0% of rows)",
+    "affected_records": 251
+  },
+  {
+    "event": "node",
+    "type": "node",
+    "node": "reporter"
+  },
+  {
+    "event": "report",
+    "type": "report",
+    "id": "204a8a64-dda2-4206-951a-3ce8f0012885",
+    "run_id": "b5444ae1-f162-41ff-8a82-28f65425be9c",
+    "finding_type": "schema_drift",
+    "specialist": "data_quality",
+    "severity": "S1",
+    "title": "S1003_20260616_0216_MOBILE.txt renamed channel_basket_id to basket_ref",
+    "problem_statement": "S1003_20260616_0216_MOBILE.txt (2026-06-16) does not match the raw.transactions contract: missing ['channel_basket_id'], unexpected ['basket_ref']. 82 rows landed with the missing column null; that column is part of the dedup key, so dedup cannot run for this batch.",
+    "affected_records": {
+      "count": 82,
+      "rate": null,
+      "detail": "82 records"
+    },
+    "root_cause_hypothesis": "The mobile team deployed a new export library that renamed the dedup\u2011key column `channel_basket_id` to `basket_ref`. The rename preserved the original value pattern (e.g., `BSK-` prefix), so the loader mapped the new column name to a missing target, leaving `channel_basket_id` null for 82 rows and causing the `validate_schema` contract violation.",
+    "recommended_fix": [
+      "Update the dbt contract for the `transactions` raw table to replace `channel_basket_id` with `basket_ref` (or add `basket_ref` as an alias).",
+      "Add a column mapping rule in the ingestion pipeline to copy `basket_ref` values into `channel_basket_id` for backward compatibility.",
+      "Backfill the missing `channel_basket_id` values for the 82 affected rows using the `basket_ref` values.",
+      "Communicate the schema change to the mobile team and require inclusion of a versioned schema descriptor in future file deliveries.",
+      "Add a monitoring alert on `validate_schema` failures for missing/extra columns to catch similar drifts earlier.",
+      "Document this rename in the schema\u2011drift runbook and reference INC-0438 as a precedent."
+    ],
+    "confidence": 0.95,
+    "confidence_label": "high",
+    "open_questions": [
+      "Will the mobile team continue to use `basket_ref` or revert to the original name in a later release?",
+      "Are there downstream processes that rely on the original `channel_basket_id` as the deduplication key and need code changes?",
+      "Is the rename reflected in any downstream analytics models that materialize on the raw table?",
+      "Do we need to version the contract to allow temporary dual\u2011column support?",
+      "What is the process for the mobile team to announce future schema changes?"
+    ],
+    "evidence": [
+      {
+        "source": "mcp:warehouse-metadata/get_table_stats",
+        "summary": "S1003_20260616_0216_MOBILE.txt header is missing ['channel_basket_id'] and has unexpected ['basket_ref']; 82 rows landed with the missing column null",
+        "data": {
+          "header": [
+            "outlet_id",
+            "location_id",
+            "transaction_id",
+            "upc_code",
+            "basket_ref",
+            "qty",
+            "amount",
+            "event_ts"
+          ],
+          "null_counts": {
+            "channel_basket_id": 82
+          }
+        }
+      },
+      {
+        "source": "mcp:warehouse-metadata/get_dbt_manifest",
+        "summary": "raw.transactions contract: amount, channel_basket_id, event_ts, location_id, outlet_id, qty, transaction_id, upc_code",
+        "data": {}
+      },
+      {
+        "source": "mcp:orchestration-metadata/get_failed_tasks",
+        "summary": "validate_schema failed on 2026-06-16: ContractViolation: S1003_20260616_0216_MOBILE.txt missing ['channel_basket_id']; unexpected ['basket_ref']",
+        "data": {
+          "state": "failed",
+          "run_id": "scheduled__2026-06-17T05:15:00Z",
+          "task_id": "validate_schema",
+          "business_date": "2026-06-16",
+          "first_error_line": "ContractViolation: S1003_20260616_0216_MOBILE.txt missing ['channel_basket_id']; unexpected ['basket_ref']"
+        }
+      }
+    ],
+    "sources": [
+      {
+        "chunk_id": "incidents/INC-0438-mobile-column-rename#problem-0",
+        "doc_id": "incidents/INC-0438-mobile-column-rename",
+        "title": "INC-0438: MOBILE file renamed a dedup-key column",
+        "section": "Problem"
+      },
+      {
+        "chunk_id": "runbooks/schema-drift#detecting-a-rename-vs-a-drop-0",
+        "doc_id": "runbooks/schema-drift",
+        "title": "Schema drift against the dbt contract",
+        "section": "Detecting a rename vs a drop"
+      },
+      {
+        "chunk_id": "runbooks/schema-drift#where-to-look-0",
+        "doc_id": "runbooks/schema-drift",
+        "title": "Schema drift against the dbt contract",
+        "section": "Where to look"
+      },
+      {
+        "chunk_id": "incidents/INC-0438-mobile-column-rename#root-cause-0",
+        "doc_id": "incidents/INC-0438-mobile-column-rename",
+        "title": "INC-0438: MOBILE file renamed a dedup-key column",
+        "section": "Root cause"
+      }
+    ],
+    "analysis_by": "model",
+    "needs_review": true,
+    "review_reason": "S1 findings always get a human sign-off",
+    "trace_url": null,
+    "status": "pending_review",
+    "review_note": null,
+    "seen_count": 3,
+    "repeat": true,
+    "template": {
+      "problem_statement": "S1003_20260616_0216_MOBILE.txt (2026-06-16) does not match the raw.transactions contract: missing ['channel_basket_id'], unexpected ['basket_ref']. 82 rows landed with the missing column null; that column is part of the dedup key, so dedup cannot run for this batch.",
+      "root_cause_hypothesis": "The submitter's export renamed channel_basket_id to basket_ref: one contracted column is missing and one similarly named column appeared in the same batch. The loader maps by name, so the rows landed with the column null. This matches the pattern in INC-0438.",
+      "recommended_fix": [
+        "Do not change the contract to match the file.",
+        "Ask S1003 to resend 2026-06-16 with the contracted header.",
+        "Reprocess the day once the resend lands; latest-file-wins supersedes the null-key rows."
+      ],
+      "open_questions": [
+        "Did the submitter ship a new export library or config?"
+      ],
+      "confidence": 0.8
+    },
+    "model_analysis": {
+      "problem_statement": "S1003_20260616_0216_MOBILE.txt (2026-06-16) does not match the raw.transactions contract: missing ['channel_basket_id'], unexpected ['basket_ref']. 82 rows landed with the missing column null; that column is part of the dedup key, so dedup cannot run for this batch.",
+      "root_cause_hypothesis": "The mobile team deployed a new export library that renamed the dedup\u2011key column `channel_basket_id` to `basket_ref`. The rename preserved the original value pattern (e.g., `BSK-` prefix), so the loader mapped the new column name to a missing target, leaving `channel_basket_id` null for 82 rows and causing the `validate_schema` contract violation.",
+      "recommended_fix": [
+        "Update the dbt contract for the `transactions` raw table to replace `channel_basket_id` with `basket_ref` (or add `basket_ref` as an alias).",
+        "Add a column mapping rule in the ingestion pipeline to copy `basket_ref` values into `channel_basket_id` for backward compatibility.",
+        "Backfill the missing `channel_basket_id` values for the 82 affected rows using the `basket_ref` values.",
+        "Communicate the schema change to the mobile team and require inclusion of a versioned schema descriptor in future file deliveries.",
+        "Add a monitoring alert on `validate_schema` failures for missing/extra columns to catch similar drifts earlier.",
+        "Document this rename in the schema\u2011drift runbook and reference INC-0438 as a precedent."
+      ],
+      "open_questions": [
+        "Will the mobile team continue to use `basket_ref` or revert to the original name in a later release?",
+        "Are there downstream processes that rely on the original `channel_basket_id` as the deduplication key and need code changes?",
+        "Is the rename reflected in any downstream analytics models that materialize on the raw table?",
+        "Do we need to version the contract to allow temporary dual\u2011column support?",
+        "What is the process for the mobile team to announce future schema changes?"
+      ],
+      "confidence": 0.95,
+      "provider": "groq",
+      "model": "openai/gpt-oss-120b",
+      "latency_ms": 2777,
+      "prompt_tokens": 1228,
+      "completion_tokens": 476,
+      "cost_usd": 0.0,
+      "prompt_version": "specialist-analysis@3",
+      "generated_at": "2026-09-19T19:00:40.800602Z"
+    }
+  },
+  {
+    "event": "report",
+    "type": "report",
+    "id": "67bc3814-3aba-4103-85dc-c1ae69748596",
+    "run_id": "b5444ae1-f162-41ff-8a82-28f65425be9c",
+    "finding_type": "key_drift",
+    "specialist": "reconciliation",
+    "severity": "S2",
+    "title": "LOC-0517 also reporting as OUT-1071 (3.0% of rows)",
+    "problem_statement": "Location LOC-0517 is reporting sales under two outlet ids: its canonical OUT-1017 and OUT-1071, which outlet_location_map does not map to it. 251 of 8373 deduplicated rows (3.0%) between 2026-06-01 and 2026-06-21 are affected, so store-level numbers for this location are split.",
+    "affected_records": {
+      "count": 251,
+      "rate": 0.03,
+      "detail": "251 records (3.0%)"
+    },
+    "root_cause_hypothesis": "The source system that feeds LOC-0517 transmitted transactions with an incorrect outlet header, using OUT-1071 instead of the canonical OUT-1017. This created a key\u2011drift condition where the same location_id appears under two outlet_ids in the immutable transactions layer, which is not reflected in the outlet_location_map.",
+    "recommended_fix": [
+      "Contact the 4 submitters (see metrics) to confirm which outlet_id (OUT-1017 or OUT-1071) is correct for LOC-0517.",
+      "Insert an alias record for the drifted id (OUT-1071) into the `outlet_alias` table with appropriate `valid_from` and `valid_to` timestamps.",
+      "Trigger a backfill of the staging model `stg_transactions` for the window 2026-06-01 to 2026-06-21, then rebuild `fct_daily_sales` for the same dates (follow the backfill runbook).",
+      "Ask the source system owner to correct the outlet header in future extracts and log the ticket number in the incident documentation."
+    ],
+    "confidence": 0.75,
+    "confidence_label": "high",
+    "open_questions": [
+      "Was the incorrect outlet_id ever introduced intentionally as a temporary alias, or is it purely a data entry error?",
+      "Are there any other locations that share the same drifted outlet_id (OUT-1071) in the same window?",
+      "What is the timeline for the source team to deploy the header fix, and does it require a schema change?",
+      "Do we need to adjust any downstream alert thresholds now that the alias will be added?"
+    ],
+    "evidence": [
+      {
+        "source": "mcp:warehouse-metadata/run_check",
+        "summary": "251 deduplicated rows (158 baskets) at LOC-0517 carry OUT-1071, which outlet_location_map does not map there; canonical is OUT-1017",
+        "data": {
+          "rows": 251,
+          "baskets": 158,
+          "last_seen": "2026-06-21",
+          "first_seen": "2026-06-01",
+          "submitters": 4,
+          "location_id": "LOC-0517",
+          "reported_outlet_id": "OUT-1071",
+          "canonical_outlet_id": "OUT-1017"
+        }
+      }
+    ],
+    "sources": [
+      {
+        "chunk_id": "runbooks/key-drift-outlet-location#why-it-matters-0",
+        "doc_id": "runbooks/key-drift-outlet-location",
+        "title": "Key drift between outlet_id and location_id",
+        "section": "Why it matters"
+      },
+      {
+        "chunk_id": "runbooks/key-drift-outlet-location#fix-0",
+        "doc_id": "runbooks/key-drift-outlet-location",
+        "title": "Key drift between outlet_id and location_id",
+        "section": "Fix"
+      },
+      {
+        "chunk_id": "runbooks/key-drift-outlet-location#overview-0",
+        "doc_id": "runbooks/key-drift-outlet-location",
+        "title": "Key drift between outlet_id and location_id",
+        "section": "Overview"
+      },
+      {
+        "chunk_id": "runbooks/key-drift-outlet-location#detection-0",
+        "doc_id": "runbooks/key-drift-outlet-location",
+        "title": "Key drift between outlet_id and location_id",
+        "section": "Detection"
+      }
+    ],
+    "analysis_by": "model",
+    "needs_review": false,
+    "review_reason": null,
+    "trace_url": null,
+    "status": "published",
+    "review_note": null,
+    "seen_count": 2,
+    "repeat": true,
+    "template": {
+      "problem_statement": "Location LOC-0517 is reporting sales under two outlet ids: its canonical OUT-1017 and OUT-1071, which outlet_location_map does not map to it. 251 of 8373 deduplicated rows (3.0%) between 2026-06-01 and 2026-06-21 are affected, so store-level numbers for this location are split.",
+      "root_cause_hypothesis": "Whole baskets (158) from 4 submitter(s) carry OUT-1071, so the id is set at the register or export profile rather than corrupted row by row; OUT-1071 looks like a transposition of OUT-1017.",
+      "recommended_fix": [
+        "Confirm the correct outlet id with the submitter before changing anything.",
+        "Add OUT-1071 -> OUT-1017 to outlet_alias for 2026-06-01 to 2026-06-21; never edit raw rows.",
+        "Rebuild stg_transactions and fct_daily_sales for the affected dates.",
+        "Ask the submitter to fix the export profile at source and record the ticket."
+      ],
+      "open_questions": [
+        "Which registers or export profiles carry the wrong id?",
+        "Did the drift start on 2026-06-01 or earlier than the scan window?"
+      ],
+      "confidence": 0.6
+    },
+    "model_analysis": {
+      "problem_statement": "Location LOC-0517 is reporting sales under two outlet ids: its canonical OUT-1017 and OUT-1071, which outlet_location_map does not map to it. 251 of 8373 deduplicated rows (3.0%) between 2026-06-01 and 2026-06-21 are affected, so store-level numbers for this location are split.",
+      "root_cause_hypothesis": "The source system that feeds LOC-0517 transmitted transactions with an incorrect outlet header, using OUT-1071 instead of the canonical OUT-1017. This created a key\u2011drift condition where the same location_id appears under two outlet_ids in the immutable transactions layer, which is not reflected in the outlet_location_map.",
+      "recommended_fix": [
+        "Contact the 4 submitters (see metrics) to confirm which outlet_id (OUT-1017 or OUT-1071) is correct for LOC-0517.",
+        "Insert an alias record for the drifted id (OUT-1071) into the `outlet_alias` table with appropriate `valid_from` and `valid_to` timestamps.",
+        "Trigger a backfill of the staging model `stg_transactions` for the window 2026-06-01 to 2026-06-21, then rebuild `fct_daily_sales` for the same dates (follow the backfill runbook).",
+        "Ask the source system owner to correct the outlet header in future extracts and log the ticket number in the incident documentation."
+      ],
+      "open_questions": [
+        "Was the incorrect outlet_id ever introduced intentionally as a temporary alias, or is it purely a data entry error?",
+        "Are there any other locations that share the same drifted outlet_id (OUT-1071) in the same window?",
+        "What is the timeline for the source team to deploy the header fix, and does it require a schema change?",
+        "Do we need to adjust any downstream alert thresholds now that the alias will be added?"
+      ],
+      "confidence": 0.75,
+      "provider": "groq",
+      "model": "openai/gpt-oss-120b",
+      "latency_ms": 1221,
+      "prompt_tokens": 1177,
+      "completion_tokens": 400,
+      "cost_usd": 0.0,
+      "prompt_version": "specialist-analysis@3",
+      "generated_at": "2026-09-19T19:00:42.020038Z"
+    }
+  },
+  {
+    "event": "report",
+    "type": "report",
+    "id": "5edc8849-0a62-4a13-9acc-7848ca9937ec",
+    "run_id": "b5444ae1-f162-41ff-8a82-28f65425be9c",
+    "finding_type": "duplicate_submission",
+    "specialist": "reconciliation",
+    "severity": "S2",
+    "title": "Resent file S1002_20260612_1120_ECOMM.txt supersedes 88 rows",
+    "problem_statement": "S1002 resent its 2026-06-12 file. S1002_20260612_1120_ECOMM.txt repeats 88 dedup keys from S1002_20260612_0304_ECOMM.txt, and 3 of them carry a different qty or amount. The resend landed after that night's DAG run, so the superseded rows reached fct_daily_sales.",
+    "affected_records": {
+      "count": 88,
+      "rate": null,
+      "detail": "88 records"
+    },
+    "root_cause_hypothesis": "The submitter (S1002) re\u2011exported the ECOMM file later in the day (12:20) after an earlier export (03:04) was already landed. Because the DAG\u2019s dedupe step uses a \"latest\u2011file\u2011wins\" rule based on the HHMM suffix, the newer file superseded 88 transaction keys, but the resend arrived after the retail_txn_daily DAG run had already completed, so the deduplication for that business date did not re\u2011run. This left the older rows in the downstream tables and caused duplicate counts for 88 records, with three of them having changed quantity/amount values.",
+    "recommended_fix": [
+      "Land the corrected file (S1002_20260612_1120_ECOMM.txt) with the later HHMM suffix as already done.",
+      "Trigger a reprocess of the retail_txn_daily DAG for business date 2026-06-12 with the `reprocess=true` flag to force dedupe_transactions to run again.",
+      "Validate that dedupe now picks the newer file and that the three changed rows reflect the corrected qty/amount.",
+      "Run publish_metrics and compare the output to the file trailer to ensure counts match.",
+      "Document the incident in the ledger, referencing this analysis and the approval chain.",
+      "Update the submitter\u2019s export SOP to include a check that resends are sent before the daily DAG completes, or to send a \u201creprocess\u201d request automatically."
+    ],
+    "confidence": 0.9,
+    "confidence_label": "high",
+    "open_questions": [
+      "Why did the resend land after the DAG run completed \u2013 was there a scheduling or network delay?",
+      "Does the submitter have visibility into the DAG schedule to avoid post\u2011run resends?",
+      "Are there any other files for the same business date that may have been resent but not yet reprocessed?",
+      "Can we automate a trigger that detects a later\u2011timestamp file and auto\u2011reprocesses the day?",
+      "What monitoring alerts could be added to flag landings after DAG completion?"
+    ],
+    "evidence": [
+      {
+        "source": "mcp:warehouse-metadata/run_check",
+        "summary": "88 keys in S1002_20260612_0304_ECOMM.txt are superseded by S1002_20260612_1120_ECOMM.txt; 3 changed qty or amount",
+        "data": {
+          "changed_rows": 3,
+          "winning_file": "S1002_20260612_1120_ECOMM.txt",
+          "business_date": "2026-06-12",
+          "superseded_file": "S1002_20260612_0304_ECOMM.txt",
+          "superseded_rows": 88
+        }
+      },
+      {
+        "source": "mcp:orchestration-metadata/list_dag_runs",
+        "summary": "retail_txn_daily for 2026-06-12 finished at 2026-06-13T05:36:38Z; the resend landed after it",
+        "data": {}
+      }
+    ],
+    "sources": [
+      {
+        "chunk_id": "runbooks/duplicate-submissions#overview-0",
+        "doc_id": "runbooks/duplicate-submissions",
+        "title": "Duplicate submissions and the latest-file-wins rule",
+        "section": "Overview"
+      },
+      {
+        "chunk_id": "incidents/INC-0438-mobile-column-rename#fix-0",
+        "doc_id": "incidents/INC-0438-mobile-column-rename",
+        "title": "INC-0438: MOBILE file renamed a dedup-key column",
+        "section": "Fix"
+      },
+      {
+        "chunk_id": "runbooks/backfills-and-reprocessing#reprocessing-a-day-0",
+        "doc_id": "runbooks/backfills-and-reprocessing",
+        "title": "Backfills and reprocessing",
+        "section": "Reprocessing a day"
+      },
+      {
+        "chunk_id": "runbooks/duplicate-submissions#things-to-check-0",
+        "doc_id": "runbooks/duplicate-submissions",
+        "title": "Duplicate submissions and the latest-file-wins rule",
+        "section": "Things to check"
+      }
+    ],
+    "analysis_by": "model",
+    "needs_review": false,
+    "review_reason": null,
+    "trace_url": null,
+    "status": "published",
+    "review_note": null,
+    "seen_count": 2,
+    "repeat": true,
+    "template": {
+      "problem_statement": "S1002 resent its 2026-06-12 file. S1002_20260612_1120_ECOMM.txt repeats 88 dedup keys from S1002_20260612_0304_ECOMM.txt, and 3 of them carry a different qty or amount. The resend landed after that night's DAG run, so the superseded rows reached fct_daily_sales.",
+      "root_cause_hypothesis": "A deliberate correction: 3 rows changed qty or amount, so the later file is the one to trust. It landed after dedupe_transactions had run, so nothing removed the older copies before publish. This matches the pattern in INC-0438.",
+      "recommended_fix": [
+        "Reprocess 2026-06-12 with reprocess=true so dedupe_transactions runs again and the latest file wins.",
+        "Check publish_metrics against the resend's trailer count.",
+        "Tell finance how many rows changed value, not just how many were duplicated."
+      ],
+      "open_questions": [
+        "Why did S1002 resend: correction or re-run?"
+      ],
+      "confidence": 0.75
+    },
+    "model_analysis": {
+      "problem_statement": "S1002 resent its 2026-06-12 file. S1002_20260612_1120_ECOMM.txt repeats 88 dedup keys from S1002_20260612_0304_ECOMM.txt, and 3 of them carry a different qty or amount. The resend landed after that night's DAG run, so the superseded rows reached fct_daily_sales.",
+      "root_cause_hypothesis": "The submitter (S1002) re\u2011exported the ECOMM file later in the day (12:20) after an earlier export (03:04) was already landed. Because the DAG\u2019s dedupe step uses a \"latest\u2011file\u2011wins\" rule based on the HHMM suffix, the newer file superseded 88 transaction keys, but the resend arrived after the retail_txn_daily DAG run had already completed, so the deduplication for that business date did not re\u2011run. This left the older rows in the downstream tables and caused duplicate counts for 88 records, with three of them having changed quantity/amount values.",
+      "recommended_fix": [
+        "Land the corrected file (S1002_20260612_1120_ECOMM.txt) with the later HHMM suffix as already done.",
+        "Trigger a reprocess of the retail_txn_daily DAG for business date 2026-06-12 with the `reprocess=true` flag to force dedupe_transactions to run again.",
+        "Validate that dedupe now picks the newer file and that the three changed rows reflect the corrected qty/amount.",
+        "Run publish_metrics and compare the output to the file trailer to ensure counts match.",
+        "Document the incident in the ledger, referencing this analysis and the approval chain.",
+        "Update the submitter\u2019s export SOP to include a check that resends are sent before the daily DAG completes, or to send a \u201creprocess\u201d request automatically."
+      ],
+      "open_questions": [
+        "Why did the resend land after the DAG run completed \u2013 was there a scheduling or network delay?",
+        "Does the submitter have visibility into the DAG schedule to avoid post\u2011run resends?",
+        "Are there any other files for the same business date that may have been resent but not yet reprocessed?",
+        "Can we automate a trigger that detects a later\u2011timestamp file and auto\u2011reprocesses the day?",
+        "What monitoring alerts could be added to flag landings after DAG completion?"
+      ],
+      "confidence": 0.9,
+      "provider": "groq",
+      "model": "openai/gpt-oss-120b",
+      "latency_ms": 1358,
+      "prompt_tokens": 1146,
+      "completion_tokens": 484,
+      "cost_usd": 0.0,
+      "prompt_version": "specialist-analysis@3",
+      "generated_at": "2026-09-19T19:00:42.019877Z"
+    }
+  },
+  {
+    "event": "report",
+    "type": "report",
+    "id": "bb191f93-c558-40f9-8708-b1e5d6442158",
+    "run_id": "b5444ae1-f162-41ff-8a82-28f65425be9c",
+    "finding_type": "volume_anomaly",
+    "specialist": "data_quality",
+    "severity": "S2",
+    "title": "S1001 2026-06-18: 110 rows, 40% below its 7-day average",
+    "problem_statement": "S1001's 2026-06-18 file S1001_20260618_0638_POSFEED.txt has 110 rows, 40% below its trailing 7-day average of 182.6, and it landed 161 minutes after the submitter SLA.",
+    "affected_records": {
+      "count": 73,
+      "rate": -0.397,
+      "detail": "73 records (39.7%)"
+    },
+    "root_cause_hypothesis": "The POSFEED file for submitter S1001 on 2026-06-18 was truncated during ingestion, resulting in only 110 rows (\u224840% below the 7\u2011day trailing average of 182.6). The sensor `wait_for_submitter_files` timed\u2011out after 5400\u202fs (median 120\u202fs), indicating the file did not arrive in full within the expected window, and it landed 161\u202fminutes after the 04:00 SLA. This pattern matches the known failure mode documented in runbook volume\u2011anomalies (truncated file) and mirrors incident INC\u20110451 where a similar drop was caused by a transfer truncation.",
+    "recommended_fix": [
+      "Open a ticket with the upstream submitter (S1001) requesting a full resend of the 2026\u201106\u201118 POSFEED file.",
+      "Validate the checksum/row count of the resent file against expected trailing average before ingestion.",
+      "Re\u2011process the day\u2019s data using the normal pipeline after the full file is landed.",
+      "Update the ingestion logs to flag the 2026\u201106\u201118 run as a manual\u2011override for audit purposes.",
+      "If the file cannot be resent, mark the day as a \u201cstore\u2011offline\u201d exception so the trailing average calculation excludes it, preventing future bias."
+    ],
+    "confidence": 0.8,
+    "confidence_label": "high",
+    "open_questions": [
+      "What caused the original transfer to truncate \u2013 network interruption, S3 multipart upload timeout, or source system bug?",
+      "Why did the sensor duration balloon to 5400\u202fs \u2013 was there a back\u2011off/retry loop that masked the failure?",
+      "Are there other submitters showing similar latency or truncation patterns in the same window?",
+      "Is the SLA enforcement (04:00) aligned with the submitter\u2019s production schedule, or does it need adjustment?"
+    ],
+    "evidence": [
+      {
+        "source": "mcp:warehouse-metadata/get_table_stats",
+        "summary": "S1001_20260618_0638_POSFEED.txt has 110 rows against a trailing average of 182.6",
+        "data": {}
+      },
+      {
+        "source": "mcp:orchestration-metadata/get_timing_history",
+        "summary": "wait_for_submitter_files took 5400s on 2026-06-18 (median 120.0s); file landed 161 minutes after the 04:00 SLA",
+        "data": {}
+      }
+    ],
+    "sources": [
+      {
+        "chunk_id": "runbooks/severity-and-escalation#overview-0",
+        "doc_id": "runbooks/severity-and-escalation",
+        "title": "Finding severity rubric and escalation",
+        "section": "Overview"
+      },
+      {
+        "chunk_id": "incidents/INC-0451-posfeed-truncated-file#problem-0",
+        "doc_id": "incidents/INC-0451-posfeed-truncated-file",
+        "title": "INC-0451: POSFEED file truncated in transfer",
+        "section": "Problem"
+      },
+      {
+        "chunk_id": "runbooks/volume-anomalies#fix-0",
+        "doc_id": "runbooks/volume-anomalies",
+        "title": "Volume anomalies",
+        "section": "Fix"
+      },
+      {
+        "chunk_id": "runbooks/volume-anomalies#method-0",
+        "doc_id": "runbooks/volume-anomalies",
+        "title": "Volume anomalies",
+        "section": "Method"
+      }
+    ],
+    "analysis_by": "model",
+    "needs_review": false,
+    "review_reason": null,
+    "trace_url": null,
+    "status": "published",
+    "review_note": null,
+    "seen_count": 2,
+    "repeat": true,
+    "template": {
+      "problem_statement": "S1001's 2026-06-18 file S1001_20260618_0638_POSFEED.txt has 110 rows, 40% below its trailing 7-day average of 182.6, and it landed 161 minutes after the submitter SLA.",
+      "root_cause_hypothesis": "A late and light file together is the signature of a truncated upstream export: the transfer shipped whatever was there once its retry window ran out. This matches the pattern in INC-0451.",
+      "recommended_fix": [
+        "Check whether the drop is spread across all outlets (truncation) or a few (stores offline).",
+        "Compare the loaded row count with the file trailer.",
+        "If truncated, request a full resend from S1001 and reprocess 2026-06-18."
+      ],
+      "open_questions": [
+        "Was it a known low day (holiday, planned closures)?",
+        "Is the drop spread evenly across outlets?"
+      ],
+      "confidence": 0.65
+    },
+    "model_analysis": {
+      "problem_statement": "S1001's 2026-06-18 file S1001_20260618_0638_POSFEED.txt has 110 rows, 40% below its trailing 7-day average of 182.6, and it landed 161 minutes after the submitter SLA.",
+      "root_cause_hypothesis": "The POSFEED file for submitter S1001 on 2026-06-18 was truncated during ingestion, resulting in only 110 rows (\u224840% below the 7\u2011day trailing average of 182.6). The sensor `wait_for_submitter_files` timed\u2011out after 5400\u202fs (median 120\u202fs), indicating the file did not arrive in full within the expected window, and it landed 161\u202fminutes after the 04:00 SLA. This pattern matches the known failure mode documented in runbook volume\u2011anomalies (truncated file) and mirrors incident INC\u20110451 where a similar drop was caused by a transfer truncation.",
+      "recommended_fix": [
+        "Open a ticket with the upstream submitter (S1001) requesting a full resend of the 2026\u201106\u201118 POSFEED file.",
+        "Validate the checksum/row count of the resent file against expected trailing average before ingestion.",
+        "Re\u2011process the day\u2019s data using the normal pipeline after the full file is landed.",
+        "Update the ingestion logs to flag the 2026\u201106\u201118 run as a manual\u2011override for audit purposes.",
+        "If the file cannot be resent, mark the day as a \u201cstore\u2011offline\u201d exception so the trailing average calculation excludes it, preventing future bias."
+      ],
+      "open_questions": [
+        "What caused the original transfer to truncate \u2013 network interruption, S3 multipart upload timeout, or source system bug?",
+        "Why did the sensor duration balloon to 5400\u202fs \u2013 was there a back\u2011off/retry loop that masked the failure?",
+        "Are there other submitters showing similar latency or truncation patterns in the same window?",
+        "Is the SLA enforcement (04:00) aligned with the submitter\u2019s production schedule, or does it need adjustment?"
+      ],
+      "confidence": 0.8,
+      "provider": "groq",
+      "model": "openai/gpt-oss-120b",
+      "latency_ms": 1528,
+      "prompt_tokens": 1301,
+      "completion_tokens": 478,
+      "cost_usd": 0.0,
+      "prompt_version": "specialist-analysis@3",
+      "generated_at": "2026-09-19T19:00:40.802437Z"
+    }
+  },
+  {
+    "event": "summary",
+    "type": "summary",
+    "headline": "S1 Incident: Schema mismatch in S1003_20260616_0216_MOBILE.txt blocks deduplication",
+    "summary": "The most severe issue is an S1 incident where file S1003_20260616_0216_MOBILE.txt (2026-06-16) failed the raw.transactions contract due to a renamed column: missing ['channel_basket_id'] and unexpected ['basket_ref']. As a result, 82 rows landed with a null dedup key column, blocking deduplication for the batch.\n\nAdditional S2 incidents were also identified:\n- Location LOC-0517 reported under two outlet IDs (canonical OUT-1017 and unmapped OUT-1071), splitting store-level numbers across 251 of 8373 deduplicated rows (3.0%) between 2026-06-01 and 2026-06-21.\n- Resent file S1002_20260612_1120_ECOMM.txt repeated 88 dedup keys from S1002_20260612_0304_ECOMM.txt (with 3 carrying different qty or amount values), causing superseded rows to reach fct_daily_sales after landing past the nightly DAG run.\n- File S1001_20260618_0638_POSFEED.txt contained 110 rows, which is 40% below its trailing 7-day average of 182.6, and arrived 161 minutes after the submitter SLA."
+  },
+  {
+    "event": "node",
+    "type": "node",
+    "node": "finalize"
+  },
+  {
+    "event": "done",
+    "type": "done",
+    "run_id": "49233696-56a7-4ba1-9f27-79da8dd07e59",
+    "latency_ms": 23775,
+    "trace_url": null,
+    "llm_calls": 6,
+    "tool_calls": 30,
+    "prompt_tokens": 6419,
+    "completion_tokens": 2243,
+    "cost_usd": 0.0
+  }
+]

@@ -1,0 +1,150 @@
+{
+  "status_code": 200,
+  "body": {
+    "id": "204a8a64-dda2-4206-951a-3ce8f0012885",
+    "title": "S1003_20260616_0216_MOBILE.txt renamed channel_basket_id to basket_ref",
+    "repeat": false,
+    "run_id": "b5444ae1-f162-41ff-8a82-28f65425be9c",
+    "status": "pending_review",
+    "sources": [
+      {
+        "chunk_id": "incidents/INC-0438-mobile-column-rename#problem-0",
+        "doc_id": "incidents/INC-0438-mobile-column-rename",
+        "title": "INC-0438: MOBILE file renamed a dedup-key column",
+        "section": "Problem"
+      },
+      {
+        "chunk_id": "runbooks/schema-drift#detecting-a-rename-vs-a-drop-0",
+        "doc_id": "runbooks/schema-drift",
+        "title": "Schema drift against the dbt contract",
+        "section": "Detecting a rename vs a drop"
+      },
+      {
+        "chunk_id": "runbooks/schema-drift#where-to-look-0",
+        "doc_id": "runbooks/schema-drift",
+        "title": "Schema drift against the dbt contract",
+        "section": "Where to look"
+      },
+      {
+        "chunk_id": "incidents/INC-0438-mobile-column-rename#root-cause-0",
+        "doc_id": "incidents/INC-0438-mobile-column-rename",
+        "title": "INC-0438: MOBILE file renamed a dedup-key column",
+        "section": "Root cause"
+      }
+    ],
+    "evidence": [
+      {
+        "data": {
+          "header": [
+            "outlet_id",
+            "location_id",
+            "transaction_id",
+            "upc_code",
+            "basket_ref",
+            "qty",
+            "amount",
+            "event_ts"
+          ],
+          "null_counts": {
+            "channel_basket_id": 82
+          }
+        },
+        "source": "mcp:warehouse-metadata/get_table_stats",
+        "summary": "S1003_20260616_0216_MOBILE.txt header is missing ['channel_basket_id'] and has unexpected ['basket_ref']; 82 rows landed with the missing column null"
+      },
+      {
+        "data": {},
+        "source": "mcp:warehouse-metadata/get_dbt_manifest",
+        "summary": "raw.transactions contract: amount, channel_basket_id, event_ts, location_id, outlet_id, qty, transaction_id, upc_code"
+      },
+      {
+        "data": {
+          "state": "failed",
+          "run_id": "scheduled__2026-06-17T05:15:00Z",
+          "task_id": "validate_schema",
+          "business_date": "2026-06-16",
+          "first_error_line": "ContractViolation: S1003_20260616_0216_MOBILE.txt missing ['channel_basket_id']; unexpected ['basket_ref']"
+        },
+        "source": "mcp:orchestration-metadata/get_failed_tasks",
+        "summary": "validate_schema failed on 2026-06-16: ContractViolation: S1003_20260616_0216_MOBILE.txt missing ['channel_basket_id']; unexpected ['basket_ref']"
+      }
+    ],
+    "severity": "S1",
+    "template": {
+      "problem_statement": "S1003_20260616_0216_MOBILE.txt (2026-06-16) does not match the raw.transactions contract: missing ['channel_basket_id'], unexpected ['basket_ref']. 82 rows landed with the missing column null; that column is part of the dedup key, so dedup cannot run for this batch.",
+      "root_cause_hypothesis": "The submitter's export renamed channel_basket_id to basket_ref: one contracted column is missing and one similarly named column appeared in the same batch. The loader maps by name, so the rows landed with the column null. This matches the pattern in INC-0438.",
+      "recommended_fix": [
+        "Do not change the contract to match the file.",
+        "Ask S1003 to resend 2026-06-16 with the contracted header.",
+        "Reprocess the day once the resend lands; latest-file-wins supersedes the null-key rows."
+      ],
+      "open_questions": [
+        "Did the submitter ship a new export library or config?"
+      ],
+      "confidence": 0.8
+    },
+    "trace_url": null,
+    "confidence": 0.95,
+    "seen_count": 3,
+    "specialist": "data_quality",
+    "analysis_by": "model",
+    "review_note": null,
+    "finding_type": "schema_drift",
+    "needs_review": true,
+    "review_reason": "S1 findings always get a human sign-off",
+    "model_analysis": {
+      "problem_statement": "S1003_20260616_0216_MOBILE.txt (2026-06-16) does not match the raw.transactions contract: missing ['channel_basket_id'], unexpected ['basket_ref']. 82 rows landed with the missing column null; that column is part of the dedup key, so dedup cannot run for this batch.",
+      "root_cause_hypothesis": "The submitter S1003 (MOBILE channel) updated their file export formatting and renamed the field `channel_basket_id` to `basket_ref` in `S1003_20260616_0216_MOBILE.txt`. Because the loader maps input data by exact header names against the `raw.transactions` schema contract, the 82 incoming records landed with `channel_basket_id` as NULL. This triggered a `ContractViolation` failure during the `validate_schema` task in the `retail_txn_daily` DAG. Since `channel_basket_id` is part of the deduplication key, this schema drift breaks downstream data integrity, similar to past incident INC-0438.",
+      "recommended_fix": [
+        "Check the logs for `validate_schema` task in the `retail_txn_daily` DAG to verify the affected file `S1003_20260616_0216_MOBILE.txt`.",
+        "Verify the value profile of `basket_ref` in the staged raw file against `runbooks/schema-drift.md` (e.g., verifying 'BSK-' prefix patterns) to confirm it matches the historical `channel_basket_id` data.",
+        "Contact submitter S1003 / the mobile engineering team to confirm whether `basket_ref` is a permanent schema rename or an accidental release regression.",
+        "If temporary/accidental, work with the submitter to re-issue the file `S1003_20260616_0216_MOBILE.txt` with the required `channel_basket_id` column header.",
+        "If permanent, update the downstream ingestion mapping / dbt contract for the MOBILE file source to alias `basket_ref` to `channel_basket_id` prior to deduplication.",
+        "Backfill or re-ingest the 82 affected records from `S1003_20260616_0216_MOBILE.txt` so `channel_basket_id` is properly populated for business date 2026-06-16."
+      ],
+      "open_questions": [
+        "Is `basket_ref` a permanent header change by submitter S1003 or a temporary file generation bug?",
+        "Do values in `basket_ref` adhere to the expected `BSK-` format and string length of `channel_basket_id` as outlined in `runbooks/schema-drift.md`?",
+        "Are other pending or upcoming MOBILE channel export files for business date 2026-06-16 also affected by this header change?"
+      ],
+      "confidence": 0.95,
+      "provider": "gemini",
+      "model": "gemini-3.6-flash",
+      "latency_ms": 4239,
+      "prompt_tokens": 1344,
+      "completion_tokens": 630,
+      "cost_usd": 0.0,
+      "prompt_version": "specialist-analysis@3",
+      "generated_at": "2026-09-19T19:01:41.930726Z"
+    },
+    "open_questions": [
+      "Is `basket_ref` a permanent header change by submitter S1003 or a temporary file generation bug?",
+      "Do values in `basket_ref` adhere to the expected `BSK-` format and string length of `channel_basket_id` as outlined in `runbooks/schema-drift.md`?",
+      "Are other pending or upcoming MOBILE channel export files for business date 2026-06-16 also affected by this header change?"
+    ],
+    "recommended_fix": [
+      "Check the logs for `validate_schema` task in the `retail_txn_daily` DAG to verify the affected file `S1003_20260616_0216_MOBILE.txt`.",
+      "Verify the value profile of `basket_ref` in the staged raw file against `runbooks/schema-drift.md` (e.g., verifying 'BSK-' prefix patterns) to confirm it matches the historical `channel_basket_id` data.",
+      "Contact submitter S1003 / the mobile engineering team to confirm whether `basket_ref` is a permanent schema rename or an accidental release regression.",
+      "If temporary/accidental, work with the submitter to re-issue the file `S1003_20260616_0216_MOBILE.txt` with the required `channel_basket_id` column header.",
+      "If permanent, update the downstream ingestion mapping / dbt contract for the MOBILE file source to alias `basket_ref` to `channel_basket_id` prior to deduplication.",
+      "Backfill or re-ingest the 82 affected records from `S1003_20260616_0216_MOBILE.txt` so `channel_basket_id` is properly populated for business date 2026-06-16."
+    ],
+    "affected_records": {
+      "rate": null,
+      "count": 82,
+      "detail": "82 records"
+    },
+    "confidence_label": "high",
+    "problem_statement": "S1003_20260616_0216_MOBILE.txt (2026-06-16) does not match the raw.transactions contract: missing ['channel_basket_id'], unexpected ['basket_ref']. 82 rows landed with the missing column null; that column is part of the dedup key, so dedup cannot run for this batch.",
+    "root_cause_hypothesis": "The submitter S1003 (MOBILE channel) updated their file export formatting and renamed the field `channel_basket_id` to `basket_ref` in `S1003_20260616_0216_MOBILE.txt`. Because the loader maps input data by exact header names against the `raw.transactions` schema contract, the 82 incoming records landed with `channel_basket_id` as NULL. This triggered a `ContractViolation` failure during the `validate_schema` task in the `retail_txn_daily` DAG. Since `channel_basket_id` is part of the deduplication key, this schema drift breaks downstream data integrity, similar to past incident INC-0438.",
+    "fingerprint": "schema_drift:S1003_20260616_0216_MOBILE.txt renamed channel_basket_id to basket_ref",
+    "duplicate_of": null,
+    "last_seen_at": "2026-09-19T19:01:33.529424+00:00",
+    "review_decision": null,
+    "reviewed_by": null,
+    "reviewed_at": null,
+    "created_at": "2026-09-19T19:00:42.032929+00:00"
+  }
+}

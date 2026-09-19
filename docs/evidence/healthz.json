@@ -4,9 +4,13 @@
   "chunks": 86,
   "retriever": "hybrid",
   "llm_providers": [
+    "groq",
+    "gemini",
     "ollama"
   ],
   "llm_models": {
+    "groq": "openai/gpt-oss-120b",
+    "gemini": "gemini-3.6-flash",
     "ollama": "qwen2.5:1.5b"
   },
   "database": true

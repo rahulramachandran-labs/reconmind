@@ -3,8 +3,11 @@
     make dev                                            # in another terminal
     uv run python scripts/capture_readme_evidence.py
 
-Runs one scan and two chat questions against the API, saves what came back to
-docs/evidence/, runs the test suite for its counts and coverage, and writes
+Plays the scenarios a reviewer would try against the API: a scan, an
+investigation question, a runbook question and a follow-up in the same session,
+the S1 written up again by the model and signed off by a person, and a second
+scan that must not duplicate anything. Saves what came back to docs/evidence/,
+runs the test suite for its counts and coverage, and writes
 docs/evidence/README.md saying when, on which commit and with which model it
 was captured. Every number in the README's Results section comes from here.
 
@@ -29,6 +32,7 @@ import httpx
 ROOT = Path(__file__).resolve().parent.parent
 MOBILE_QUESTION = "Did the MOBILE file have a schema problem on 2026-06-16?"
 RUNBOOK_QUESTION = "Which file wins when a submitter resends the same day?"
+FOLLOW_UP = "What should we check before reprocessing that day?"
 TEST_LAYERS = {
     "unit": ["tests/unit"],
     "integration": ["tests/integration"],
@@ -52,11 +56,14 @@ def wait_for_run(api: httpx.Client, run_id: str, timeout_s: float = 900) -> dict
     raise SystemExit(f"run {run_id} still running after {timeout_s:.0f}s")
 
 
-def stream_question(api: httpx.Client, question: str) -> list[dict[str, Any]]:
+def stream_question(
+    api: httpx.Client, question: str, session_id: str | None = None
+) -> list[dict[str, Any]]:
     """POST /chat/stream and collect the server-sent events in order."""
     events: list[dict[str, Any]] = []
     name = None
-    with api.stream("POST", "/chat/stream", json={"question": question}, timeout=900) as res:
+    body = {"question": question} | ({"session_id": session_id} if session_id else {})
+    with api.stream("POST", "/chat/stream", json=body, timeout=900) as res:
         res.raise_for_status()
         for line in res.iter_lines():
             if line.startswith("event:"):
@@ -82,6 +89,11 @@ def usage(run: dict[str, Any]) -> dict[str, Any]:
         "cost_usd": round(sum(s["cost_usd"] or 0 for s in llm), 6),
         "models": sorted({f"{s['provider']}/{s['model']}" for s in llm if s["provider"]}),
     }
+
+
+def written_by(report: dict[str, Any]) -> str:
+    m = report.get("model_analysis")
+    return f"{m['provider']}/{m['model']}" if m else "template"
 
 
 def run_tests(out: Path) -> dict[str, Any]:
@@ -200,8 +212,15 @@ def main() -> None:
     print("scan:", run_id, scan["status"], f"{scan_wall_s}s", file=sys.stderr)
 
     asked = {}
-    for slug, question in (("ask-mobile", MOBILE_QUESTION), ("ask-runbook", RUNBOOK_QUESTION)):
-        events = stream_question(api, question)
+    session = None
+    for slug, question in (
+        ("ask-mobile", MOBILE_QUESTION),
+        ("ask-runbook", RUNBOOK_QUESTION),
+        ("ask-follow-up", FOLLOW_UP),
+    ):
+        # the follow-up continues the runbook question's session, so memory is exercised
+        events = stream_question(api, question, session if slug == "ask-follow-up" else None)
+        session = next(e["session_id"] for e in events if e["event"] == "session")
         ask_run_id = next(e["run_id"] for e in events if e["event"] == "run")
         ask_run = wait_for_run(api, ask_run_id)
         save(out, f"{slug}-events.json", events)
@@ -213,6 +232,24 @@ def main() -> None:
             **usage(ask_run),
         }
         print(slug, ask_run_id, ask_run["status"], file=sys.stderr)
+
+    # the S1 waits for a person: have the model write it up again, then sign it off
+    s1 = next(r for r in reports if r["severity"] == "S1")
+    regen = api.post(f"/incidents/{s1['id']}/regenerate", timeout=900)
+    save(out, "regenerate-s1.json", {"status_code": regen.status_code, "body": regen.json()})
+    decision = api.post(
+        f"/review/reports/{s1['id']}",
+        json={"decision": "approve", "note": "Resend requested from S1003"},
+        headers={"X-Reviewer": "evidence-capture"},
+        timeout=900,
+    ).json()
+    save(out, "review-s1.json", decision)
+    # a second scan sees the same four findings: counted again, nothing new, nothing paused
+    rescan = wait_for_run(api, api.post("/scan").json()["run_id"])
+    save(out, "rescan-run.json", rescan)
+    after = api.get("/incidents").json()
+    save(out, "incidents-after.json", after)
+    print("regenerate:", regen.status_code, "review:", decision.get("status"), file=sys.stderr)
 
     expected = json.loads((ROOT / "data" / "sample" / "expected_anomalies.json").read_text())
     summary: dict[str, Any] = {
@@ -235,12 +272,32 @@ def main() -> None:
                     "status": r["status"],
                     "affected_records": r["affected_records"]["count"],
                     "analysis_by": r["analysis_by"],
+                    "written_by": written_by(r),
                     "planted": expected.get(r["finding_type"]),
                 }
                 for r in reports
             ],
         },
         "questions": asked,
+        "regenerate_s1": {
+            "status_code": regen.status_code,
+            "analysis_by": regen.json().get("analysis_by"),
+            "model_analysis": {
+                k: (regen.json().get("model_analysis") or {}).get(k)
+                for k in ("provider", "model", "latency_ms", "prompt_tokens", "completion_tokens")
+            },
+        },
+        "review_s1": decision,
+        "rescan": {
+            "run_id": rescan["id"],
+            "status": rescan["status"],
+            "summary": (rescan.get("summary") or "").splitlines()[0],
+            **usage(rescan),
+        },
+        "feed_after": [
+            {k: r.get(k) for k in ("severity", "title", "status", "seen_count", "analysis_by")}
+            for r in after
+        ],
         "ragas": ragas_rows(),
         "ci": latest_ci(),
     }
@@ -277,21 +334,31 @@ def write_readme(out: Path, s: dict[str, Any]) -> None:
     ]
     for slug, q in s["questions"].items():
         lines.append(f"| {slug} run | `{q['run_id']}` ({q['status']}): {q['question']} |")
+    if rg := s.get("regenerate_s1"):
+        m = rg["model_analysis"]
+        lines.append(
+            f"| S1 written up again | HTTP {rg['status_code']}, `analysis_by: {rg['analysis_by']}`"
+            f", {m['provider']}/{m['model']}, {m['latency_ms']} ms |"
+        )
+    if rv := s.get("review_s1"):
+        outcome = ", ".join(f"{o['decision']} -> {o['status']}" for o in rv.get("outcome", []))
+        lines.append(f"| S1 signed off | run {rv.get('status')}: {outcome} |")
+    if rs := s.get("rescan"):
+        lines.append(f"| Second scan | `{rs['run_id']}` ({rs['status']}): {rs['summary']} |")
     if tests:
         lines.append(
             f"| Tests | {tests['passed']} passed, {tests['failed']} failed, "
             f"{tests['coverage_percent']}% coverage |"
         )
     lines += ["", "| Severity | Finding | Status | Written by |", "|---|---|---|---|"]
-    lines += [
-        f"| {f['severity']} | {f['title']} | {f['status']} | {f['analysis_by']} |"
-        for f in scan["findings"]
-    ]
+    for f in scan["findings"]:
+        by = f.get("written_by", f["analysis_by"])
+        lines.append(f"| {f['severity']} | {f['title']} | {f['status']} | {by} |")
     lines += [
         "",
-        "`Written by` is who wrote the root cause, fix and open questions: the model's "
-        "provider, or `template` when the model's reply failed validation twice. Counts, "
-        "severity and the problem statement always come from the deterministic checks.",
+        "`Written by` is who wrote the root cause, fix and open questions: the model, or "
+        "`template` when no model reply validated. Counts, severity and the problem "
+        "statement always come from the deterministic checks.",
         "",
         "| File | What it is |",
         "|---|---|",
@@ -303,6 +370,10 @@ def write_readme(out: Path, s: dict[str, Any]) -> None:
         "| `dashboard.json` | `GET /dashboard` after the scan |",
         "| `ask-mobile-*.json` | Events streamed for the MOBILE question, and its run |",
         "| `ask-runbook-*.json` | Events streamed for a runbook question, and its run |",
+        "| `ask-follow-up-*.json` | A follow-up in the same session, and its run |",
+        "| `regenerate-s1.json` | `POST /incidents/{id}/regenerate` on the S1: both write-ups |",
+        "| `review-s1.json` | The S1 approved with a note; the paused run resumes |",
+        "| `rescan-run.json`, `incidents-after.json` | A second scan, and the feed after it |",
         "| `tests.txt` | The tail of `make test`: pass count and coverage |",
         "",
         "Reproduce: start a freshly seeded stack with `make dev`, then run "

@@ -1,0 +1,11 @@
+{
+  "status": "resumed",
+  "run_id": "b5444ae1-f162-41ff-8a82-28f65425be9c",
+  "outcome": [
+    {
+      "id": "204a8a64-dda2-4206-951a-3ce8f0012885",
+      "status": "published",
+      "decision": "approve"
+    }
+  ]
+}
