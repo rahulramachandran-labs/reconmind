@@ -11,10 +11,15 @@ All notable changes, grouped by build phase. Dates are UTC.
 - Findings are fingerprinted. A scan that sees a finding an earlier scan reported increments its `seen_count` and `last_seen_at` and writes `finding.seen_again` to the ledger instead of creating a new report. Repeats never pause a run, and rejected findings stay rejected. Migration 0003 backfills fingerprints.
 - The incident feed shows how many scans have seen each finding.
 - ADR 0011.
+- `keep-warm.yml` pings `/healthz` every ten minutes from 03:00 to 19:00 UTC so the free instance doesn't sleep while people are looking at the demo. It stops after `KEEP_WARM_UNTIL` (a repository variable, default 2026-10-05), because free instance hours are shared across the Render workspace.
 
 ### Changed
 - Dashboard "open findings" counts what the latest scan saw, minus rejected ones.
 - Render runs with `SCAN_INTERVAL_MINUTES=0`; a free instance sleeps too often for an in-process timer.
+- `docs/DEMO.md` gives the free-tier scan time (about fifteen seconds, against four locally) and says what to show if someone has already cleared the review queue.
+
+### Fixed
+- The package, the API and the web app all report 1.1.0; `/healthz` still said 0.1.0.
 
 ## [1.0.1] - 2026-09-18
 

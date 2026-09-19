@@ -1,6 +1,6 @@
 [project]
 name = "reconmind"
-version = "0.1.0"
+version = "1.1.0"
 description = "Multi-agent, RAG-powered incident copilot for data pipelines: key drift, duplicate submissions, schema drift, volume anomalies."
 readme = "README.md"
 license = "MIT"

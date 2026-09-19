@@ -255,7 +255,7 @@ The web app runs on Vercel and the API (with its Postgres) on Render; a Railway 
 Two things to know about the free tier:
 
 - **The database expires.** Render deletes free Postgres databases 30 days after they are created. The demo's `reconmind-db` was created on 2026-09-19, so it goes around 2026-10-19. When it does, apply the blueprint again or point `DATABASE_URL` at another Postgres; migrations and the sample load run on startup either way.
-- **The instance sleeps.** A free instance spins down after 15 minutes without traffic, which is why scheduled scans come from GitHub Actions rather than from a timer inside the API (`SCAN_INTERVAL_MINUTES`, kept for always-on deployments). GitHub pauses scheduled workflows in repositories with no commits for 60 days; re-enable it from the Actions tab if that happens.
+- **The instance sleeps.** A free instance spins down after 15 minutes without traffic, which is why scheduled scans come from GitHub Actions rather than from a timer inside the API (`SCAN_INTERVAL_MINUTES`, kept for always-on deployments). [`keep-warm.yml`](.github/workflows/keep-warm.yml) pings it every ten minutes from 03:00 to 19:00 UTC until the date in the `KEEP_WARM_UNTIL` repository variable; free instance hours are shared across a Render workspace, so it doesn't run around the clock. GitHub pauses scheduled workflows in repositories with no commits for 60 days; re-enable it from the Actions tab if that happens.
 
 Anyone can read. Scans and review decisions go through the web app, which checks the session and forwards the call with the server-side token, so the token never reaches the browser. Chat, ask and scan are rate limited per client.
 
