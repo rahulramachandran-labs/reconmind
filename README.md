@@ -16,7 +16,7 @@
 
 **[Live app](https://reconmind-labs.vercel.app)** · [Project deck (PDF)](docs/slides/Rahul_Ramachandran_ReconMind-ProjectSubmission.pdf) · [60-second demo script](docs/DEMO.md) · [Write-up](docs/blog/reconmind-writeup.md)
 
-Final project for the IIT Patna Generative AI & Agentic AI for Developers program, by Rahul Ramachandran. All data is synthetic.
+Final project for the IIT Patna Generative AI & Agentic AI for Developers program, by Rahul Ramachandran, submitted 18 September 2026. All data is synthetic.
 
 ![A scan finds four planted incidents, one S1 is signed off in the review queue, a question streams through the agents, and the run's trace shows every tool call](docs/demo.gif)
 
@@ -239,7 +239,7 @@ uv run pytest -m chaos -v    # plants each anomaly with the generator; checks th
 uv run python scripts/generate_synthetic_pipeline.py --seed 7 --out /tmp/p --only key_drift   # a fresh dataset with one planted problem
 ```
 
-**12. Run the quality gates.** `make test` runs 145 tests at 93% coverage. `make eval` scores retrieval and answers on the 46-question golden set and fails below the thresholds.
+**12. Run the quality gates.** `make test` runs 152 tests at 93% coverage. `make eval` scores retrieval and answers on the 46-question golden set and fails below the thresholds.
 
 ## Project structure
 
@@ -308,7 +308,19 @@ A 46-question golden set covers every anomaly type and screen. [RAGAS](evals/run
 | **Hybrid + reranker (default)** | **0.911** | **0.862** | **0.830** | **0.922** |
 | *Threshold* | *0.85* | *0.80* | *0.80* | *0.85* |
 
-CI also runs ruff, black and mypy, then 145 tests with an 80% coverage gate (currently 93%), including Postgres, MCP, agent, prompt-injection and chaos tests. It finishes with gitleaks and a production build of the web app. Details are in [docs/EVALUATION.md](docs/EVALUATION.md).
+CI also runs ruff, black and mypy, then 152 tests with an 80% coverage gate (currently 93.27%), including Postgres, MCP, agent, prompt-injection and chaos tests. It finishes with gitleaks and a production build of the web app. Details are in [docs/EVALUATION.md](docs/EVALUATION.md).
+
+### Testing
+
+From the last captured run of `make test` ([`docs/evidence/tests.txt`](docs/evidence/tests.txt)): 152 passed, 0 failed, 93.27% coverage.
+
+| Layer | Tests | What it covers |
+|---|---|---|
+| Unit | 101 | Retrieval (tokenizer, RRF, reranker), the model fallback chain, structured output, prompts, tracing, the synthetic generator, rate limits |
+| Integration | 45 | Postgres and the append-only ledger, both MCP servers through a real client, the agent graph end to end, the API |
+| of which prompt injection | 1 | A runbook carrying planted instructions can't change a severity or approve anything ([test](tests/integration/test_prompt_injection.py)) |
+| of which domain-agnostic proof | 2 | The same graph runs on the support-triage domain, and no agent module imports a domain ([test](tests/integration/test_domain_agnostic.py)) |
+| Chaos | 6 | Each anomaly planted on its own is caught by the right agent at the right severity, a clean pipeline raises nothing, and a scan fits the 30-second budget ([tests](tests/chaos/test_injected_anomalies.py)) |
 
 ## Tech stack
 
@@ -350,6 +362,9 @@ Links in *Where* and *Test* point at the exact lines, pinned to commit `ecd0ee3`
 
 ## Limitations and next steps
 
+- The hosted demo runs without a model unless a key is set on the server: explanations then come from templates and answers are extractive, which `/healthz` shows as `"llm_providers": ["extractive"]`. The captured results above used a local model.
+- The hosted API is on a free tier that sleeps after 15 idle minutes; the first request after that takes up to a minute.
+- The demo's free Postgres expires around 2026-10-19; applying the Render blueprint again recreates it, and the sample reloads on startup ([docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)).
 - Scans run on a schedule, not when data lands. Next step: trigger them from the loader or a Kafka topic.
 - The Reporter proposes fixes but doesn't apply them. Next step: open a pull request with the fix, gated on approval.
 - Confidence thresholds are set by hand. Next step: tune them from the approve and reject history.

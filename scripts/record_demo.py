@@ -1,17 +1,25 @@
-"""Walk through the app with Playwright and save the frames used for docs/demo.gif.
+"""Walk through the app with Playwright and save the frames used for docs/demo.gif,
+or, with --screenshots, one still of each screen for the README.
 
-    uv run python scripts/record_demo.py --base http://localhost:3000 --out /tmp/frames
+    uv run --with playwright python scripts/record_demo.py --out /tmp/frames
     uv run python scripts/make_gif.py /tmp/frames docs/demo.gif
+    uv run --with playwright python scripts/record_demo.py --screenshots docs/screenshots
 
 Needs `uvx playwright install chromium` once, the API and the web app running,
-and a freshly seeded database so the scan finds the planted anomalies.
+and a freshly seeded database so the scan finds the planted anomalies. The
+screenshots expect a scan to have run already (scripts/capture_readme_evidence.py
+runs one).
 """
 
 import argparse
 import asyncio
+import json
+import urllib.request
 from pathlib import Path
 
 from playwright.async_api import Page, async_playwright
+
+MOBILE_QUESTION = "Did the MOBILE file have a schema problem on 2026-06-16?"
 
 
 async def shot(page: Page, out: Path, name: str, hold: int = 1) -> None:
@@ -78,9 +86,72 @@ async def main(base: str, out: Path) -> None:
         await browser.close()
 
 
+def api_get(api: str, path: str) -> list[dict[str, object]]:
+    with urllib.request.urlopen(f"{api}{path}", timeout=60) as res:  # noqa: S310 (local API)
+        data: list[dict[str, object]] = json.loads(res.read())
+        return data
+
+
+async def screenshots(base: str, api: str, out: Path) -> None:
+    """One 1440x900 still per screen, named for the README's screens table."""
+    out.mkdir(parents=True, exist_ok=True)
+    incidents = api_get(api, "/incidents")
+    key_drift = next(r for r in incidents if r["finding_type"] == "key_drift")
+    scan = next(r for r in api_get(api, "/runs") if r["trigger"] == "scan")
+
+    async with async_playwright() as p:
+        browser = await p.chromium.launch()
+        page = await browser.new_page(viewport={"width": 1440, "height": 900})
+
+        async def still(name: str) -> None:
+            await page.wait_for_timeout(600)
+            await page.screenshot(path=out / f"{name}.png")
+
+        await page.goto(f"{base}/signin?callbackUrl=/")
+        await page.click("text=Continue as the demo reviewer")
+        await page.wait_for_selector("text=Rows loaded", timeout=120_000)
+        await still("dashboard")
+
+        await page.goto(f"{base}/incidents")
+        await page.wait_for_selector("summary")
+        await still("incidents")
+
+        await page.goto(f"{base}/incidents/{key_drift['id']}")
+        await page.wait_for_selector("text=Recommended fix", timeout=60_000)
+        await still("incident-detail")
+
+        await page.goto(f"{base}/review")
+        await page.wait_for_selector("text=Findings to sign off")
+        await still("review")
+
+        await page.goto(f"{base}/ask")
+        await page.fill("textarea", MOBILE_QUESTION)
+        await page.keyboard.press("Enter")
+        await page.wait_for_selector("text=trace", timeout=600_000)
+        await still("ask")
+
+        await page.goto(f"{base}/traces/{scan['id']}")
+        await page.wait_for_selector("text=LLM calls")
+        await still("trace")
+
+        query = "q=basket_ref+ContractViolation"
+        await page.goto(f"{base}/docs?{query}")
+        await page.wait_for_selector("text=bm25")
+        await still("docs-hybrid")
+        await page.goto(f"{base}/docs?{query}&mode=dense")
+        await page.wait_for_selector("text=/^dense \\d+$/")
+        await still("docs-dense")
+        await browser.close()
+
+
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--base", default="http://localhost:3000")
+    ap.add_argument("--api", default="http://localhost:8000")
     ap.add_argument("--out", type=Path, default=Path("frames"))
+    ap.add_argument("--screenshots", type=Path, help="save one still per screen here instead")
     args = ap.parse_args()
-    asyncio.run(main(args.base, args.out))
+    if args.screenshots:
+        asyncio.run(screenshots(args.base, args.api, args.screenshots))
+    else:
+        asyncio.run(main(args.base, args.out))
