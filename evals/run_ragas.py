@@ -222,7 +222,10 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     start = time.perf_counter()
     for it in items:
         ans = answer_question(it.question, retrieval, llm, k=args.k)
-        providers.add(ans.provider)
+        # name the model, not just the provider, so a history row says what answered
+        providers.add(
+            ans.provider if ans.provider == "extractive" else f"{ans.provider}/{ans.model}"
+        )
         contexts = [c.text for c in ans.sources]
         sample = SingleTurnSample(
             user_input=it.question,
