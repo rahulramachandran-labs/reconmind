@@ -21,6 +21,9 @@ flowchart LR
     G --> P[Planner]
     P --> R[Reconciliation]
     P --> Q[Data-Quality]
+    P --> X[Explorer]
+    X --> WH
+    X --> OR
     P -. low confidence .-> H[Human review]
     R --> REP[Reporter]
     Q --> REP
@@ -39,7 +42,7 @@ flowchart LR
 | Synthetic pipeline | A seeded generator writes landing files; a loader puts them into Postgres | [`app/pipeline/`](../app/pipeline) |
 | Tool servers | Two read-only MCP servers expose warehouse and orchestrator metadata | [`mcp_servers/`](../mcp_servers) |
 | Knowledge | Runbooks, schema docs, dbt models and past incidents, indexed for hybrid search | [`corpus/`](../corpus), [`app/retrieval/`](../app/retrieval) |
-| Agents | A LangGraph graph: Planner, specialists, Reporter, human review | [`app/agents/`](../app/agents) |
+| Agents | A LangGraph graph: Planner, specialists, Reporter, Explorer, human review | [`app/agents/`](../app/agents) |
 | Domain | Every business rule, behind the `DomainAdapter` protocol | [`app/domain/`](../app/domain) |
 | Models | Provider fallback chain, a traced client, structured output | [`app/llm/`](../app/llm) |
 | Tracing | Every step to Postgres, mirrored to LangFuse | [`app/observability/`](../app/observability) |
@@ -51,8 +54,10 @@ flowchart LR
 ```
 planner --(low confidence)--> plan_review --+
    |                                        |
-   +--(answer)--> answer -------------------+--> finalize
-   |                                        |
+   +--(answer)--> answer -------------------+
+   +--(explore)--> explore -----------------+--> finalize
+   |               (the model picks up to   |
+   |                three read-only tools)  |
    +--(investigate)--> one node per specialist (run concurrently)
                               |
                            reporter --(S1 or low confidence)--> report_review --> finalize
@@ -60,20 +65,21 @@ planner --(low confidence)--> plan_review --+
 
 | Node | Module | Job |
 |---|---|---|
-| `planner` | [`planner.py`](../app/agents/planner.py) | Keyword rules route the question: answer from the runbooks, investigate with some or all specialists, or unclear. A model, if available, may refine the routing but only to specialists the adapter defines. |
+| `planner` | [`planner.py`](../app/agents/planner.py) | Keyword rules route the question: answer from the runbooks, investigate with some or all specialists, explore the data with tools, or unclear. A model, if available, may refine the routing, seeing the last turns of the conversation, but only to specialists the adapter defines. |
 | `plan_review` | [`review.py`](../app/agents/review.py) | When the Planner's confidence is below `PLANNER_CONFIDENCE_THRESHOLD`, a person picks the specialists or rejects the run. |
 | `reconciliation`, `data_quality` | [`specialists.py`](../app/agents/specialists.py) | Built from the adapter's roster, one node per role, run in the same superstep so they execute concurrently. Each runs its checks, retrieves runbooks for every finding, and writes an analysis. |
 | `reporter` | [`reporter.py`](../app/agents/reporter.py) | Builds `IncidentReport`s, applies the review rule (S1, or root-cause confidence below `REVIEW_CONFIDENCE_THRESHOLD`), stores them and writes the run summary. |
 | `report_review` | [`review.py`](../app/agents/review.py) | Pauses with `interrupt()` until every pending report has a decision. |
 | `answer` | [`answerer.py`](../app/agents/answerer.py) | Answers runbook questions from retrieved passages, with citations. |
+| `explore` | [`explorer.py`](../app/agents/explorer.py) | For a question about the data that isn't one of the failure types, offers the model every MCP tool as a function call, runs the ones it asks for (at most three in all), and returns its answer. Falls back to the runbooks without a tool-capable model ([ADR 0013](adr/0013-bounded-tool-use-for-open-questions.md)). |
 
 Every node is wrapped by the tracer, and every node receives the same [`AgentDeps`](../app/agents/deps.py): the domain adapter, the MCP toolbox, retrieval, the traced model client and the run store.
 
-**Facts versus language.** Checks produce `Finding`s with counts and evidence. The model (or the adapter's template) only writes the root-cause hypothesis, fix steps, confidence and open questions, validated by Pydantic. A model's confidence is capped at the template's calibrated prior plus 0.15, and the review gate uses the lower of the two, so a model can push a finding into review but never talk it out of one ([ADR 0010](adr/0010-facts-from-checks-language-from-models.md)).
+**Facts versus language.** Checks produce `Finding`s with counts and evidence. The model (or the adapter's template) only writes the root-cause hypothesis, fix steps, confidence and open questions, validated by Pydantic and by a grounding check that rejects any time, id or multi-digit number that isn't in the finding, its evidence or the passages. A model's confidence is capped at the template's calibrated prior plus 0.15, and the review gate uses the lower of the two, so a model can push a finding into review but never talk it out of one ([ADR 0010](adr/0010-facts-from-checks-language-from-models.md)).
 
 **Pausing and resuming.** `interrupt()` stores the graph state in the checkpointer: `AsyncPostgresSaver` when there is a database, in memory otherwise. A review decision arrives through `POST /review/...`, which resumes the same thread id with `Command(resume=...)`. Because the checkpoint is in Postgres, the decision can arrive hours later, after a restart, or at a different API instance.
 
-**Repeated scans.** A finding's fingerprint is `finding_type:title`, and titles carry the subject and size. A later scan that sees the same finding increments `seen_count` on the existing report instead of creating a new one, and doesn't pause for it again ([ADR 0011](adr/0011-scheduled-scans-and-finding-fingerprints.md)).
+**Repeated scans.** A finding's fingerprint is `finding_type:title`, and titles carry the subject and size. A later scan that sees the same finding increments `seen_count` on the existing report instead of creating a new one, and doesn't pause for it again ([ADR 0011](adr/0011-scheduled-scans-and-finding-fingerprints.md)). It also doesn't ask the model again about a finding that already has a model write-up; a template-only one gets the model's write-up once a model is available. A decided finding can be reopened (`POST /incidents/{id}/reopen`); a decision on it is then applied directly, since its run has finished.
 
 ## MCP tool servers
 

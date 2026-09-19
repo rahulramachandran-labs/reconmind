@@ -6,10 +6,11 @@ For showing ReconMind live, on [reconmind-labs.vercel.app](https://reconmind-lab
 |---|---|---|---|
 | 0:00 | Dashboard | Point at the chart | "Twenty-one days of a synthetic retail feed. One day came in light: POSFEED on the 18th, 40% under its own average." |
 | 0:08 | Dashboard | Sign in as the demo reviewer, click **Run a scan** | "A scan sends the Planner, then the Reconciliation and Data-Quality agents in parallel. They read the pipeline through two read-only MCP servers." |
-| 0:15 | Dashboard | Wait for the tiles to update | "Four findings, one S1, with no model at all: the checks are deterministic, and a model only writes the explanation. Locally a scan takes about four seconds; on the free tier, about fifteen." |
+| 0:15 | Dashboard | Wait for the tiles to update | "Four findings, one S1. The checks are deterministic and measured the facts; Groq's free tier wrote the explanations, and each report names its model. A scan takes about fifteen seconds." |
 | 0:22 | Incident feed | Open the key-drift finding | "Each one is a write-up, not a chat transcript: problem, record counts, root-cause hypothesis, fix steps, confidence, open questions, and the evidence and runbooks behind it." |
 | 0:32 | Review queue | Add a note, click **Approve with note** | "S1s and anything the agents aren't sure about stop here. The decision resumes the LangGraph run and lands in an append-only ledger under my name." |
 | 0:40 | Ask ReconMind | Ask *Did the MOBILE file have a schema problem on 2026-06-16?* | "Questions stream. The Planner decided this needs Data-Quality only, and the answer is a real investigation, not a guess from the docs." |
+| 0:45 | Ask ReconMind | *New conversation*, then *Show me which submitter sent the fewest rows on 2026-06-18, and when its file landed.* | "A fact no check covers goes to the Explorer. Here the model decides which tools to call, three at most, and answers from what they returned." |
 | 0:50 | Traces | Open the run | "Every node, tool call, retrieval and model call is recorded, with latency and cost. With LangFuse keys set, the same trace is there too." |
 | 0:57 | Docs & runbooks | Search *basket_ref ContractViolation*, toggle BM25 / dense | "And the retrieval layer is inspectable on its own. Hybrid finds the exact identifier where dense-only doesn't." |
 

@@ -34,6 +34,9 @@ ROOT = Path(__file__).resolve().parent.parent
 MOBILE_QUESTION = "Did the MOBILE file have a schema problem on 2026-06-16?"
 RUNBOOK_QUESTION = "Which file wins when a submitter resends the same day?"
 FOLLOW_UP = "What should we check before reprocessing that day?"
+EXPLORE_QUESTION = (
+    "Show me which submitter sent the fewest rows on 2026-06-18, and when its file landed."
+)
 TEST_LAYERS = {
     "unit": ["tests/unit"],
     "integration": ["tests/integration"],
@@ -184,6 +187,12 @@ def main() -> None:
     ap.add_argument("--token", default=os.environ.get("WRITE_TOKEN", ""))
     ap.add_argument("--skip-tests", action="store_true")
     ap.add_argument(
+        "--pause",
+        type=float,
+        default=0,
+        help="seconds between scenarios, to stay under a free tier's per-minute token limit",
+    )
+    ap.add_argument(
         "--tests-only", action="store_true", help="add test counts to an existing capture"
     )
     args = ap.parse_args()
@@ -222,29 +231,45 @@ def main() -> None:
     save(out, "dashboard.json", api.get("/dashboard").json())
     print("scan:", run_id, scan["status"], f"{scan_wall_s}s", file=sys.stderr)
 
+    time.sleep(args.pause)
     asked = {}
     session = None
     for slug, question in (
         ("ask-mobile", MOBILE_QUESTION),
         ("ask-runbook", RUNBOOK_QUESTION),
         ("ask-follow-up", FOLLOW_UP),
+        ("ask-explore", EXPLORE_QUESTION),
     ):
         # the follow-up continues the runbook question's session, so memory is exercised
         events = stream_question(api, question, session if slug == "ask-follow-up" else None)
+        time.sleep(args.pause)
         session = next(e["session_id"] for e in events if e["event"] == "session")
         ask_run_id = next(e["run_id"] for e in events if e["event"] == "run")
         ask_run = wait_for_run(api, ask_run_id)
         save(out, f"{slug}-events.json", events)
         save(out, f"{slug}-run.json", ask_run)
+        plan = next((e for e in events if e["event"] == "plan"), {})
+        reply = next((e for e in events if e["event"] in ("answer", "summary")), {})
         asked[slug] = {
             "question": question,
             "run_id": ask_run_id,
             "status": ask_run["status"],
+            "intent": plan.get("intent"),
+            "specialists": plan.get("specialists"),
+            "planned_by": plan.get("planned_by"),
+            "reply": reply.get("text") or reply.get("headline"),
+            "tools_used": [
+                s["name"]
+                for s in ask_run["steps"]
+                if s["kind"] == "tool" and s["node"] == "explore"
+            ],
+            "latency_ms": ask_run["latency_ms"],
             **usage(ask_run),
         }
         print(slug, ask_run_id, ask_run["status"], file=sys.stderr)
 
     # the S1 waits for a person: have the model write it up again, then sign it off
+    time.sleep(args.pause)
     s1 = next(r for r in reports if r["severity"] == "S1")
     regen = api.post(f"/incidents/{s1['id']}/regenerate", timeout=900)
     save(out, "regenerate-s1.json", {"status_code": regen.status_code, "body": regen.json()})
@@ -256,6 +281,7 @@ def main() -> None:
     ).json()
     save(out, "review-s1.json", decision)
     # a second scan sees the same four findings: counted again, nothing new, nothing paused
+    time.sleep(args.pause)
     rescan = wait_for_run(api, api.post("/scan").json()["run_id"])
     save(out, "rescan-run.json", rescan)
     after = api.get("/incidents").json()
@@ -302,6 +328,15 @@ def main() -> None:
         "rescan": {
             "run_id": rescan["id"],
             "status": rescan["status"],
+            "latency_ms": rescan["latency_ms"],
+            "fallbacks": sorted(
+                {
+                    fb
+                    for st in rescan["steps"]
+                    if st["kind"] == "llm"
+                    for fb in (st.get("output") or {}).get("fallbacks") or []
+                }
+            ),
             "summary": (rescan.get("summary") or "").splitlines()[0],
             **usage(rescan),
         },
@@ -383,6 +418,7 @@ def write_readme(out: Path, s: dict[str, Any]) -> None:
         "| `ask-mobile-*.json` | Events streamed for the MOBILE question, and its run |",
         "| `ask-runbook-*.json` | Events streamed for a runbook question, and its run |",
         "| `ask-follow-up-*.json` | A follow-up in the same session, and its run |",
+        "| `ask-explore-*.json` | A data question the Explorer answers with tools it picks |",
         "| `regenerate-s1.json` | `POST /incidents/{id}/regenerate` on the S1: both write-ups |",
         "| `review-s1.json` | The S1 approved with a note; the paused run resumes |",
         "| `rescan-run.json`, `incidents-after.json` | A second scan, and the feed after it |",

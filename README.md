@@ -5,20 +5,20 @@
 [![Python 3.12](https://img.shields.io/badge/python-3.12-3776AB.svg)](pyproject.toml)
 [![Next.js](https://img.shields.io/badge/next.js-16-black.svg)](frontend/package.json)
 
-**When a data pipeline's numbers go wrong, someone has to work out why: which file, which key, how many rows, and what to do about it. ReconMind is a multi-agent AI copilot that does that investigation.** Specialist agents inspect the live pipeline through MCP tools, look up the team's runbooks and past incidents, and hand back an incident report with record counts, a likely root cause, a fix and a confidence score. Anything serious or uncertain waits for a person to sign it off.
+**When a data pipeline's numbers go wrong, someone has to work out why: which file, which key, how many rows, and what to do about it. I've spent years doing that by hand. ReconMind hands the investigation to a small team of AI agents.** They read the live pipeline through MCP tools, look up the team's runbooks and past incidents, and hand back an incident report with record counts, a likely root cause, a fix and a confidence score. Anything serious or uncertain waits for a person to sign it off.
 
 > **Evaluate this in five minutes**
 > 1. Open the [API health check](https://reconmind-labs-api.onrender.com/healthz) first: the free tier can take up to a minute to wake.
-> 2. Open **[reconmind-labs.vercel.app](https://reconmind-labs.vercel.app)** and choose *Sign in* → *Continue as the demo reviewer*.
-> 3. Click **Run a scan**: the dashboard counts four open findings, one of them an S1 waiting in the **Review queue**.
-> 4. In **Ask ReconMind**, ask *Did the MOBILE file have a schema problem on 2026-06-16?*, then open the run on **Traces**.
-> 5. Narrated version: [docs/DEMO.md](docs/DEMO.md). Full checklist: [docs/REVIEWER_GUIDE.md](docs/REVIEWER_GUIDE.md).
+> 2. Open **[reconmind-labs.vercel.app](https://reconmind-labs.vercel.app)**, choose *Sign in* → *Continue as the demo reviewer*, and click **Run a scan**. The dashboard counts four open findings, one of them an S1 waiting in the **Review queue**: sign it off there.
+> 3. In **Incidents**, open the key-drift finding. The chip names the model that wrote it, with its latency and tokens, and *Side by side* shows the template it was checked against.
+> 4. In **Ask ReconMind**, ask *Did the MOBILE file have a schema problem on 2026-06-16?*, then *Show me which submitter sent the fewest rows on 2026-06-18, and when its file landed.* Open either run on **Traces**.
+> 5. Short on time, or the API asleep? The same walkthrough is a [two-minute video](docs/demo.mp4). [VERIFY.md](docs/VERIFY.md) lines up every planted problem with its finding and test, and [REVIEWER_GUIDE.md](docs/REVIEWER_GUIDE.md) is the full checklist.
 
-**[Live app](https://reconmind-labs.vercel.app)** · [2-minute demo video](docs/demo.mp4) · [Project deck (PDF)](docs/slides/Rahul_Ramachandran_ReconMind-ProjectSubmission.pdf) · [60-second demo script](docs/DEMO.md) · [Write-up](docs/blog/reconmind-writeup.md)
+**[Live app](https://reconmind-labs.vercel.app)** · [Two-minute video](docs/demo.mp4) · [Project deck (PDF)](docs/slides/Rahul_Ramachandran_ReconMind-ProjectSubmission.pdf) · [Demo script](docs/DEMO.md) · [Write-up](docs/blog/reconmind-writeup.md)
 
-Final project for the IIT Patna Generative AI & Agentic AI for Developers program, by Rahul Ramachandran, submitted 18 September 2026. All data is synthetic.
+Final project for the IIT Patna Generative AI & Agentic AI for Developers program, by Rahul Ramachandran, submitted September 2026. All data is synthetic.
 
-![A scan finds the four planted incidents with Groq writing the reports, the S1 is signed off, two questions are answered with citations, then the trace, hybrid search and the Verify page](docs/demo.gif)
+![A scan finds the four planted incidents with Groq writing the reports, the S1 is signed off, questions are answered, one by the Explorer choosing its own tools, then the trace, hybrid search and the Verify page](docs/demo.gif)
 
 ---
 
@@ -30,6 +30,8 @@ Four submitters send a retail pipeline a daily file each. Over 21 days of seeded
 flowchart LR
     T["Scheduled scan<br/>or a question"] --> P[Planner agent]
     P -- "a runbook question" --> A[Answer from the runbooks]
+    P -- "a fact about the data" --> X[Explorer agent:<br/>the model picks the tools]
+    X --> M
     P -- "needs a look at the data" --> R[Reconciliation agent]
     P -- "needs a look at the data" --> Q[Data-Quality agent]
     R & Q --> M[("Warehouse and orchestrator<br/>metadata, via read-only MCP tools")]
@@ -41,11 +43,11 @@ flowchart LR
 ```
 
 1. **Something starts a run.** A scan every six hours (GitHub Actions), a click on *Run a scan*, or a question in the chat. *Code:* [`refresh-demo.yml`](.github/workflows/refresh-demo.yml), [`app/api/`](app/api)
-2. **The Planner decides who should look.** A general question ("which file wins when a submitter resends?") is answered straight from the runbooks. A question about the data ("did the MOBILE file have a schema problem on 2026-06-16?") goes to the specialist that owns it. A scan sends both. *Code:* [`app/agents/planner.py`](app/agents/planner.py)
+2. **The Planner decides who should look.** A general question ("which file wins when a submitter resends?") is answered straight from the runbooks. A question about a known kind of problem ("did the MOBILE file have a schema problem on 2026-06-16?") goes to the specialist that owns it, and a scan sends both. A plain question about the data that no check covers ("which submitter sent the fewest rows on the 18th?") goes to the Explorer, where the model picks up to three read-only tools itself and answers from what they return. *Code:* [`app/agents/planner.py`](app/agents/planner.py), [`app/agents/explorer.py`](app/agents/explorer.py)
 3. **Specialists investigate in parallel.** *Reconciliation* checks for duplicate submissions and key drift; *Data-Quality* checks every file against the dbt contract and each day's volume against its trailing week. They get their facts by calling tools on two read-only **MCP servers** (a scan makes 30 tool calls), so every number is measured, not generated. *Code:* [`app/agents/specialists.py`](app/agents/specialists.py), [`app/domain/retail_recon/`](app/domain/retail_recon), [`mcp_servers/`](mcp_servers)
-4. **They look up what the team already knows.** Hybrid search (BM25 + embeddings, fused, then reranked) finds the matching runbook and any past incident with the same pattern. A model, or a template when no model is configured, turns facts plus runbooks into a root cause, fix steps and a confidence score. *Code:* [`app/retrieval/`](app/retrieval), [`app/rag/`](app/rag)
+4. **They look up what the team already knows.** Hybrid search (BM25 + embeddings, fused, then reranked) finds the matching runbook and any past incident with the same pattern. A model, or a template when no model is configured, turns facts plus runbooks into a root cause, fix steps and a confidence score. A grounding check sends the write-up back if it states a time, number or id that isn't in the evidence. *Code:* [`app/retrieval/`](app/retrieval), [`app/rag/`](app/rag)
 5. **The Reporter writes it up and decides who signs off.** Each finding becomes a structured incident report. S1 findings and anything below the confidence threshold **pause** the LangGraph run in a review queue; a reviewer approves, rejects or annotates, and the run resumes from its Postgres checkpoint. Every decision goes into an append-only audit ledger. *Code:* [`app/agents/reporter.py`](app/agents/reporter.py), [`app/agents/review.py`](app/agents/review.py)
-6. **Everything is traced.** Every agent step, tool call, retrieval and model call is stored with its latency and cost, shown on the Traces page and mirrored to LangFuse. *Code:* [`app/observability/`](app/observability)
+6. **Everything is traced.** Every agent step, tool call, retrieval and model call is stored with its latency and cost and shown on the Traces page, and mirrored to LangFuse when its keys are set. *Code:* [`app/observability/`](app/observability)
 
 ### What a run looks like
 
@@ -120,14 +122,7 @@ class IncidentReport(BaseModel):
 ```
 <!-- /evidence:schema -->
 
-### What a scan finds in the sample data
-
-| Severity | Finding | Found by | Records | What happens |
-|---|---|---|---|---|
-| **S1** | `S1003_20260616_0216_MOBILE.txt` renamed `channel_basket_id` to `basket_ref` | Data-Quality | 82 | Waits in the review queue: it breaks the dedup key |
-| S2 | `LOC-0517` also reporting as `OUT-1071` (3.0% of rows) | Reconciliation | 251 | Published |
-| S2 | Resent file `S1002_20260612_1120_ECOMM.txt` supersedes 88 rows | Reconciliation | 88 | Published |
-| S2 | `S1001` 2026-06-18: 110 rows, 40% below its 7-day average | Data-Quality | 73 missing | Published |
+### One report, as a reviewer sees it
 
 <!-- evidence:report -->
 The key-drift report from that scan, exactly as the API returned it:
@@ -153,11 +148,12 @@ Run `b5444ae1-f162-41ff-8a82-28f65425be9c`, captured 2026-09-19 19:00:42 UTC · 
 
 ### Why it is built this way
 
-- **Facts come from checks; models only write the words.** Counts, severities and evidence come from deterministic checks, so a model can't invent a number, and the whole system still works with no model at all, at zero cost. A model can lower a confidence score but can't argue its way past the calibrated one.
-- **Several narrow agents instead of one big one.** When a single all-purpose agent gets something wrong, you can't tell which part failed. Here each agent has one job, its own prompt and its own trace.
-- **Hybrid retrieval, because pipelines are full of identifiers.** Embeddings blur `channel_basket_id` and `basket_ref`; BM25 matches them exactly. Fusing both, then reranking, raised context precision from 0.66 (dense only) to 0.83.
-- **A person signs off anything serious.** S1s and low-confidence findings stop and wait, and the decision is on the record.
-- **Built to be reused.** Every retail rule sits behind a `DomainAdapter`. A second, small domain (support-ticket triage) runs on the same agent graph in every CI run.
+- Facts come from checks, and models only write the words. The counts, severities and evidence are measured, so no model can change them, and the grounding check keeps a model from slipping in numbers of its own. It all still works with no model at all, at no cost.
+- I split the work across narrow agents because my first version was one agent with every job, and when it got something wrong I couldn't tell which part had failed. Here each agent has one job and its own place in the trace.
+- Pipelines are full of identifiers, and embeddings blur `channel_basket_id` and `basket_ref` where BM25 matches them exactly. Fusing the two and reranking raised context precision from 0.66 (dense only) to 0.83.
+- Anything serious waits for a person. S1s and low-confidence findings stop, and the decision goes on the record.
+- The model only chooses its own tools where that's safe: questions no check covers, three read-only calls at most, each one traced ([ADR 0013](docs/adr/0013-bounded-tool-use-for-open-questions.md)).
+- Every retail rule sits behind a `DomainAdapter`, and a second, small domain (support-ticket triage) runs on the same agent graph in every CI run, so the reuse is tested, not just claimed.
 
 ## Results
 
@@ -207,15 +203,7 @@ Captured at 1440×900 from a freshly seeded local stack with Groq's free tier wr
 
 ## Try it
 
-**Online, no install:** open **[reconmind-labs.vercel.app](https://reconmind-labs.vercel.app)**, choose *Sign in* → *Continue as the demo reviewer*, then:
-
-1. **Dashboard** → *Run a scan*. The four findings appear in about 15 seconds.
-2. **Incidents** → expand a finding to read the full report.
-3. **Review queue** → approve the S1 with a note. It may already be empty, because other visitors can sign it off.
-4. **Ask ReconMind** → *Did the MOBILE file have a schema problem on 2026-06-16?*
-5. **Traces** → open the run and see every agent step and tool call.
-
-The API runs on a free instance that sleeps when idle. If the first page load fails, give it a minute and refresh.
+**Online:** follow *Evaluate this in five minutes* at the top.
 
 **On your machine:** you need Python 3.12 with [uv](https://docs.astral.sh/uv/), Node 20+ and Docker. [Ollama](https://ollama.com) is optional.
 
@@ -225,7 +213,7 @@ make bootstrap   # Python and Node dependencies, git hooks, .env and frontend/.e
 make dev         # Postgres, migrations and sample data, then the API on :8000 and the web app on :3000
 ```
 
-No keys are needed. Without a model, explanations come from templates and the runbooks. To have a model write them, add a free-tier key (`GROQ_API_KEY`, `GEMINI_API_KEY` or `OPENROUTER_API_KEY`), a paid one (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`) to `.env`, or run `ollama pull qwen2.5:1.5b`. Every setting is explained in [`.env.example`](.env.example).
+To have a model write the explanations, put a free Groq key in `.env` as `GROQ_API_KEY` ([console.groq.com/keys](https://console.groq.com/keys)); that's what the hosted demo and the captured evidence use. A Gemini or OpenRouter key, a paid OpenAI or Anthropic key, or a local `ollama pull qwen2.5:1.5b` work too. With no key at all everything still runs, with explanations from templates and answers from the runbooks. Every setting is explained in [`.env.example`](.env.example).
 
 ## Runbook: walk through the whole flow locally
 
@@ -268,7 +256,7 @@ docker compose exec postgres psql -U reconmind -c \
 
 **9. Scan again.** The run summary lists the same four findings as *already reported, still there*, with none new and nothing added to the review queue. Findings are fingerprinted, so repeated scans don't pile up duplicates.
 
-**10. Ask a question that needs an investigation.** In **Ask ReconMind**, try *Did the MOBILE file have a schema problem on 2026-06-16?* The Planner sends only the Data-Quality agent, and the steps stream in as they happen. `curl -N localhost:8000/chat/stream -H 'content-type: application/json' -d '{"question": "..."}'` shows the raw server-sent events.
+**10. Ask a question that needs an investigation.** In **Ask ReconMind**, try *Did the MOBILE file have a schema problem on 2026-06-16?* The Planner sends only the Data-Quality agent, and the steps stream in as they happen. Then try a fact no check covers, *Show me which submitter sent the fewest rows on 2026-06-18, and when its file landed*: the Planner sends it to the Explorer, and the trace shows which tools the model chose. `curl -N localhost:8000/chat/stream -H 'content-type: application/json' -d '{"question": "..."}'` shows the raw server-sent events.
 
 **11. Break it yourself.**
 ```bash
@@ -332,13 +320,13 @@ To read the code in the order a run executes: [`graph.py`](app/agents/graph.py) 
 | **Storage** | Postgres 16 through SQLAlchemy 2 and versioned Alembic migrations. The audit ledger is append-only, enforced by a database trigger. Vectors live in FAISS in memory or in managed Pinecone, switched with one setting (`VECTOR_STORE`). The Docker image runs the embedding model on ONNX to fit in 512 MB. | Managed Postgres with backups (the free demo database expires after 30 days) |
 | **Knowledge retrieval** | Live facts are fetched through MCP tools at the moment of each investigation, never from a stale copy. Documents are indexed with BM25 and embeddings, fused, then reranked. The index is fingerprinted and rebuilt automatically when documents change, and `CORPUS_DIR` points it at any folder of markdown. | Ingest from a wiki or docs repo on change; add approved incident reports to the corpus as new precedents |
 | **State management** | LangGraph checkpoints every step in Postgres, so a run paused for review survives restarts and resumes on whichever API instance receives the decision. Runs, reports, decisions and chat memory are in Postgres too, and fingerprints make repeated scans idempotent. Only rate-limit counters, the provider cooldown and the FAISS copy are per instance. | Redis for global rate limits; Pinecone to share one index |
-| **Reliability and cost** | Model fallback chain: OpenAI → Anthropic → the free tiers of Groq, Gemini and OpenRouter → local Ollama → extractive answers, with a cooldown for failing providers. Outputs are validated by Pydantic and retried, then fall back to a template. `DEMO_MODE` guarantees $0. A chaos suite and a 30-second latency budget run in CI. | Queue-backed scans for long windows |
-| **Observability** | Every agent step, tool call, retrieval and model call is stored with latency, tokens and cost, and mirrored to LangFuse. A model call outside a traced run raises an error instead of going unrecorded. Logs are JSON. | Alerts on failed or slow runs |
+| **Reliability and cost** | Model fallback chain: OpenAI → Anthropic → the free tiers of Groq, Gemini and OpenRouter → local Ollama → extractive answers, with a cooldown for failing providers. Outputs are validated by Pydantic and a grounding check, retried, then fall back to a template. `DEMO_MODE` guarantees $0. A chaos suite and a 30-second latency budget run in CI. | Queue-backed scans for long windows |
+| **Observability** | Every agent step, tool call, retrieval and model call is stored with latency, tokens and cost, and mirrored to LangFuse when its keys are set. A model call outside a traced run raises an error instead of going unrecorded. Logs are JSON. | Alerts on failed or slow runs |
 | **Security** | Retrieved text is treated as untrusted: it is delimited, tag-sanitised and covered by a planted prompt-injection test. MCP tools are read-only with validated arguments. Secrets come only from the environment, gitleaks runs in pre-commit and in CI over the full history, and the container runs as non-root. | Secret manager instead of env vars |
 
 ## Quality and evaluation
 
-A 46-question golden set covers every anomaly type and screen. [RAGAS](evals/run_ragas.py) scores it on every push, and CI fails if any metric drops below [its threshold](evals/thresholds.yaml). Each row names who wrote the answers and who judged them; every row is in [`evals/history.csv`](evals/history.csv).
+I wrote a golden set of 46 questions, each with a reference answer and the passages that support it, covering every anomaly type and every screen. [RAGAS](evals/run_ragas.py) scores it on every push, and CI fails if a metric drops below [its threshold](evals/thresholds.yaml). Each row says who wrote the answers and who judged them; all of them are in [`evals/history.csv`](evals/history.csv).
 
 | Retriever | Answers written by | Judged by | Faithfulness | Answer relevancy | Context precision | Context recall |
 |---|---|---|---|---|---|---|
@@ -350,7 +338,7 @@ A 46-question golden set covers every anomaly type and screen. [RAGAS](evals/run
 | Hybrid + reranker | `qwen2.5:1.5b`, local, through Ollama | offline | 0.427 | 0.624 | 0.830 | 0.922 |
 | *Threshold* | | | *0.85* | *0.80* | *0.80* | *0.85* |
 
-*Offline* means no language model grades anything: RAGAS's non-LLM context precision and recall against the reference passages, an NLI cross-encoder for faithfulness and an MS MARCO cross-encoder for relevancy ([ADR 0006](docs/adr/0006-offline-eval-judges.md)). The model rows keep retrieval identical and change who writes the answers. Groq's `gpt-oss-120b` answers the questions well (relevancy 0.943), but the small NLI model finds only 0.566 of its sentences supported, because it doesn't recognise a paraphrase as support. So in a second run I had a different model grade them: Qwen3.8-27B found 0.935 of the claims in `gpt-oss-120b`'s answers supported by the passages it was given. Qwen's relevancy of 0.720 is RAGAS's embedding measure, the similarity between the real question and one the judge reconstructs from the answer, so it isn't on the cross-encoder's scale. A 1.5-billion-parameter local model gets 0.427 faithfulness from the offline judge. That spread is why CI gates on extractive answers, which can't claim more than the passages say, and why the model-judged runs happen by hand and on release tags (`ragas (model answers)` in CI).
+*Offline* means no language model grades anything: RAGAS's non-LLM context metrics, an NLI cross-encoder for faithfulness and an MS MARCO cross-encoder for relevancy ([ADR 0006](docs/adr/0006-offline-eval-judges.md)). The model rows keep retrieval the same and change who writes the answers. Groq's `gpt-oss-120b` answers well (relevancy 0.943), but the small NLI model credits only 0.566 of its sentences, because it doesn't recognise a paraphrase as support. So I had a different model grade the same model's answers in a second run: Qwen3.8-27B found 0.935 of the claims supported by the passages. Its relevancy (0.720) is RAGAS's embedding measure, not on the cross-encoder's scale. A 1.5-billion-parameter local model gets 0.427. That spread is why CI gates on extractive answers, and why the model-judged runs are a separate job, run by hand and on release tags.
 
 CI also runs ruff, black and mypy, then 158 tests with an 80% coverage gate (currently 93.17%), including Postgres, MCP, agent, prompt-injection and chaos tests. It finishes with gitleaks and a production build of the web app. Details are in [docs/EVALUATION.md](docs/EVALUATION.md).
 
@@ -414,13 +402,13 @@ Links in *Where* and *Test* point at the exact lines, pinned to commit `e8dcd0e`
 
 ## Limitations and next steps
 
-- The hosted demo runs without a model unless a key is set on the server: explanations then come from templates and answers are extractive, which `/healthz` shows as `"llm_providers": ["extractive"]`. The captured results above ran on a local stack with the same free-tier keys.
-- The hosted API is on a free tier that sleeps after 15 idle minutes; the first request after that takes up to a minute.
+- The hosted demo writes with Groq's free tier, which allows about 8,000 tokens a minute. A burst of scans and questions can run past it; calls then fall through to the next provider and, last, to the template, and every report says which wrote it.
+- The hosted API sleeps after 15 idle minutes, and the first request after that takes up to a minute. It also runs without the reranker to fit in 512 MB, so its search rankings differ a little from the local ones shown here.
 - The demo's free Postgres expires around 2026-10-19. Applying the Render blueprint again recreates it, and the **Reseed the demo** workflow reloads the sample, scans and writes the findings up again ([docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)).
-- Scans run on a schedule, not when data lands. Next step: trigger them from the loader or a Kafka topic.
-- The Reporter proposes fixes but doesn't apply them. Next step: open a pull request with the fix, gated on approval.
-- Confidence thresholds are set by hand. Next step: tune them from the approve and reject history.
-- One domain at a time. Next step: an adapter registry and multi-tenant auth so several domains can run side by side.
+- Scans run on a schedule rather than when data lands; triggering them from the loader, or a Kafka topic, is the obvious next step.
+- The Reporter proposes fixes but never applies them. Opening a pull request with the fix, gated on approval, would close that loop.
+- Confidence thresholds are set by hand, and the approve and reject history is already in the ledger to tune them from.
+- It runs one domain at a time; an adapter registry and multi-tenant auth would let several run side by side.
 
 ## License
 

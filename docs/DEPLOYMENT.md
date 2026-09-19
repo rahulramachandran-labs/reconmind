@@ -11,7 +11,7 @@ The web app runs on Vercel and the API, with its Postgres, on Render. [`railway.
 
 1. Open [render.com/deploy?repo=…/reconmind](https://render.com/deploy?repo=https://github.com/rahulramachandran-labs/reconmind) and approve the blueprint in [`render.yaml`](../render.yaml). It creates the Docker web service and a free Postgres, and on every start the container runs migrations and loads the synthetic sample ([`scripts/start.sh`](../scripts/start.sh)).
 2. Fill in the variables the blueprint leaves blank: `WRITE_TOKEN` (any long random string, e.g. `openssl rand -hex 24`) and, optionally, a model key and the LangFuse keys. A free tier is enough: `GROQ_API_KEY`, `GEMINI_API_KEY` or `OPENROUTER_API_KEY` (or the paid `OPENAI_API_KEY` / `ANTHROPIC_API_KEY`). Once one is set, `/healthz` lists it under `llm_providers` and `/model` names the model that will answer. Everything else is set by the blueprint and explained in [`.env.example`](../.env.example).
-3. With the service connected to the GitHub repo, every push to `main` redeploys it. Otherwise, use **Manual Deploy → Deploy latest commit**.
+3. To redeploy on every push to `main`, turn on Auto-Deploy for the service in Render, or add the service's deploy hook URL as the repository secret `RENDER_DEPLOY_HOOK_URL`; CI calls it once every check has passed. Otherwise, use **Manual Deploy → Deploy latest commit**.
 
 The image has no PyTorch: embeddings run on onnxruntime through fastembed, the MCP servers run in-process and the reranker is off, so the whole API fits a 512 MB instance ([ADR 0003](adr/0003-onnx-embeddings-in-the-container.md)).
 

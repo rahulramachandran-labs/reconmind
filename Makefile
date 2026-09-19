@@ -77,7 +77,7 @@ sync: ## hooks + tests, then commit everything and push. usage: make sync MSG="f
 	git commit -m "$(MSG)"
 	git push origin main
 
-deploy: ## deploy the web app to vercel (the api redeploys on push via render)
+deploy: ## deploy the web app to vercel (the api redeploys from render, or ci's deploy hook if set)
 	cd frontend && vercel deploy --prod --yes
 
 clean:

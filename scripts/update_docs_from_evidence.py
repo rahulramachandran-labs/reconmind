@@ -173,7 +173,7 @@ def report_block() -> str:
     )
     return "\n".join(
         [
-            "The key-drift report from that scan, exactly as the API returned it:",
+            "The key-drift report from the captured scan, exactly as the API returned it:",
             "",
             f"> **Problem.** {k['problem_statement']}",
             ">",
@@ -210,12 +210,17 @@ def schema_block(sha: str) -> str:
     code = "\n".join((ROOT / path).read_text().splitlines()[a - 1 : b])
     return "\n".join(
         [
-            "Every report is validated against this model before it is stored "
-            f"([`{path}`]({REPO}/blob/{sha}/{path}#L{a}-L{b})):",
+            "<details>",
+            "<summary>The report contract: every report is validated against this Pydantic "
+            "model before it is stored</summary>",
+            "",
+            f"From [`{path}`]({REPO}/blob/{sha}/{path}#L{a}-L{b}):",
             "",
             "```python",
             code,
             "```",
+            "",
+            "</details>",
         ]
     )
 
@@ -231,125 +236,145 @@ def results_block(s: dict[str, Any]) -> str:
     rows = [
         (
             "Schema drift",
-            f"`{p['schema_drift']['file']}` renames `channel_basket_id` to "
-            f"`basket_ref`: {p['schema_drift']['affected_rows']} rows",
+            f"`{p['schema_drift']['file']}` renames `channel_basket_id` to `basket_ref`: "
+            f"{p['schema_drift']['affected_rows']} rows",
             "schema_drift",
         ),
         (
             "Key drift",
             f"`{p['key_drift']['location_id']}` also reports as "
-            f"`{p['key_drift']['drifted_outlet_id']}`: {p['key_drift']['drifted_rows']} "
-            f"of {p['key_drift']['rows_in_window']:,} rows",
+            f"`{p['key_drift']['drifted_outlet_id']}`: {p['key_drift']['drifted_rows']} of "
+            f"{p['key_drift']['rows_in_window']:,} rows",
             "key_drift",
         ),
         (
             "Duplicate submission",
             f"`{p['duplicate_submission']['resend_file']}` supersedes "
             f"{p['duplicate_submission']['superseded_rows']} rows, "
-            f"{p['duplicate_submission']['changed_rows']} with changed "
-            "values, after the DAG ran",
+            f"{p['duplicate_submission']['changed_rows']} with changed values, after the DAG ran",
             "duplicate_submission",
         ),
         (
             "Volume anomaly",
-            f"`{p['volume_anomaly']['file']}`: {p['volume_anomaly']['rows']} "
-            f"rows vs {p['volume_anomaly']['trailing_avg_7d']} trailing, "
+            f"`{p['volume_anomaly']['file']}`: {p['volume_anomaly']['rows']} rows vs "
+            f"{p['volume_anomaly']['trailing_avg_7d']} trailing, "
             f"{p['volume_anomaly']['minutes_after_sla']} min late",
             "volume_anomaly",
         ),
     ]
     out = [
-        f"From the last capture of every scenario, on {s['captured_at'][:10]}, against a "
-        "freshly seeded local stack with Groq's free tier first in the fallback chain "
+        f"From the last capture, on {s['captured_at'][:10]}: a freshly seeded local stack with "
+        "Groq's free tier first in the fallback chain, and every scenario a reviewer would try "
         "([`docs/evidence/`](docs/evidence/README.md)). Planted sizes are from "
         "[`expected_anomalies.json`](data/sample/expected_anomalies.json).",
         "",
-        "| Planted anomaly | Planted size | Finding produced | Severity (expected) | Outcome "
-        "| Written by |",
+        "| Planted anomaly | Planted size | Finding produced | Severity | Outcome | Written by |",
         "|---|---|---|---|---|---|",
     ]
     for name, size, key in rows:
         x = f[key]
+        expected = x["planted"]["expected_severity"]
+        sev = x["severity"] + (", as expected" if x["severity"] == expected else f" ({expected})")
         outcome = "held for review" if x["status"] == "pending_review" else x["status"]
         out.append(
-            f"| {name} | {size} | {x['title']} ({x['affected_records']} records) | "
-            f"{x['severity']} ({x['planted']['expected_severity']}) | {outcome} | "
-            f"`{x.get('written_by', x['analysis_by'])}` |"
+            f"| {name} | {size} | {x['title']}; {x['affected_records']} records | {sev} | "
+            f"{outcome} | `{x.get('written_by', x['analysis_by'])}` |"
         )
-    q, rg, rs = s["questions"], s.get("regenerate_s1") or {}, s.get("rescan") or {}
-    after = {x["severity"]: x for x in s.get("feed_after", [])}
-    caught = (
-        all(x["severity"] == x["planted"]["expected_severity"] for x in sc["findings"])
-        and len(sc["findings"]) == 4
+    caught = len(sc["findings"]) == 4 and all(
+        x["severity"] == x["planted"]["expected_severity"] for x in sc["findings"]
     )
-    follow = q.get("ask-follow-up", {})
     out += [
         "",
-        f"- **{'Every planted anomaly found' if caught else 'Not every anomaly found'}**, "
-        "each by the expected specialist at the expected severity, and nothing else flagged.",
-        f"- **Scan:** {sc['wall_seconds']} s from the request to four written-up findings: "
+        (
+            "All four planted anomalies were found, each by the specialist expected to find it "
+            "and at the expected severity, and nothing else was flagged."
+            if caught
+            else "Not every planted anomaly was found as expected; see the table."
+        )
+        + f" The scan took {sc['wall_seconds']} s from the request to four written-up findings: "
         f"{sc['nodes']} agent nodes, {sc['tool_calls']} MCP tool calls, {sc['retrievals']} "
-        f"retrievals, {sc['llm_calls']} model calls ({sc['prompt_tokens']:,} prompt and "
+        f"retrievals and {sc['llm_calls']} model calls ({sc['prompt_tokens']:,} prompt and "
         f"{sc['completion_tokens']:,} completion tokens, ${sc['cost_usd']:.2f} on the free tier).",
-        f"- **Investigation question:** *{q['ask-mobile']['question']}* went to Data-Quality "
-        f"only; {q['ask-mobile']['llm_calls']} model calls.",
+        "",
+        "Then the questions, each a real run:",
+        "",
     ]
-    if follow:
-        fell = [
-            fb
-            for st in load("ask-follow-up-run.json")["steps"]
-            if st["kind"] == "llm"
-            for fb in (st.get("output") or {}).get("fallbacks") or []
-        ]
-        why = (
-            ", because Groq's per-minute token limit sent some calls on to the next provider"
-            if any("RateLimit" in fb for fb in fell)
-            else ""
+    q = s["questions"]
+
+    def went(a: dict[str, Any]) -> str:
+        if a.get("intent") == "investigate":
+            who = " and ".join(x.replace("_", "-") for x in a.get("specialists") or [])
+            return f"went to {who}"
+        if a.get("intent") == "explore":
+            return "went to the Explorer"
+        if a.get("intent") == "answer":
+            return "was answered from the runbooks"
+        return f"was routed `{a.get('intent')}`"
+
+    for slug in ("ask-mobile", "ask-runbook", "ask-follow-up", "ask-explore"):
+        a = q.get(slug)
+        if not a:
+            continue
+        line = (
+            f"- *{a['question']}* {went(a)} in {a['latency_ms'] / 1000:.1f} s, "
+            f"{a['llm_calls']} model call{'s' if a['llm_calls'] != 1 else ''}"
         )
-        out.append(
-            f"- **Runbook question and follow-up:** *{q['ask-runbook']['question']}* was "
-            "answered from the runbooks with a citation; the follow-up in the same session, "
-            f"*{follow['question']}*, used {follow['llm_calls']} model calls "
-            f"({', '.join(follow['models'])}){why}."
-        )
+        if slug == "ask-follow-up":
+            line += " (asked in the same session, so the Planner saw the question before it)"
+        if a.get("tools_used"):
+            tools = ", ".join(f"`{x.split('/')[1]}`" for x in a["tools_used"])
+            line += f"; the model chose {tools}"
+        if a.get("reply"):
+            line += f". It said: *\u201c{first_sentence(a['reply'])}\u201d*"
+        out.append(line + ("" if line.endswith(".") else "."))
+    rg, rs = s.get("regenerate_s1") or {}, s.get("rescan") or {}
+    after = s.get("feed_after", [])
+    out.append("")
+    notes = []
     if rg:
         m = rg["model_analysis"]
-        out.append(
-            f"- **Written up again:** `POST /incidents/{{id}}/regenerate` on the S1 returned "
-            f"HTTP {rg['status_code']} with `analysis_by: {rg['analysis_by']}`, written by "
-            f"`{m['provider']}/{m['model']}` in {m['latency_ms']:,} ms, the template's version "
-            "kept beside it."
+        notes.append(
+            "Writing the S1 up again with `POST /incidents/{id}/regenerate` returned HTTP "
+            f"{rg['status_code']}, `analysis_by: {rg['analysis_by']}`, from "
+            f"`{m['provider']}/{m['model']}` in {m['latency_ms']:,} ms, with the template's "
+            "version kept beside it."
         )
     if s.get("review_s1"):
-        out.append(
-            "- **Signed off:** approving the S1 with a note resumed its paused run and "
-            "published it."
+        notes.append("Approving it with a note resumed its paused run and published it.")
+    if rs:
+        s1: dict[str, Any] = next((x for x in after if x["severity"] == "S1"), {})
+        fell = rs.get("fallbacks") or []
+        notes.append(
+            f"A second scan took {rs.get('latency_ms', 0) / 1000:.1f} s and paused for nothing; "
+            f"the feed still held {len(after)} findings, each counted as seen again (the S1 "
+            f"{s1.get('seen_count')} times, counting the questions that looked at it). It reused "
+            f"the stored write-ups rather than asking the model again, so its {rs['llm_calls']} "
+            f"model call{'s' if rs['llm_calls'] != 1 else ''} went to the summary"
+            + (f", after falling back past {', '.join(fell)}." if fell else ".")
         )
-    if rs and "S1" in after:
-        out.append(
-            f"- **Scanned again:** the second scan {rs['status']} without pausing, and the feed "
-            f"still holds {len(s['feed_after'])} findings, each seen again (the S1 "
-            f"{after['S1']['seen_count']} times, counting the questions that looked at it)."
-        )
+    if notes:
+        out.append(" ".join(notes))
+        out.append("")
+    tail = []
     if t:
-        out.append(
-            f"- **Tests:** {t['passed']} passed, {t['failed']} failed, "
+        tail.append(
+            f"`make test`: {t['passed']} passed, {t['failed']} failed, "
             f"{t['coverage_percent']}% line and branch coverage "
             "([`tests.txt`](docs/evidence/tests.txt))."
         )
     if gate:
-        out.append(
-            f"- **RAGAS gate:** {gate['gate']} (faithfulness {float(gate['faithfulness']):.3f}, "
+        tail.append(
+            f"The RAGAS gate: {gate['gate']} (faithfulness {float(gate['faithfulness']):.3f}, "
             f"answer relevancy {float(gate['answer_relevancy']):.3f}, context precision "
             f"{float(gate['context_precision']):.3f}, context recall "
-            f"{float(gate['context_recall']):.3f}; hybrid retrieval, extractive answers, "
-            "offline judges)."
+            f"{float(gate['context_recall']):.3f})."
         )
     if ci:
-        out.append(
-            f"- **CI:** [run {ci['databaseId']}]({ci['url']}) on "
-            f"`{ci['headSha'][:7]}`, {ci['conclusion']}."
+        tail.append(
+            f"CI: [run {ci['databaseId']}]({ci['url']}) on `{ci['headSha'][:7]}`, "
+            f"{ci['conclusion']}."
         )
+    out.append(" ".join(tail))
     return "\n".join(out)
 
 
@@ -385,6 +410,12 @@ SCREENS = [
         "ask-runbook.png",
         "Answered from the runbooks with numbered citations, and the footer names the model "
         "that answered.",
+    ),
+    (
+        "Ask ReconMind: a fact no check covers",
+        "ask-explore.png",
+        "The Planner sends it to the Explorer, which picks the read-only tools itself (at most "
+        "three), then answers from what they returned.",
     ),
     (
         "Traces",
@@ -512,13 +543,15 @@ COURSE = [
     ),
     (
         "LangChain",
-        "Markdown and dbt YAML loaders, section-aware splitting, retrievers, session memory in "
-        "Postgres",
+        "Markdown and dbt YAML loaders, section-aware splitting, a `BaseRetriever`, a "
+        "`ChatPromptTemplate` with a `MessagesPlaceholder`, chat memory as a "
+        "`BaseChatMessageHistory` over Postgres",
         [
             ("app/retrieval/corpus.py", "load_corpus", "`load_corpus`"),
             ("app/retrieval/chunking.py", "chunk_docs", "`chunk_docs`"),
             ("app/retrieval/hybrid.py", "HybridRetriever", "`HybridRetriever`"),
-            ("app/memory/sessions.py", "SqlSessionStore", "`SqlSessionStore`"),
+            ("app/rag/prompts.py", "answer_messages", "`ANSWER_PROMPT`"),
+            ("app/memory/sessions.py", "SessionHistory", "`SessionHistory`"),
         ],
         [
             ("tests/unit/test_corpus.py", "test_chunks_carry_title_and_section", "chunk metadata"),
@@ -528,9 +561,14 @@ COURSE = [
                 "LangChain retriever",
             ),
             (
+                "tests/unit/test_rag.py",
+                "test_the_answer_prompt_is_a_chat_prompt_template",
+                "prompt template",
+            ),
+            (
                 "tests/unit/test_sessions.py",
-                "test_memory_store_keeps_order_and_limits_history",
-                "session history",
+                "test_a_session_is_a_langchain_message_history",
+                "message history",
             ),
         ],
     ),
@@ -555,11 +593,12 @@ COURSE = [
     (
         "Agentic AI",
         "LangGraph StateGraph, conditional edges, parallel specialists, checkpoints, "
-        "human-in-the-loop",
+        "human-in-the-loop, and an Explorer where the model chooses its own tools",
         [
             ("app/agents/graph.py", "build_graph", "`build_graph`"),
             ("app/agents/review.py", "report_review", "`interrupt()`"),
             ("app/agents/bootstrap.py", "build_investigations", "Postgres checkpointer"),
+            ("app/agents/explorer.py", "run", "Explorer (tool choice)"),
         ],
         [
             (
@@ -571,6 +610,11 @@ COURSE = [
                 "tests/integration/test_agents.py",
                 "test_approving_the_review_resumes_and_writes_the_ledger",
                 "pause and resume",
+            ),
+            (
+                "tests/integration/test_agents.py",
+                "test_the_explorer_answers_from_the_tools_it_chose",
+                "model picks tools",
             ),
         ],
     ),
@@ -808,14 +852,17 @@ NOTES = {
     "tokens and estimated cost for every call. `DEMO_MODE` removes the paid providers.",
     "LangChain": "Markdown with front matter and dbt model YAML are loaded as documents, split "
     "by section then size with the section carried into each chunk, and served through a "
-    "LangChain `BaseRetriever`. Chat history lives in Postgres and is replayed into the "
-    "prompt for follow-ups.",
+    "LangChain `BaseRetriever`. The answer prompt is a `ChatPromptTemplate` whose "
+    "`MessagesPlaceholder` takes the conversation so far, read from a "
+    "`BaseChatMessageHistory` over the Postgres session store.",
     "RAG": "BM25 with an identifier-aware tokenizer and MiniLM embeddings each rank the "
     "corpus, reciprocal rank fusion merges them, and a cross-encoder re-scores the top 10. "
     "RAGAS scores the golden set on every push and fails CI below the thresholds.",
     "Agentic AI": "A LangGraph `StateGraph`: the Planner routes, specialists built from the "
     "domain adapter run in the same superstep, the Reporter decides who signs off, and "
-    "`interrupt()` pauses the run in Postgres until a reviewer decides.",
+    "`interrupt()` pauses the run in Postgres until a reviewer decides. For a question no "
+    "check covers, the Explorer lets the model choose among the MCP tools, up to three "
+    "calls, and answer from what they return (ADR 0013).",
     "MCP": "Two MCP servers expose warehouse and orchestrator metadata as typed, read-only "
     "tools. The agents reach them through one client over stdio, streamable HTTP or in "
     "process, and every call is traced.",

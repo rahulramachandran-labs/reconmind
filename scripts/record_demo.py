@@ -23,6 +23,9 @@ from playwright.async_api import Page, async_playwright
 
 MOBILE_QUESTION = "Did the MOBILE file have a schema problem on 2026-06-16?"
 RUNBOOK_QUESTION = "Which file wins when a submitter resends the same day?"
+EXPLORE_QUESTION = (
+    "Show me which submitter sent the fewest rows on 2026-06-18, and when its file landed."
+)
 
 
 async def shot(page: Page, out: Path, name: str, hold: int = 1) -> None:
@@ -148,6 +151,11 @@ async def screenshots(base: str, api: str, out: Path) -> None:
         await page.keyboard.press("Enter")
         await page.wait_for_selector("text=/^answered by/", timeout=600_000)
         await still("ask-runbook")
+        await page.click("text=New conversation")
+        await page.fill("textarea", EXPLORE_QUESTION)
+        await page.keyboard.press("Enter")
+        await page.wait_for_selector("text=/^answered by/", timeout=600_000)
+        await still("ask-explore")
 
         await page.goto(f"{base}/traces/{scan['id']}")
         await page.wait_for_selector("text=LLM calls")
@@ -285,6 +293,16 @@ async def video(base: str, api: str, out: Path) -> None:
             "and names the model that answered.",
             6,
         )
+        await page.click("text=New conversation")
+        await page.fill("textarea", EXPLORE_QUESTION)
+        await page.keyboard.press("Enter")
+        await say(
+            "A fact no check covers goes to the Explorer: the model picks read-only tools "
+            "itself, up to three.",
+            3,
+        )
+        await page.wait_for_selector("text=/^answered by/", timeout=300_000)
+        await say("It answers from what the tools returned; the trace shows each call.", 6)
 
         scan = next(r for r in api_get(api, "/runs") if r["trigger"] == "scan")
         await page.goto(f"{base}/traces/{scan['id']}")
