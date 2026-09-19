@@ -122,3 +122,22 @@ jobs:
         env:
           NEXT_PUBLIC_API_URL: https://example.invalid
           NEXT_TELEMETRY_DISABLED: "1"
+
+  # Render redeploys the API only when told to: this calls the service's deploy hook once
+  # every check on main has passed. Without the RENDER_DEPLOY_HOOK_URL secret it does nothing.
+  deploy-api:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [lint, test, eval, secrets, web]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Trigger the Render deploy hook
+        env:
+          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "$HOOK" ]; then
+            echo "RENDER_DEPLOY_HOOK_URL is not set; deploy the API from the Render dashboard"
+            exit 0
+          fi
+          curl -fsS -X POST "$HOOK" > /dev/null
+          echo "deploy of ${GITHUB_SHA::7} requested"

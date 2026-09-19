@@ -89,7 +89,7 @@ make bootstrap   # Python and Node dependencies, git hooks, .env and frontend/.e
 make dev         # Postgres, migrations and sample data, then the API on :8000 and the web app on :3000
 ```
 
-No keys are needed. Without a model, explanations come from templates and the runbooks. To have a model write them, add `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` to `.env`, or run `ollama pull qwen2.5:1.5b`. Every setting is explained in [`.env.example`](.env.example).
+No keys are needed. Without a model, explanations come from templates and the runbooks. To have a model write them, add a free-tier key (`GROQ_API_KEY`, `GEMINI_API_KEY` or `OPENROUTER_API_KEY`), a paid one (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`) to `.env`, or run `ollama pull qwen2.5:1.5b`. Every setting is explained in [`.env.example`](.env.example).
 
 ## Runbook: walk through the whole flow locally
 

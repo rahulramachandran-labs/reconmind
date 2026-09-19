@@ -22,5 +22,12 @@ def healthz(
         "chunks": len(retrieval.chunks),
         "retriever": retrieval.mode,
         "llm_providers": llm.names or ["extractive"],
+        "llm_models": {p.name: p.model for p in llm.providers},
         "database": getattr(request.app.state, "db_ok", False),
     }
+
+
+@router.get("/model")
+def model(llm: Annotated[LLMChain, Depends(get_llm)]) -> dict[str, object]:
+    """The provider the next model call goes to, and whether the last one fell back."""
+    return llm.status()

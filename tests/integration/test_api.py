@@ -19,7 +19,14 @@ def test_healthz(client: TestClient) -> None:
     assert body["chunks"] > 60
     assert body["retriever"] == "hybrid"
     assert body["llm_providers"] == ["extractive"]
+    assert body["llm_models"] == {}
     assert body["database"] is False
+
+
+def test_model_reports_extractive_until_a_provider_is_configured(client: TestClient) -> None:
+    body = client.get("/model").json()
+    assert body["provider"] == "extractive" and body["model"] is None
+    assert body["chain"] == ["extractive"] and body["fell_back"] is None
 
 
 def test_ask_creates_a_session_and_remembers_it(client: TestClient) -> None:

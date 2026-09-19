@@ -31,16 +31,31 @@ class Settings(BaseSettings):
     pinecone_index: str = "reconmind"
 
     # tried in order; DEMO_MODE drops the paid ones so a demo never costs anything
-    llm_providers: list[str] = Field(default=["openai", "anthropic", "ollama"])
+    llm_providers: list[str] = Field(
+        default=["openai", "anthropic", "groq", "gemini", "openrouter", "ollama"]
+    )
     demo_mode: bool = False
     openai_api_key: SecretStr | None = None
     openai_model: str = "gpt-5-mini"
     anthropic_api_key: SecretStr | None = None
     anthropic_model: str = "claude-haiku-4-5"
+    # free tiers, all spoken to through the OpenAI-compatible chat API
+    groq_api_key: SecretStr | None = None
+    groq_model: str = "openai/gpt-oss-120b"
+    groq_base_url: str = "https://api.groq.com/openai/v1"
+    groq_free_tier: bool = True
+    gemini_api_key: SecretStr | None = None
+    gemini_model: str = "gemini-2.5-flash"
+    gemini_base_url: str = "https://generativelanguage.googleapis.com/v1beta/openai/"
+    gemini_free_tier: bool = True
+    openrouter_api_key: SecretStr | None = None
+    openrouter_model: str = "deepseek/deepseek-v4-flash-0731:free"
+    openrouter_base_url: str = "https://openrouter.ai/api/v1"
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "qwen2.5:1.5b"
     llm_timeout_s: float = 60.0
     llm_cooldown_s: float = 60.0
+    llm_concurrency: int = 2  # model calls at once; free tiers limit tokens per minute
 
     database_url: str | None = None
 
@@ -69,6 +84,7 @@ class Settings(BaseSettings):
         default=["http://localhost:3000", "https://reconmind-labs.vercel.app"]
     )
     max_question_chars: int = 1000
+    public_url: str = "https://reconmind-labs.vercel.app"
     history_turns: int = 3
 
 

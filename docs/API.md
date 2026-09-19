@@ -24,6 +24,7 @@ The API is FastAPI; interactive docs are served at `/docs` on any running instan
 | `GET` | `/corpus`, `/corpus/{doc_id}` | The indexed documents |
 | `GET` | `/sessions/{id}/messages` | A chat session's history |
 | `GET` | `/healthz` | Status, version, chunk count, retriever, model providers, database |
+| `GET` | `/model` | The provider and model the next call goes to, the fallback order, and whether the last call fell back |
 
 ## Chat stream events
 

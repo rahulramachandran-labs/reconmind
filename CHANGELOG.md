@@ -4,7 +4,14 @@ All notable changes, grouped by build phase. Dates are UTC.
 
 ## [Unreleased]
 
+### Added
+- Free-tier model providers in the fallback chain, after OpenAI and Anthropic and before Ollama: Groq (`openai/gpt-oss-120b`), Google Gemini (`gemini-2.5-flash`, thinking off) and OpenRouter (`deepseek/deepseek-v4-flash-0731:free`), each through the OpenAI-compatible API with the same cooldown, cost accounting and tracing. Free-tier calls retry a 429 before falling through, record $0, and run at most `LLM_CONCURRENCY` (2) at a time so a scan stays under a tokens-per-minute limit.
+- `GET /model`: the provider and model the next call goes to, the fallback order, and whether the last call fell back. `/healthz` adds `llm_models`.
+- CI calls a Render deploy hook (`RENDER_DEPLOY_HOOK_URL`) once every check on `main` has passed.
+- Web: incident reports show the template and model write-ups under *Deterministic checks* and *Model analysis* (or side by side) with provider, model, latency, tokens and cost; a header pill names the active model; each chat answer names who answered and says plainly when it fell back to an extractive answer; a notice while the free-tier API wakes up; *Run a scan* tells signed-out visitors to sign in as the demo reviewer; a permalink page per incident; and `/verify`, which lines up each planted anomaly with its finding, its chaos test and both write-ups, takes a question for the live model, and shows the latest RAGAS scores.
+
 ### Changed
+- An empty reply from a model counts as a failed call, so the chain moves on to the next provider.
 - README rewritten for a first-time reader: what ReconMind does and how a run flows end to end come first, then a step-by-step runbook for exploring it locally, the project structure, and production readiness (authentication, storage, knowledge retrieval, state). The detail moved to `docs/ARCHITECTURE.md`, `docs/API.md`, `docs/DEPLOYMENT.md`, `docs/EVALUATION.md` and `docs/DEVELOPMENT.md`.
 - Backend reorganised (ADR 0012): one module per agent (`planner`, `specialists`, `reporter`, `answerer`, `review`), `app/core`, `app/llm`, `app/rag` and `app/memory` packages, the run store split into Postgres and in-memory modules, and the retail domain split into `rules`, `checks`, `writeups` and `adapter`. No behaviour change.
 - `.env.example` explains every setting, and `frontend/.env.example` does the same for the web app.
