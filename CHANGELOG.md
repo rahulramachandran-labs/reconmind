@@ -4,51 +4,42 @@ All notable changes, grouped by build phase. Dates are UTC.
 
 ## [Unreleased]
 
-### Added
-- Every incident report keeps two write-ups: the template's (`template`) and, when a model's reply validated, the model's (`model_analysis`, with provider, model, latency, tokens, cost and prompt version). `analysis_by` is now `model` or `template`. The problem statement and counts stay the checks' in both.
-- `POST /incidents/{id}/regenerate` (write token): runs the finding's checks again and has the active model write it up, as its own traced run. `make regenerate-reports` and `scripts/regenerate_reports.py` do it for every finding without a model write-up.
-- `refresh-demo.yml` replaces `scheduled-scan.yml`: the six-hourly scan, then model write-ups for new findings.
-- The chat stream's `answer` event names the model and any providers it fell back past.
-- Startup logs which model providers are active and which were skipped, and why (for example `no GROQ_API_KEY`); with none, a warning says answers will be extractive.
+## [1.1.0] - 2026-09-19
 
-### Fixed
-- Migration 0004 folds findings duplicated before fingerprints: one report per finding keeps the seen count and latest sighting, the copies point at it through `duplicate_of` and leave the feed and the review queue, and runs that were waiting only on copies are marked `superseded`. Nothing is deleted; each fold is in the ledger.
-- Alembic no longer disables the app's loggers when migrations run in-process.
+A model now does the writing, and everything a reviewer needs to check that is in the repository.
 
 ### Added
-- Free-tier model providers in the fallback chain, after OpenAI and Anthropic and before Ollama: Groq (`openai/gpt-oss-120b`), Google Gemini (`gemini-3.6-flash`, thinking off; new keys can no longer use 2.5 Flash) and OpenRouter (`deepseek/deepseek-v4-flash-0731:free`), each through the OpenAI-compatible API with the same cooldown, cost accounting and tracing. Free-tier calls retry a 429 before falling through, record $0, and run at most `LLM_CONCURRENCY` (2) at a time so a scan stays under a tokens-per-minute limit.
-- `GET /model`: the provider and model the next call goes to, the fallback order, and whether the last call fell back. `/healthz` adds `llm_models`.
-- CI calls a Render deploy hook (`RENDER_DEPLOY_HOOK_URL`) once every check on `main` has passed.
-- Web: incident reports show the template and model write-ups under *Deterministic checks* and *Model analysis* (or side by side) with provider, model, latency, tokens and cost; a header pill names the active model; each chat answer names who answered and says plainly when it fell back to an extractive answer; a notice while the free-tier API wakes up; *Run a scan* tells signed-out visitors to sign in as the demo reviewer; a permalink page per incident; and `/verify`, which lines up each planted anomaly with its finding, its chaos test and both write-ups, takes a question for the live model, and shows the latest RAGAS scores.
+- **Free-tier models.** Groq (`openai/gpt-oss-120b`), Google Gemini (`gemini-3.6-flash`, thinking off; new keys can no longer use 2.5 Flash) and OpenRouter (`deepseek/deepseek-v4-flash-0731:free`) join the fallback chain after OpenAI and Anthropic and before Ollama, through the OpenAI-compatible API, with the same cooldown, cost accounting and tracing. Free-tier calls retry a 429 before falling through, record $0, and run at most `LLM_CONCURRENCY` (2) at a time. Startup logs which providers are active and which were skipped, and why (for example `no GROQ_API_KEY`).
+- **Both write-ups on every report.** The template's (`template`) and, when a model's reply validated, the model's (`model_analysis`, with provider, model, latency, tokens, cost and prompt version). `analysis_by` is `model` or `template`. The problem statement and counts stay the checks' in both.
+- `POST /incidents/{id}/regenerate` (write token) runs the finding's checks again and has the active model write it up, as its own traced run. `make regenerate-reports` and `scripts/regenerate_reports.py` do it for every finding without a model write-up.
+- `GET /model`: the provider and model the next call goes to, the fallback order, and whether the last call fell back. `/healthz` adds `llm_models`, and the chat stream's `answer` event names its model and any providers it fell back past.
+- **Web.** *Deterministic checks*, *Model analysis* and *Side by side* on every report, with the model's provider, latency, tokens and cost; a header pill naming the active model; each chat answer names who answered and says plainly when it was extractive; a notice while the free-tier API wakes up; `/verify`, which lines up each planted anomaly with its finding, its chaos test and both write-ups.
+- **Scheduled work.** `refresh-demo.yml` (replaces `scheduled-scan.yml`) scans every six hours and has the model write up new findings; `keepalive.yml` (replaces `keep-warm.yml`) keeps the free instance awake 03:00-19:00 UTC until `KEEP_ALIVE_UNTIL` (default 2026-10-03); `reseed.yml` reloads the sample into a recreated database, then scans and writes up; `make reseed`.
+- **CI.** A `fresh clone` job runs `make bootstrap && make dev` in an empty directory and checks that the API, the web app and `/ask` answer. A `ragas (model answers)` job, by hand and on release tags, scores Groq's answers with offline judges and with a different model judging (`--judge llm --judge-model groq/qwen/qwen3.8-27b`). The Render deploy hook is called once every check on `main` passes.
+- **Evidence.** `scripts/capture_readme_evidence.py` plays every scenario a reviewer would try against a running stack (scan, investigation question, runbook question and follow-up, the S1 written up again and signed off, a second scan) and saves the raw responses and test counts to `docs/evidence/`. `scripts/update_docs_from_evidence.py` then rewrites the README's trace excerpt, quoted report, Results, screens and test counts, and writes `docs/VERIFY.md` and `docs/COURSE_MAPPING.md`, with code links pinned to the commit.
+- Eleven screenshots in `docs/screenshots/`, a two-minute captioned walkthrough in `docs/demo.mp4` (`scripts/record_demo.py --screenshots`, `--video`), and `docs/demo.gif` cut from it.
+- `docs/REVIEWER_GUIDE.md`, an evaluate-in-five-minutes box at the top of the README, and a model-answered row in the evaluation table.
+- Findings are fingerprinted: a scan that sees a finding an earlier scan reported increments its `seen_count` and `last_seen_at` and writes `finding.seen_again` to the ledger instead of creating a new report. Repeats never pause a run, and rejected findings stay rejected. The incident feed shows how many scans have seen each finding. ADR 0011.
 
 ### Changed
-- An empty reply from a model counts as a failed call, so the chain moves on to the next provider.
-- README rewritten for a first-time reader: what ReconMind does and how a run flows end to end come first, then a step-by-step runbook for exploring it locally, the project structure, and production readiness (authentication, storage, knowledge retrieval, state). The detail moved to `docs/ARCHITECTURE.md`, `docs/API.md`, `docs/DEPLOYMENT.md`, `docs/EVALUATION.md` and `docs/DEVELOPMENT.md`.
-- Backend reorganised (ADR 0012): one module per agent (`planner`, `specialists`, `reporter`, `answerer`, `review`), `app/core`, `app/llm`, `app/rag` and `app/memory` packages, the run store split into Postgres and in-memory modules, and the retail domain split into `rules`, `checks`, `writeups` and `adapter`. No behaviour change.
+- README rewritten for a first-time reader: what ReconMind does and how a run flows end to end first, then results from a real run, screens, a step-by-step local runbook, the project structure and production readiness. Detail moved to `docs/ARCHITECTURE.md`, `docs/API.md`, `docs/DEPLOYMENT.md`, `docs/EVALUATION.md` and `docs/DEVELOPMENT.md`.
+- Backend reorganised (ADR 0012): one module per agent (`planner`, `specialists`, `reporter`, `answerer`, `review`), `app/core`, `app/llm`, `app/rag` and `app/memory` packages, the run store split into Postgres and in-memory modules, and the retail domain split into `rules`, `checks`, `writeups` and `adapter`.
 - `.env.example` explains every setting, and `frontend/.env.example` does the same for the web app.
+- `--judge llm` picks a judge that isn't the answering model, and only faithfulness and relevancy are model-judged; retrieval is still scored against the labelled chunks.
+- An empty reply from a model counts as a failed call, so the chain moves on.
+- Dashboard "open findings" counts what the latest scan saw, minus rejected ones. Render runs with `SCAN_INTERVAL_MINUTES=0`.
 
 ### Fixed
-- `/ask` strips context tags from retrieved passages, as the agents already did; the two paths now share one prompt module.
+- Migration 0004 folds findings duplicated before fingerprints existed: one report per finding keeps the seen count and latest sighting, the copies point at it through `duplicate_of` and leave the feed and the review queue, and runs that were waiting only on copies are marked `superseded`. Nothing is deleted; each fold is in the ledger.
+- A template cites a past incident only when it matches the finding type; the duplicate-submission template had been citing the schema-drift incident.
+- The trace page groups each step under the agent that recorded it; with two specialists running at once, one agent's tool calls had appeared under the other.
+- `/ask` strips context tags from retrieved passages, as the agents already did; the two paths share one prompt module.
+- The header no longer overlaps at desktop widths, and the chat says why a write-up came from a template instead of claiming no model was reachable.
+- Alembic no longer disables the app's loggers when migrations run in-process.
+- The package, the API and the web app all report 1.1.0.
 
 ### Removed
 - The `RETRIEVAL_K` setting, which nothing read.
-
-## [1.1.0] - 2026-09-19
-
-### Added
-- Scheduled scans from GitHub Actions (`scheduled-scan.yml`, every six hours and on demand): wakes the API, starts a scan with the write token from a repository secret, and writes the run summary to the job page.
-- Findings are fingerprinted. A scan that sees a finding an earlier scan reported increments its `seen_count` and `last_seen_at` and writes `finding.seen_again` to the ledger instead of creating a new report. Repeats never pause a run, and rejected findings stay rejected. Migration 0003 backfills fingerprints.
-- The incident feed shows how many scans have seen each finding.
-- ADR 0011.
-- `keep-warm.yml` pings `/healthz` every ten minutes from 03:00 to 19:00 UTC so the free instance doesn't sleep while people are looking at the demo. It stops after `KEEP_WARM_UNTIL` (a repository variable, default 2026-10-05), because free instance hours are shared across the Render workspace.
-
-### Changed
-- Dashboard "open findings" counts what the latest scan saw, minus rejected ones.
-- Render runs with `SCAN_INTERVAL_MINUTES=0`; a free instance sleeps too often for an in-process timer.
-- `docs/DEMO.md` gives the free-tier scan time (about fifteen seconds, against four locally) and says what to show if someone has already cleared the review queue.
-
-### Fixed
-- The package, the API and the web app all report 1.1.0; `/healthz` still said 0.1.0.
 
 ## [1.0.1] - 2026-09-18
 

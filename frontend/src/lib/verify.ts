@@ -15,7 +15,7 @@ export const ANOMALY_LABEL: Record<Anomaly, string> = {
 // The chaos suite plants each anomaly alone with the generator and asserts the right agent
 // reports it at the right severity; the ids are pytest's parametrize ids.
 const CHAOS_FILE = "tests/chaos/test_injected_anomalies.py";
-const CHAOS_LINES = "L60-L73";
+const CHAOS_LINES = "L60-L72";
 export const chaosTest = (kind: Anomaly) => ({
   label: `test_each_anomaly_is_caught_by_the_right_agent[${kind}]`,
   href: `${REPO_URL}/blob/main/${CHAOS_FILE}#${CHAOS_LINES}`,
