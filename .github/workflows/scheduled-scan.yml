@@ -1,0 +1,52 @@
+name: Scheduled scan
+
+# A free Render instance sleeps after 15 minutes without traffic, so a timer inside
+# the API rarely fires. This wakes it and starts a scan every six hours instead.
+on:
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: scheduled-scan
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      API: ${{ vars.RECONMIND_API_URL || 'https://reconmind-labs-api.onrender.com' }}
+    steps:
+      - name: Wake the API
+        run: |
+          for i in $(seq 1 18); do
+            if curl -sf --max-time 60 "$API/healthz" > /dev/null; then exit 0; fi
+            sleep 10
+          done
+          echo "::error::API did not wake up"
+          exit 1
+
+      - name: Run a scan
+        env:
+          TOKEN: ${{ secrets.RECONMIND_WRITE_TOKEN }}
+        run: |
+          run_id=$(curl -sf -X POST "$API/scan" \
+            -H "Authorization: Bearer $TOKEN" -H "X-Reviewer: scheduled-scan" | jq -r .run_id)
+          echo "run $run_id"
+          status=running
+          for i in $(seq 1 60); do
+            status=$(curl -sf "$API/runs/$run_id" | jq -r .status)
+            [ "$status" != "running" ] && break
+            sleep 5
+          done
+          {
+            echo "### Scheduled scan: $status"
+            echo
+            curl -sf "$API/runs/$run_id" | jq -r '.summary // "no summary"'
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "status: $status"
+          [ "$status" = "completed" ] || [ "$status" = "paused_review" ]

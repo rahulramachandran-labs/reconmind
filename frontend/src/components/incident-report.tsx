@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ExternalLink } from "lucide-react";
 
-import { SeverityBadge, StatusText } from "@/components/severity";
+import { SeverityBadge, StatusText, ago } from "@/components/severity";
 import type { IncidentReport } from "@/lib/api";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -101,6 +101,11 @@ export function ReportSummary({ report }: { report: IncidentReport }) {
       <SeverityBadge severity={report.severity} />
       <span className="min-w-0 flex-1 truncate text-sm font-medium">{report.title}</span>
       <span className="font-mono text-[11px] text-muted-foreground">{report.finding_type}</span>
+      {(report.seen_count ?? 1) > 1 && (
+        <span className="text-[11px] text-muted-foreground" title={report.last_seen_at ? `last seen ${ago(report.last_seen_at)}` : undefined}>
+          seen by {report.seen_count} scans
+        </span>
+      )}
       <StatusText status={report.status} />
     </div>
   );

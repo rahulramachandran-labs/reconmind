@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 from langgraph.checkpoint.memory import InMemorySaver
+from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
 from app.agents.llm import TracedLLM
@@ -23,6 +24,9 @@ from mcp_servers.warehouse_metadata.server import build_server as warehouse
 async def retail_service(
     engine: Engine, settings: Settings, providers: list[Any] | None = None, adapter: Any = None
 ) -> AsyncIterator[InvestigationService]:
+    # findings now carry over between scans, so every test starts without earlier runs
+    with engine.begin() as conn:
+        conn.execute(text("delete from agent_runs"))
     retrieval = RetrievalService.from_settings(settings)
     servers = {"warehouse-metadata": warehouse(engine), "orchestration-metadata": orchestration()}
     async with MCPToolBox(servers) as tools:

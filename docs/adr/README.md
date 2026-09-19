@@ -14,3 +14,4 @@ One file per decision that would be expensive to reverse, or that someone will a
 | [0008](0008-mcp-over-direct-clients.md) | Agents reach the pipeline through MCP, not direct clients | accepted |
 | [0009](0009-tracing-langfuse-and-postgres.md) | Trace every step to Postgres, mirror to LangFuse | accepted |
 | [0010](0010-facts-from-checks-language-from-models.md) | Facts come from checks; models only write the words | accepted |
+| [0011](0011-scheduled-scans-and-finding-fingerprints.md) | Scheduled scans from outside the API; findings are fingerprinted | accepted |

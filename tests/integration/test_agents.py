@@ -122,3 +122,44 @@ async def test_specialists_run_concurrently(loaded_engine: Engine, settings: Set
         await svc.run_to_end(svc.run("scan"))
         elapsed = time.perf_counter() - start
     assert elapsed < 1.1, f"two 0.6 s specialists took {elapsed:.2f}s"
+
+
+async def test_a_second_scan_does_not_duplicate_findings(
+    loaded_engine: Engine, settings: Settings
+) -> None:
+    async with retail_service(loaded_engine, settings) as svc:
+        first = await svc.run_to_end(svc.run("scan"))
+        second = await svc.run_to_end(svc.run("scan"))
+        ids_first = {e["id"] for e in first if e["type"] == "report"}
+        repeats = [e for e in second if e["type"] == "report"]
+        assert {e["id"] for e in repeats} == ids_first
+        assert all(e["repeat"] and e["seen_count"] == 2 for e in repeats)
+        assert (
+            second[-1]["type"] == "done"
+        ), "the S1 is already waiting; the second scan must not pause"
+        summary = next(e for e in second if e["type"] == "summary")
+        assert "0 new" in summary["headline"]
+        assert len(svc.store.list_incidents()) == 4
+        assert svc.store.open_findings()["by_severity"] == {"S1": 1, "S2": 3, "S3": 0, "S4": 0}
+        assert len(svc.store.list_incidents(status="pending_review")) == 1
+    with loaded_engine.connect() as conn:
+        seen = conn.scalar(
+            text("select count(*) from audit_ledger where action = 'finding.seen_again'")
+        )
+    assert seen >= 4
+
+
+async def test_a_rejected_finding_stays_rejected_on_rescan(
+    loaded_engine: Engine, settings: Settings
+) -> None:
+    async with retail_service(loaded_engine, settings) as svc:
+        events = await svc.run_to_end(svc.run("scan"))
+        paused = next(e for e in events if e["type"] == "paused")
+        report_id = uuid.UUID(paused["reports"][0]["id"])
+        run_id = svc.store.record_decision(report_id, "reject", "known, resend on its way", "rahul")
+        await svc.run_to_end(svc.resume(run_id, svc.store.pending_decisions(run_id)[0]))
+        again = await svc.run_to_end(svc.run("scan"))
+        s1 = next(e for e in again if e["type"] == "report" and e["severity"] == "S1")
+        assert s1["repeat"] and s1["status"] == "rejected"
+        assert again[-1]["type"] == "done"
+        assert svc.store.open_findings()["by_severity"]["S1"] == 0

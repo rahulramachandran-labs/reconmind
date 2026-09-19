@@ -8,7 +8,7 @@ from typing import Any
 from sqlalchemy import Engine, cast, func, select, update
 from sqlalchemy.types import Date
 
-from app.agents.schemas import IncidentReport
+from app.agents.schemas import IncidentReport, fingerprint
 from app.db.models import AgentRun, AgentStep, AuditLedger
 from app.db.models import IncidentReport as ReportRow
 from app.db.session import session_scope
@@ -40,6 +40,8 @@ def _row_to_run(r: AgentRun, **extra: Any) -> dict[str, Any]:
 def _row_to_report(r: ReportRow) -> dict[str, Any]:
     return r.report | {
         "status": r.status,
+        "seen_count": r.seen_count,
+        "last_seen_at": r.last_seen_at.isoformat() if r.last_seen_at else None,
         "review_decision": r.review_decision,
         "review_note": r.review_note,
         "reviewed_by": r.reviewed_by,
@@ -80,9 +82,43 @@ class SqlRunStore:
         with session_scope(self.engine) as s:
             s.execute(update(AgentRun).where(AgentRun.id == run_id).values(plan=plan))
 
-    def save_reports(self, run_id: uuid.UUID, reports: list[IncidentReport]) -> None:
+    def save_reports(
+        self, run_id: uuid.UUID, reports: list[IncidentReport]
+    ) -> list[IncidentReport]:
+        """Store new findings; a finding an earlier scan already reported is counted
+        as seen again instead. Returns what was recorded, repeats marked."""
+        out = []
+        now = datetime.now(UTC)
         with session_scope(self.engine) as s:
             for r in reports:
+                fp = r.fingerprint
+                existing = s.scalars(
+                    select(ReportRow)
+                    .where(ReportRow.fingerprint == fp)
+                    .order_by(ReportRow.created_at.desc())
+                    .limit(1)
+                ).first()
+                if existing is not None:
+                    existing.seen_count = (existing.seen_count or 1) + 1
+                    existing.last_seen_at = now
+                    s.add(
+                        AuditLedger(
+                            actor=f"agent:{r.specialist}",
+                            action="finding.seen_again",
+                            subject=str(existing.id),
+                            payload={"run_id": str(run_id), "seen_count": existing.seen_count},
+                        )
+                    )
+                    out.append(
+                        IncidentReport(**existing.report).model_copy(
+                            update={
+                                "status": existing.status,
+                                "seen_count": existing.seen_count,
+                                "repeat": True,
+                            }
+                        )
+                    )
+                    continue
                 s.add(
                     ReportRow(
                         id=r.id,
@@ -92,6 +128,9 @@ class SqlRunStore:
                         title=r.title,
                         status=r.status,
                         report=r.model_dump(mode="json"),
+                        fingerprint=fp,
+                        seen_count=1,
+                        last_seen_at=now,
                     )
                 )
                 s.add(
@@ -107,6 +146,8 @@ class SqlRunStore:
                         },
                     )
                 )
+                out.append(r)
+        return out
 
     def record_decision(
         self, report_id: uuid.UUID, decision: str, note: str | None, reviewer: str
@@ -256,7 +297,7 @@ class SqlRunStore:
         self, status: str | None = None, severity: str | None = None, limit: int = 100
     ) -> list[dict[str, Any]]:
         with session_scope(self.engine) as s:
-            q = select(ReportRow).order_by(ReportRow.created_at.desc()).limit(limit)
+            q = select(ReportRow).order_by(ReportRow.last_seen_at.desc()).limit(limit)
             if status:
                 q = q.where(ReportRow.status == status)
             if severity:
@@ -313,34 +354,38 @@ class SqlRunStore:
         }
 
     def open_findings(self) -> dict[str, Any]:
-        """Findings from the most recent run that produced any, minus rejected ones."""
+        """What the latest scan saw, minus anything a reviewer rejected."""
         with session_scope(self.engine) as s:
-            latest = s.scalar(
-                select(ReportRow.run_id).order_by(ReportRow.created_at.desc()).limit(1)
+            since = s.scalar(
+                select(AgentRun.started_at)
+                .where(AgentRun.trigger == "scan", AgentRun.status != "failed")
+                .order_by(AgentRun.started_at.desc())
+                .limit(1)
             )
+            q = select(ReportRow).where(ReportRow.status != "rejected")
+            if since is not None:
+                q = q.where(ReportRow.last_seen_at >= since)
+            rows = s.scalars(q).all()
             pending = s.scalar(
                 select(func.count())
                 .select_from(ReportRow)
                 .where(ReportRow.status == "pending_review")
             )
-            rows = (
-                s.scalars(
-                    select(ReportRow).where(
-                        ReportRow.run_id == latest, ReportRow.status != "rejected"
-                    )
-                ).all()
-                if latest
-                else []
-            )
         by = {sev: 0 for sev in ("S1", "S2", "S3", "S4")}
         for r in rows:
             by[r.severity] += 1
         return {
-            "run_id": str(latest) if latest else None,
+            "since": since.isoformat() if since else None,
             "by_severity": by,
             "pending_review": pending or 0,
             "items": [
-                {"id": str(r.id), "severity": r.severity, "title": r.title, "status": r.status}
+                {
+                    "id": str(r.id),
+                    "severity": r.severity,
+                    "title": r.title,
+                    "status": r.status,
+                    "seen_count": r.seen_count,
+                }
                 for r in sorted(rows, key=lambda r: r.severity)
             ],
         }
@@ -394,10 +439,32 @@ class MemoryRunStore:
     def save_plan(self, run_id: uuid.UUID, plan: dict[str, Any]) -> None:
         self.runs.setdefault(run_id, {})["plan"] = plan
 
-    def save_reports(self, run_id: uuid.UUID, reports: list[IncidentReport]) -> None:
+    def save_reports(
+        self, run_id: uuid.UUID, reports: list[IncidentReport]
+    ) -> list[IncidentReport]:
+        out = []
         for r in reports:
+            existing = next(
+                (
+                    x
+                    for x in self.reports.values()
+                    if fingerprint(x["finding_type"], x["title"]) == r.fingerprint
+                ),
+                None,
+            )
+            if existing is not None:
+                existing["seen_count"] = existing.get("seen_count", 1) + 1
+                self.ledger.append({"action": "finding.seen_again", "subject": existing["id"]})
+                out.append(
+                    IncidentReport(
+                        **{k: v for k, v in existing.items() if k in IncidentReport.model_fields}
+                    ).model_copy(update={"repeat": True})
+                )
+                continue
             self.reports[r.id] = r.model_dump(mode="json") | {"review_decision": None}
             self.ledger.append({"action": "finding.created", "subject": str(r.id)})
+            out.append(r)
+        return out
 
     def record_decision(
         self, report_id: uuid.UUID, decision: str, note: str | None, reviewer: str
@@ -508,7 +575,7 @@ class MemoryRunStore:
         live = [r for r in self.reports.values() if r["status"] != "rejected"]
         by = {sev: sum(1 for r in live if r["severity"] == sev) for sev in ("S1", "S2", "S3", "S4")}
         return {
-            "run_id": live[-1]["run_id"] if live else None,
+            "since": None,
             "by_severity": by,
             "pending_review": sum(1 for r in live if r["status"] == "pending_review"),
             "items": [{k: r[k] for k in ("id", "severity", "title", "status")} for r in live],

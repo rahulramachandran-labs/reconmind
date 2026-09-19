@@ -4,6 +4,18 @@ All notable changes, grouped by build phase. Dates are UTC.
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-09-19
+
+### Added
+- Scheduled scans from GitHub Actions (`scheduled-scan.yml`, every six hours and on demand): wakes the API, starts a scan with the write token from a repository secret, and writes the run summary to the job page.
+- Findings are fingerprinted. A scan that sees a finding an earlier scan reported increments its `seen_count` and `last_seen_at` and writes `finding.seen_again` to the ledger instead of creating a new report. Repeats never pause a run, and rejected findings stay rejected. Migration 0003 backfills fingerprints.
+- The incident feed shows how many scans have seen each finding.
+- ADR 0011.
+
+### Changed
+- Dashboard "open findings" counts what the latest scan saw, minus rejected ones.
+- Render runs with `SCAN_INTERVAL_MINUTES=0`; a free instance sleeps too often for an in-process timer.
+
 ## [1.0.1] - 2026-09-18
 
 ### Fixed

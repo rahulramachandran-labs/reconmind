@@ -82,6 +82,9 @@ export type IncidentReport = {
   review_reason: string | null;
   trace_url: string | null;
   status: "pending_review" | "published" | "rejected";
+  seen_count?: number;
+  last_seen_at?: string | null;
+  repeat?: boolean;
   review_decision?: string | null;
   review_note?: string | null;
   reviewed_by?: string | null;

@@ -50,6 +50,14 @@ class IncidentReport(BaseModel):
     trace_url: str | None = None
     status: Literal["pending_review", "published", "rejected"] = "published"
     review_note: str | None = None
+    seen_count: int = 1
+    repeat: bool = Field(
+        default=False, description="Already reported by an earlier scan; not written up again"
+    )
+
+    @property
+    def fingerprint(self) -> str:
+        return fingerprint(self.finding_type, self.title)
 
 
 class RunSummary(BaseModel):
@@ -61,6 +69,12 @@ class ReviewDecision(BaseModel):
     decision: Literal["approve", "reject", "annotate"]
     note: str | None = Field(default=None, max_length=2000)
     reviewer: str = Field(default="reviewer", max_length=120)
+
+
+def fingerprint(finding_type: str, title: str) -> str:
+    """Titles carry the subject and the size (file, location, row counts), so a
+    finding with the same type and title is the same finding seen again."""
+    return f"{finding_type}:{title}"
 
 
 def confidence_label(c: float) -> Literal["low", "medium", "high"]:

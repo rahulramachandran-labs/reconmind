@@ -247,14 +247,15 @@ curl -s localhost:8000/ask -H 'content-type: application/json' \
 
 The web app runs on Vercel and the API (with its Postgres) on Render; a Railway config is included as the alternative.
 
-1. **API:** open [render.com/deploy?repo=…/reconmind](https://render.com/deploy?repo=https://github.com/rahulramachandran-labs/reconmind) and approve the blueprint in [`render.yaml`](render.yaml). It creates the service and a free Postgres, runs migrations, loads the synthetic sample, and schedules a scan every six hours. Fill in `WRITE_TOKEN` (any long random string) and, optionally, model and LangFuse keys.
+1. **API:** open [render.com/deploy?repo=…/reconmind](https://render.com/deploy?repo=https://github.com/rahulramachandran-labs/reconmind) and approve the blueprint in [`render.yaml`](render.yaml). It creates the service and a free Postgres, runs migrations and loads the synthetic sample. Fill in `WRITE_TOKEN` (any long random string) and, optionally, model and LangFuse keys.
 2. **Web:** import `frontend/` in Vercel and set `NEXT_PUBLIC_API_URL` / `RECONMIND_API_URL` to the API URL, `RECONMIND_WRITE_TOKEN` to the same token, and `AUTH_SECRET` to a random string. `AUTH_DEMO_MODE=true` lets visitors act as a shared demo reviewer. Set it to `false`, and set `AUTH_GITHUB_ID` / `AUTH_GITHUB_SECRET` / `AUTH_ALLOWED_GITHUB_LOGINS`, for real sign-in.
-3. `make deploy` redeploys the web app from the CLI; the API redeploys on every push to `main`.
+3. **Scheduled scans:** add the same token as the repository secret `RECONMIND_WRITE_TOKEN`. [`scheduled-scan.yml`](.github/workflows/scheduled-scan.yml) then wakes the API and runs a scan every six hours, and you can also start one by hand from the Actions tab. A finding that an earlier scan already reported is counted again rather than written up twice, so the review queue holds one item per problem ([ADR 0011](docs/adr/0011-scheduled-scans-and-finding-fingerprints.md)).
+4. `make deploy` redeploys the web app from the CLI; the API redeploys on every push to `main`.
 
 Two things to know about the free tier:
 
 - **The database expires.** Render deletes free Postgres databases 30 days after they are created. The demo's `reconmind-db` was created on 2026-09-19, so it goes around 2026-10-19. When it does, apply the blueprint again or point `DATABASE_URL` at another Postgres; migrations and the sample load run on startup either way.
-- **Scheduled scans only run while the instance is awake.** `SCAN_INTERVAL_MINUTES` schedules scans inside the API process, but a free instance sleeps after 15 minutes without traffic and the timer restarts when it wakes. For scans on a real schedule, run it on a paid instance or call `POST /scan` from an external cron with the write token.
+- **The instance sleeps.** A free instance spins down after 15 minutes without traffic, which is why scheduled scans come from GitHub Actions rather than from a timer inside the API (`SCAN_INTERVAL_MINUTES`, kept for always-on deployments). GitHub pauses scheduled workflows in repositories with no commits for 60 days; re-enable it from the Actions tab if that happens.
 
 Anyone can read. Scans and review decisions go through the web app, which checks the session and forwards the call with the server-side token, so the token never reaches the browser. Chat, ask and scan are rate limited per client.
 

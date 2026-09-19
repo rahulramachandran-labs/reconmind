@@ -53,7 +53,9 @@ _INVESTIGATE = re.compile(
 
 class RunStore(Protocol):
     def save_plan(self, run_id: uuid.UUID, plan: dict[str, Any]) -> None: ...
-    def save_reports(self, run_id: uuid.UUID, reports: list[IncidentReport]) -> None: ...
+    def save_reports(
+        self, run_id: uuid.UUID, reports: list[IncidentReport]
+    ) -> list[IncidentReport]: ...
     def apply_decisions(
         self, run_id: uuid.UUID, decisions: dict[str, dict[str, Any]]
     ) -> list[dict[str, Any]]: ...
@@ -257,11 +259,15 @@ def _summary_fallback(reports: list[IncidentReport]) -> RunSummary:
             headline="No incidents found", summary="Every check passed for the window."
         )
     worst = min(reports, key=lambda r: SEVERITY_ORDER[r.severity]).severity
-    lines = [f"- {r.severity} {r.title}" for r in reports]
-    return RunSummary(
-        headline=f"{len(reports)} finding{'s' if len(reports) != 1 else ''}, worst {worst}",
-        summary="\n".join(lines),
-    )
+    new = sum(1 for r in reports if not r.repeat)
+    lines = [
+        f"- {r.severity} {r.title}" + (" (already reported, still there)" if r.repeat else "")
+        for r in reports
+    ]
+    headline = f"{len(reports)} finding{'s' if len(reports) != 1 else ''}, worst {worst}"
+    if new < len(reports):
+        headline += f"; {new} new"
+    return RunSummary(headline=headline, summary="\n".join(lines))
 
 
 async def report(deps: AgentDeps, state: dict[str, Any]) -> dict[str, Any]:
@@ -311,6 +317,8 @@ async def report(deps: AgentDeps, state: dict[str, Any]) -> dict[str, Any]:
                 status="pending_review" if reasons else "published",
             )
         )
+    # repeats of findings an earlier scan reported come back resolved to that report
+    reports = deps.store.save_reports(run_id, reports)
     fallback = _summary_fallback(reports)
     summary, _ = (
         await structured(
@@ -322,7 +330,12 @@ async def report(deps: AgentDeps, state: dict[str, Any]) -> dict[str, Any]:
             ),
             user=json.dumps(
                 [
-                    {"severity": r.severity, "title": r.title, "problem": r.problem_statement}
+                    {
+                        "severity": r.severity,
+                        "title": r.title,
+                        "problem": r.problem_statement,
+                        "already_reported": r.repeat,
+                    }
                     for r in reports
                 ],
                 indent=1,
@@ -335,7 +348,6 @@ async def report(deps: AgentDeps, state: dict[str, Any]) -> dict[str, Any]:
         if reports
         else (fallback, "template")
     )
-    deps.store.save_reports(run_id, reports)
     return {
         "reports": [r.model_dump(mode="json") for r in reports],
         "summary": summary.model_dump(),

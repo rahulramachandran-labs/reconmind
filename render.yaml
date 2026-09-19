@@ -21,8 +21,10 @@ services:
       # one small container: MCP servers run in-process instead of as subprocesses
       - key: MCP_TRANSPORT
         value: inprocess
+      # scans come from .github/workflows/scheduled-scan.yml; a free instance sleeps too
+      # often for a timer inside the API to be useful
       - key: SCAN_INTERVAL_MINUTES
-        value: "360"
+        value: "0"
       # the ONNX reranker adds ~220 MB and grows with use; 512 MB can't carry it (ADR 0003)
       - key: RERANKER
         value: none

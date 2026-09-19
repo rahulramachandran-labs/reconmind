@@ -78,7 +78,11 @@ def build_graph(
         return {"plan_review": decision}
 
     async def report_review(deps: AgentDeps, state: dict[str, Any]) -> dict[str, Any]:
-        pending = [r for r in state.get("reports", []) if r["status"] == "pending_review"]
+        pending = [
+            r
+            for r in state.get("reports", [])
+            if r["status"] == "pending_review" and not r.get("repeat")
+        ]
         decisions = interrupt(
             {
                 "kind": "reports",
@@ -127,7 +131,11 @@ def build_graph(
         return dispatch(plan)
 
     def after_report(state: InvestigationState) -> str:
-        pending = any(r["status"] == "pending_review" for r in state.get("reports", []))
+        # a repeat that is still waiting for review is already in the queue under its first run
+        pending = any(
+            r["status"] == "pending_review" and not r.get("repeat")
+            for r in state.get("reports", [])
+        )
         return "report_review" if pending else "finalize"
 
     targets = ["plan_review", "answer", *roles]

@@ -193,3 +193,9 @@ class IncidentReport(Base):
     reviewed_by: Mapped[str | None] = mapped_column(Text, nullable=True)
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    # the same finding seen by a later scan updates these instead of adding a row
+    fingerprint: Mapped[str] = mapped_column(Text, index=True)
+    seen_count: Mapped[int] = mapped_column(Integer, default=1)
+    last_seen_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )

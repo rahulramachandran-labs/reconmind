@@ -6,6 +6,7 @@ from collections.abc import Iterator
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
 from app.config import Settings
@@ -14,6 +15,8 @@ from app.main import create_app
 
 @pytest.fixture
 def client(settings: Settings, db_url: str, loaded_engine: Engine) -> Iterator[TestClient]:
+    with loaded_engine.begin() as conn:
+        conn.execute(text("delete from agent_runs"))
     s = settings.model_copy(update={"database_url": db_url, "agents_enabled": True})
     with TestClient(create_app(s)) as c:
         yield c
