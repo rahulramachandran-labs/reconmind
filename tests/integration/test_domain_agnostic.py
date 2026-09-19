@@ -6,13 +6,13 @@ from typing import Any
 
 from langgraph.checkpoint.memory import InMemorySaver
 
-from app.agents.llm import TracedLLM
-from app.agents.nodes import AgentDeps
+from app.agents.deps import AgentDeps
 from app.agents.service import InvestigationService
 from app.agents.store import MemoryRunStore
-from app.config import ROOT, Settings
+from app.core.config import ROOT, Settings
 from app.domain.example_support_triage import SupportTriageAdapter
-from app.llm import LLMChain
+from app.llm.providers import LLMChain
+from app.llm.traced import TracedLLM
 from app.retrieval.service import RetrievalService
 
 
@@ -44,7 +44,7 @@ async def test_graph_boots_and_runs_on_the_stub_adapter(settings: Settings) -> N
 
 
 def test_agent_layer_imports_only_the_protocol() -> None:
-    for path in sorted((ROOT / "app" / "agents").glob("*.py")):
+    for path in sorted((ROOT / "app" / "agents").rglob("*.py")):
         tree = ast.parse(Path(path).read_text())
         for node in ast.walk(tree):
             if isinstance(node, ast.ImportFrom) and node.module:

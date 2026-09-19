@@ -9,21 +9,20 @@
                                reporter --(S1 or low confidence)--> report_review --> finalize
 
 The specialist nodes are created from the domain adapter, so the same graph
-runs on any adapter.
+runs on any adapter. Each agent lives in its own module (planner, specialists,
+reporter, answerer, review); this file only wires them together.
 """
 
 import operator
-import uuid
 from collections.abc import Awaitable, Callable
 from typing import Annotated, Any, TypedDict
 
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
-from langgraph.types import interrupt
 
-from app.agents import nodes
-from app.agents.nodes import AgentDeps
+from app.agents import answerer, planner, reporter, review, specialists
+from app.agents.deps import AgentDeps
 from app.observability.tracer import RunTracer
 
 
@@ -63,48 +62,17 @@ def build_graph(
         node.__name__ = name
         return node
 
-    async def plan_review(deps: AgentDeps, state: dict[str, Any]) -> dict[str, Any]:
-        plan = state["plan"]
-        decision = interrupt(
-            {
-                "kind": "plan",
-                "question": state.get("question"),
-                "proposed": {
-                    k: plan[k] for k in ("intent", "specialists", "confidence", "rationale")
-                },
-                "options": roles,
-            }
-        )
-        return {"plan_review": decision}
-
-    async def report_review(deps: AgentDeps, state: dict[str, Any]) -> dict[str, Any]:
-        pending = [
-            r
-            for r in state.get("reports", [])
-            if r["status"] == "pending_review" and not r.get("repeat")
-        ]
-        decisions = interrupt(
-            {
-                "kind": "reports",
-                "reports": [
-                    {k: r[k] for k in ("id", "title", "severity", "review_reason")} for r in pending
-                ],
-            }
-        )
-        outcome = deps.store.apply_decisions(uuid.UUID(state["run_id"]), decisions)
-        return {"review_outcome": outcome}
-
     async def finalize(deps: AgentDeps, state: dict[str, Any]) -> dict[str, Any]:
         return {}
 
     g: StateGraph[InvestigationState] = StateGraph(InvestigationState)
-    g.add_node("planner", traced("planner", nodes.plan))
-    g.add_node("plan_review", traced("plan_review", plan_review))
-    g.add_node("answer", traced("answer", nodes.answer))
+    g.add_node("planner", traced("planner", planner.run))
+    g.add_node("plan_review", traced("plan_review", review.plan_review))
+    g.add_node("answer", traced("answer", answerer.run))
     for role in roles:
-        g.add_node(role, traced(role, nodes.specialist(role)))
-    g.add_node("reporter", traced("reporter", nodes.report))
-    g.add_node("report_review", traced("report_review", report_review))
+        g.add_node(role, traced(role, specialists.build(role)))
+    g.add_node("reporter", traced("reporter", reporter.run))
+    g.add_node("report_review", traced("report_review", review.report_review))
     g.add_node("finalize", traced("finalize", finalize))
 
     def dispatch(plan: dict[str, Any]) -> list[str]:
@@ -119,11 +87,11 @@ def build_graph(
         return dispatch(plan)
 
     def after_plan_review(state: InvestigationState) -> list[str]:
-        review = state.get("plan_review") or {}
-        if review.get("decision") == "reject":
+        decision = state.get("plan_review") or {}
+        if decision.get("decision") == "reject":
             return ["finalize"]
         plan = dict(state["plan"])
-        chosen = [s for s in review.get("specialists") or [] if s in roles]
+        chosen = [s for s in decision.get("specialists") or [] if s in roles]
         if chosen:
             plan |= {"intent": "investigate", "specialists": chosen}
         elif plan["intent"] == "unclear":

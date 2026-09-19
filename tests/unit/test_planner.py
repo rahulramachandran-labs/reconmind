@@ -1,6 +1,6 @@
 import pytest
 
-from app.agents.nodes import heuristic_plan
+from app.agents.planner import heuristic_plan
 from app.domain.retail_recon import RetailReconAdapter
 
 A = RetailReconAdapter()

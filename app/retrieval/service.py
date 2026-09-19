@@ -4,7 +4,7 @@ from typing import Any
 
 from langchain_core.documents import Document
 
-from app.config import Settings
+from app.core.config import Settings
 from app.retrieval.bm25 import BM25Retriever
 from app.retrieval.chunking import chunk_docs
 from app.retrieval.corpus import SourceDoc, load_corpus, load_dbt_models

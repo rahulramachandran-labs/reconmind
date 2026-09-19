@@ -2,7 +2,7 @@ import uuid
 
 import pytest
 
-from app.sessions import MAX_MESSAGES, MemorySessionStore, SessionFull
+from app.memory.sessions import MAX_MESSAGES, MemorySessionStore, SessionFull
 
 
 def test_memory_store_keeps_order_and_limits_history() -> None:

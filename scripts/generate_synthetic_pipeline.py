@@ -11,7 +11,7 @@ import argparse
 from datetime import date
 from pathlib import Path
 
-from app.config import ROOT
+from app.core.config import ROOT
 from app.pipeline.artifacts import write_all
 from app.pipeline.synthetic import ALL_ANOMALIES, GeneratorConfig, generate
 

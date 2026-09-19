@@ -1,6 +1,6 @@
 from typing import Any
 
-from app.config import ROOT
+from app.core.config import ROOT
 from app.retrieval.chunking import chunk_docs
 from app.retrieval.corpus import load_corpus
 from app.retrieval.embeddings import HashingEmbeddings

@@ -6,8 +6,8 @@ from pathlib import Path
 
 from sqlalchemy.engine import Engine
 
-from app.config import ROOT, Settings
-from app.llm import Message
+from app.core.config import ROOT, Settings
+from app.llm.providers import Message
 from tests.fakes import ScriptedProvider, well_behaved
 from tests.integration.agent_fixtures import retail_service
 

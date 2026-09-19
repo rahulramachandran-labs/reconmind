@@ -1,19 +1,20 @@
+"""Retrieval without the agents: ask, search, the corpus and chat history."""
+
 from datetime import datetime
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from app import __version__
 from app.api.deps import get_app_settings, get_llm, get_retrieval, get_sessions
 from app.api.guards import rate_limit
-from app.config import Settings
-from app.llm import LLMChain, Message
-from app.rag import Answer, answer_question
+from app.core.config import Settings
+from app.llm.providers import LLMChain, Message
+from app.memory.sessions import SessionFull, SessionStore
+from app.rag.answer import Answer, answer_question
 from app.retrieval.service import RetrievalService
 from app.retrieval.types import RetrievedChunk
-from app.sessions import SessionFull, SessionStore
 
 router = APIRouter()
 
@@ -49,18 +50,6 @@ class SessionMessage(BaseModel):
     content: str
     created_at: datetime
     meta: dict[str, Any]
-
-
-@router.get("/healthz")
-def healthz(request: Request, retrieval: Retrieval, llm: LLM) -> dict[str, object]:
-    return {
-        "status": "ok",
-        "version": __version__,
-        "chunks": len(retrieval.chunks),
-        "retriever": retrieval.mode,
-        "llm_providers": llm.names or ["extractive"],
-        "database": getattr(request.app.state, "db_ok", False),
-    }
 
 
 @router.post(

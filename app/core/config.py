@@ -5,7 +5,7 @@ from typing import Literal
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[2]
 
 
 class Settings(BaseSettings):
@@ -26,7 +26,6 @@ class Settings(BaseSettings):
     reranker: Literal["cross-encoder", "none"] = "cross-encoder"
     reranker_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
     rerank_candidates: int = 10
-    retrieval_k: int = 5
     vector_store: Literal["faiss", "pinecone"] = "faiss"
     pinecone_api_key: SecretStr | None = None
     pinecone_index: str = "reconmind"

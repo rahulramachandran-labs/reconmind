@@ -32,7 +32,7 @@ RUN uv sync --frozen --no-default-groups --group onnx
 
 # fetch the embedding model and build the index at build time so a cold start
 # on a small instance doesn't spend a minute downloading weights
-RUN python -c "from app.config import Settings; from app.retrieval.service import RetrievalService; RetrievalService.from_settings(Settings())" \
+RUN python -c "from app.core.config import Settings; from app.retrieval.service import RetrievalService; RetrievalService.from_settings(Settings())" \
     && chown -R app:app /app /opt/hf
 
 USER app

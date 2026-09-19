@@ -6,7 +6,7 @@ import uuid
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
-from app.config import ROOT, Settings
+from app.core.config import ROOT, Settings
 from app.domain.retail_recon import RetailReconAdapter
 from tests.fakes import ScriptedProvider, well_behaved
 from tests.integration.agent_fixtures import retail_service

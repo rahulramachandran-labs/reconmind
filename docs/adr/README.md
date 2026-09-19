@@ -15,3 +15,4 @@ One file per decision that would be expensive to reverse, or that someone will a
 | [0009](0009-tracing-langfuse-and-postgres.md) | Trace every step to Postgres, mirror to LangFuse | accepted |
 | [0010](0010-facts-from-checks-language-from-models.md) | Facts come from checks; models only write the words | accepted |
 | [0011](0011-scheduled-scans-and-finding-fingerprints.md) | Scheduled scans from outside the API; findings are fingerprinted | accepted |
+| [0012](0012-package-layout.md) | Package layout: one module per agent, shared code by concern | accepted |

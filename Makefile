@@ -57,7 +57,7 @@ eval: ## RAGAS gate on the golden set; appends a row to evals/history.csv
 	uv run --group eval python evals/run_ragas.py --gate --record
 
 index: ## build the dense index into .index/
-	uv run python -c "from app.config import Settings; from app.retrieval.service import RetrievalService; s = RetrievalService.from_settings(Settings()); print(len(s.chunks), 'chunks indexed')"
+	uv run python -c "from app.core.config import Settings; from app.retrieval.service import RetrievalService; s = RetrievalService.from_settings(Settings()); print(len(s.chunks), 'chunks indexed')"
 
 deck: ## re-export the slide deck to pdf and refresh the cover image
 	./docs/slides/export.sh

@@ -15,7 +15,7 @@ from alembic.config import Config
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 
-from app.config import ROOT, Settings
+from app.core.config import ROOT, Settings
 from app.pipeline.artifacts import write_sample
 from app.pipeline.loader import load_pipeline
 from app.pipeline.synthetic import ALL_ANOMALIES, GeneratorConfig, generate

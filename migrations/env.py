@@ -3,7 +3,7 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy import create_engine, pool
 
-from app.config import get_settings
+from app.core.config import get_settings
 from app.db.models import Base
 from app.db.session import normalize_url
 

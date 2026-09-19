@@ -1,4 +1,4 @@
-from app.config import ROOT
+from app.core.config import ROOT
 from app.retrieval.bm25 import BM25Retriever, tokenize
 from app.retrieval.chunking import chunk_docs
 from app.retrieval.corpus import load_corpus, load_dbt_models

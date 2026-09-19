@@ -3,7 +3,7 @@ from fastapi.testclient import TestClient
 from pydantic import SecretStr
 
 from app.api.guards import RateLimiter, parse_limit, rate_limit, require_writer
-from app.config import Settings
+from app.core.config import Settings
 
 
 def make_app(**overrides: object) -> TestClient:

@@ -5,11 +5,11 @@ from sqlalchemy import text
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import DBAPIError
 
-from app.config import ROOT
+from app.core.config import ROOT
 from app.db.models import AuditLedger
 from app.db.session import get_engine, normalize_url, ping, session_scope
+from app.memory.sessions import SqlSessionStore
 from app.pipeline.loader import load_pipeline, parse_landing_file
-from app.sessions import SqlSessionStore
 
 SAMPLE = ROOT / "data" / "sample"
 EXPECTED = json.loads((SAMPLE / "expected_anomalies.json").read_text())

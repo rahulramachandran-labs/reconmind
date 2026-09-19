@@ -1,7 +1,7 @@
 import asyncio
 import time
 
-from app.llm import Completion, LLMChain, LLMUnavailable, Message
+from app.llm.providers import Completion, LLMChain, LLMUnavailable, Message
 from app.observability.tracer import current_tracer
 
 

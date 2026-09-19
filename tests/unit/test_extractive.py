@@ -1,4 +1,4 @@
-from app.extractive import _sentences, extractive_answer
+from app.rag.extractive import _sentences, extractive_answer
 from app.retrieval.types import RetrievedChunk
 
 

@@ -71,6 +71,10 @@ class ReviewDecision(BaseModel):
     reviewer: str = Field(default="reviewer", max_length=120)
 
 
+# the report status each review decision leads to
+STATUS_AFTER_REVIEW = {"approve": "published", "annotate": "published", "reject": "rejected"}
+
+
 def fingerprint(finding_type: str, title: str) -> str:
     """Titles carry the subject and the size (file, location, row counts), so a
     finding with the same type and title is the same finding seen again."""

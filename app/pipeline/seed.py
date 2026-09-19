@@ -3,7 +3,7 @@
 python -m app.pipeline.seed
 """
 
-from app.config import ROOT
+from app.core.config import ROOT
 from app.db.session import get_engine
 from app.pipeline.loader import load_pipeline
 

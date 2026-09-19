@@ -6,8 +6,8 @@ from collections.abc import Callable
 
 from pydantic import BaseModel, ValidationError
 
-from app.agents.llm import TracedLLM
-from app.llm import LLMUnavailable, Message
+from app.llm.providers import LLMUnavailable, Message
+from app.llm.traced import TracedLLM
 
 _FENCE = re.compile(r"```(?:json)?\s*(\{.*?\})\s*```", re.S)
 

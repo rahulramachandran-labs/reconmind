@@ -4,13 +4,13 @@ import os
 from contextlib import AsyncExitStack
 from typing import Any
 
-from app.agents.llm import TracedLLM
-from app.agents.nodes import AgentDeps
+from app.agents.deps import AgentDeps
 from app.agents.service import InvestigationService
 from app.agents.store import MemoryRunStore, SqlRunStore
-from app.config import ROOT, Settings
+from app.core.config import ROOT, Settings
 from app.domain.registry import get_adapter
-from app.llm import LLMChain
+from app.llm.providers import LLMChain
+from app.llm.traced import TracedLLM
 from app.observability.tracer import SqlStepSink, build_langfuse
 from app.retrieval.service import RetrievalService
 from app.tools.mcp_toolbox import SERVERS, MCPToolBox, stdio_params

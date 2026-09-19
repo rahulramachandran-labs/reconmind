@@ -12,8 +12,8 @@ from app.agents.schemas import ReviewDecision
 from app.agents.service import InvestigationService
 from app.api.deps import get_app_settings, get_sessions
 from app.api.guards import rate_limit, require_writer
-from app.config import Settings
-from app.sessions import SessionFull, SessionStore
+from app.core.config import Settings
+from app.memory.sessions import SessionFull, SessionStore
 
 router = APIRouter()
 Sessions = Annotated[SessionStore, Depends(get_sessions)]

@@ -3,7 +3,7 @@
 import json
 from collections.abc import Callable
 
-from app.llm import Completion, Message
+from app.llm.providers import Completion, Message
 
 Responder = Callable[[str, list[Message]], str]
 

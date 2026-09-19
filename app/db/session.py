@@ -5,7 +5,7 @@ from functools import lru_cache
 from sqlalchemy import Engine, create_engine, text
 from sqlalchemy.orm import Session, sessionmaker
 
-from app.config import get_settings
+from app.core.config import get_settings
 
 
 def normalize_url(url: str) -> str:

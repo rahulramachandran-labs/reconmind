@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
-from app.config import Settings
+from app.core.config import Settings
 from app.main import create_app
 
 

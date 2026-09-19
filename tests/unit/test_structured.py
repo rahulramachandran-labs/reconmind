@@ -1,9 +1,9 @@
 import pytest
 from pydantic import BaseModel, Field
 
-from app.agents.llm import TracedLLM, UntracedCall
-from app.agents.structured import extract_json, structured
-from app.llm import LLMChain, Message
+from app.llm.providers import LLMChain, Message
+from app.llm.structured import extract_json, structured
+from app.llm.traced import TracedLLM, UntracedCall
 from app.observability.tracer import RunTracer
 from tests.fakes import ScriptedProvider
 

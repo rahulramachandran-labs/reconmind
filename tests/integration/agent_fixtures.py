@@ -6,13 +6,13 @@ from langgraph.checkpoint.memory import InMemorySaver
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
-from app.agents.llm import TracedLLM
-from app.agents.nodes import AgentDeps
+from app.agents.deps import AgentDeps
 from app.agents.service import InvestigationService
 from app.agents.store import SqlRunStore
-from app.config import Settings
+from app.core.config import Settings
 from app.domain.registry import get_adapter
-from app.llm import LLMChain
+from app.llm.providers import LLMChain
+from app.llm.traced import TracedLLM
 from app.observability.tracer import SqlStepSink
 from app.retrieval.service import RetrievalService
 from app.tools.mcp_toolbox import MCPToolBox

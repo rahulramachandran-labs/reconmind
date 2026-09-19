@@ -11,8 +11,8 @@ from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.types import Command
 
+from app.agents.deps import AgentDeps
 from app.agents.graph import build_graph
-from app.agents.nodes import AgentDeps
 from app.observability.tracer import LangfuseMirror, RunTracer, StepSink
 
 log = logging.getLogger(__name__)

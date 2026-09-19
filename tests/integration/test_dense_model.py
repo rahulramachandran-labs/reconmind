@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from app.config import ROOT, Settings
+from app.core.config import ROOT, Settings
 from app.retrieval.service import RetrievalService
 
 pytestmark = pytest.mark.model

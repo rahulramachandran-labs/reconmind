@@ -1,3 +1,5 @@
+"""API entry point: builds the shared services once at startup and mounts the routers."""
+
 import logging
 from collections.abc import AsyncIterator
 from contextlib import AsyncExitStack, asynccontextmanager
@@ -9,12 +11,13 @@ from app import __version__
 from app.api.agents import router as agents_router
 from app.api.dashboard import router as dashboard_router
 from app.api.guards import RateLimiter
-from app.api.routes import router
-from app.config import Settings, get_settings
-from app.llm import LLMChain
-from app.logging_setup import configure_logging
+from app.api.health import router as health_router
+from app.api.knowledge import router as knowledge_router
+from app.core.config import Settings, get_settings
+from app.core.logging_setup import configure_logging
+from app.llm.providers import LLMChain
+from app.memory.sessions import MemorySessionStore, SessionStore, SqlSessionStore
 from app.retrieval.service import RetrievalService
-from app.sessions import MemorySessionStore, SessionStore, SqlSessionStore
 
 log = logging.getLogger("reconmind")
 
@@ -65,7 +68,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         )
         scheduler = None
         if app.state.investigations is not None:
-            from app.scheduler import start_scheduler
+            from app.agents.scheduler import start_scheduler
 
             scheduler = start_scheduler(app.state.investigations, settings.scan_interval_minutes)
         try:
@@ -88,7 +91,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_headers=["*"],
         expose_headers=["Retry-After"],
     )
-    app.include_router(router)
+    app.include_router(health_router)
+    app.include_router(knowledge_router)
     app.include_router(agents_router)
     app.include_router(dashboard_router)
     return app

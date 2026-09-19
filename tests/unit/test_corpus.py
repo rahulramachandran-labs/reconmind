@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from app.config import ROOT
+from app.core.config import ROOT
 from app.retrieval.chunking import chunk_docs
 from app.retrieval.corpus import _split_front_matter, load_corpus
 

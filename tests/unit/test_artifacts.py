@@ -2,7 +2,7 @@ import filecmp
 import json
 from pathlib import Path
 
-from app.config import ROOT
+from app.core.config import ROOT
 from app.pipeline.artifacts import data_dictionary, write_all
 from app.pipeline.synthetic import GeneratorConfig, generate
 

@@ -3,8 +3,8 @@ from datetime import UTC, datetime
 
 from sqlalchemy.engine import Engine
 
-from app.config import Settings
-from app.scheduler import scheduled_scan, start_scheduler
+from app.agents.scheduler import scheduled_scan, start_scheduler
+from app.core.config import Settings
 from tests.integration.agent_fixtures import retail_service
 
 

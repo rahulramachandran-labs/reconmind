@@ -5,8 +5,8 @@ from typing import Any
 import pytest
 from pydantic import SecretStr
 
-from app.config import Settings
-from app.llm import (
+from app.core.config import Settings
+from app.llm.providers import (
     AnthropicProvider,
     Completion,
     LLMChain,

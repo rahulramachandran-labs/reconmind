@@ -4,7 +4,7 @@ import pytest
 from mcp import Client
 from sqlalchemy.engine import Engine
 
-from app.config import ROOT
+from app.core.config import ROOT
 from mcp_servers.warehouse_metadata.server import build_server
 
 EXPECTED = json.loads((ROOT / "data" / "sample" / "expected_anomalies.json").read_text())

@@ -54,9 +54,9 @@ sys.modules.setdefault("langchain_community.chat_models.vertexai", _vertex)
 from ragas.dataset_schema import SingleTurnSample
 from ragas.metrics import NonLLMContextPrecisionWithReference, NonLLMContextRecall
 
-from app.config import Settings
-from app.llm import LLMChain
-from app.rag import answer_question
+from app.core.config import Settings
+from app.llm.providers import LLMChain
+from app.rag.answer import answer_question
 from app.retrieval.service import RetrievalService
 
 EVALS = ROOT / "evals"

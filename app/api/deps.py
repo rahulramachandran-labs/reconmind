@@ -1,9 +1,9 @@
 from fastapi import Request
 
-from app.config import Settings
-from app.llm import LLMChain
+from app.core.config import Settings
+from app.llm.providers import LLMChain
+from app.memory.sessions import SessionStore
 from app.retrieval.service import RetrievalService
-from app.sessions import SessionStore
 
 
 def get_retrieval(request: Request) -> RetrievalService:

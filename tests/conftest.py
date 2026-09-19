@@ -6,7 +6,7 @@ import pytest
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine, make_url
 
-from app.config import ROOT, Settings
+from app.core.config import ROOT, Settings
 from app.db.session import normalize_url
 
 
