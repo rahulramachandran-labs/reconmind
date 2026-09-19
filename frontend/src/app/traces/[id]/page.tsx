@@ -12,6 +12,22 @@ import { cn } from "@/lib/utils";
 
 const ICON = { node: Workflow, llm: Bot, tool: Database, retrieval: Search };
 
+// Specialists run at the same time, so ordering by start time alone would interleave their
+// tool calls. Each step goes under the latest run of the node that recorded it.
+function grouped(steps: RunStep[]): RunStep[] {
+  const sorted = [...steps].sort((a, b) => a.started_at.localeCompare(b.started_at));
+  const nodes = sorted.filter((s) => s.kind === "node");
+  const kids = new Map<RunStep, RunStep[]>(nodes.map((n) => [n, []]));
+  const loose: RunStep[] = [];
+  for (const s of sorted) {
+    if (s.kind === "node") continue;
+    const owner = [...nodes].reverse().find((n) => n.name === s.node && n.started_at <= s.started_at);
+    if (owner) kids.get(owner)?.push(s);
+    else loose.push(s);
+  }
+  return [...nodes.flatMap((n) => [n, ...(kids.get(n) ?? [])]), ...loose];
+}
+
 function StepRow({ step }: { step: RunStep }) {
   const Icon = ICON[step.kind];
   return (
@@ -81,11 +97,9 @@ export default function TracePage() {
             {run.summary && <p className="text-sm whitespace-pre-wrap">{run.summary}</p>}
           </header>
           <ol className="flex flex-col gap-1.5">
-            {[...(run.steps ?? [])]
-              .sort((a, b) => a.started_at.localeCompare(b.started_at))
-              .map((s, i) => (
-                <StepRow key={i} step={s} />
-              ))}
+            {grouped(run.steps ?? []).map((s, i) => (
+              <StepRow key={i} step={s} />
+            ))}
           </ol>
         </>
       )}
