@@ -4,6 +4,9 @@ All notable changes, grouped by build phase. Dates are UTC.
 
 ## [Unreleased]
 
+### Fixed
+- The web app folds reports by fingerprint before it renders them (`onePerFinding`), keeping the copy still waiting for a reviewer, else the one seen most recently, and summing their seen counts. The incident feed, the review queue and the dashboard now show one row per finding, and the dashboard's tiles count the same rows the list shows, even against an API deployed before migration 0004 folded the copies in the store.
+
 ## [1.1.0] - 2026-09-19
 
 A model now does the writing, and everything a reviewer needs to check that is in the repository.

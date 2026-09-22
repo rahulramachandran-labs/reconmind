@@ -6,7 +6,7 @@ import { Loader2 } from "lucide-react";
 import { ErrorNote } from "@/components/error-note";
 import { ReportBody, ReportSummary } from "@/components/incident-report";
 import { ScanButton } from "@/components/scan-button";
-import { getRun, listIncidents, startScan, type IncidentReport } from "@/lib/api";
+import { getRun, listIncidents, onePerFinding, startScan, type IncidentReport } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 const SEVERITIES = ["", "S1", "S2", "S3", "S4"];
@@ -22,7 +22,7 @@ export default function IncidentsPage() {
   const load = useCallback(() => {
     listIncidents({ severity, status })
       .then((r) => {
-        setItems(r);
+        setItems(onePerFinding(r));
         setError(null);
       })
       .catch((e: Error) => setError(e.message));

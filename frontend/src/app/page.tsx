@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CheckCircle2, Loader2, XCircle } from "lucide-react";
 
 import { ErrorNote } from "@/components/error-note";
@@ -9,7 +9,7 @@ import { usd } from "@/components/incident-report";
 import { ScanButton } from "@/components/scan-button";
 import { SeverityBadge, StatusText, ago } from "@/components/severity";
 import { VolumeChart } from "@/components/volume-chart";
-import { getDashboard, getRun, startScan, type Dashboard, type Severity } from "@/lib/api";
+import { getDashboard, getRun, onePerFinding, startScan, type Dashboard, type Severity } from "@/lib/api";
 
 function Tile({ label, children, footer }: { label: string; children: React.ReactNode; footer?: React.ReactNode }) {
   return (
@@ -61,7 +61,12 @@ export default function DashboardPage() {
   const run = data?.pipeline.last_run;
   const f = data?.findings;
   const u = data?.usage;
-  const openTotal = f ? Object.values(f.by_severity).reduce((a, b) => a + b, 0) : 0;
+  // one entry per finding, so the tiles and the list agree even if an older deployment
+  // wrote a copy of the same finding on every scan
+  const findings = useMemo(() => onePerFinding(f?.items ?? []), [f]);
+  const openTotal = findings.length;
+  const pending = findings.filter((i) => i.status === "pending_review").length;
+  const bySeverity = (s: Severity) => findings.filter((i) => i.severity === s).length;
   // small day-to-day wobble is normal; only colour a move the volume check would care about
   const tone =
     (v?.pct_change ?? 0) <= -0.25 ? "text-red-300" : (v?.pct_change ?? 0) >= 0.6 ? "text-amber" : "text-muted-foreground";
@@ -110,9 +115,9 @@ export default function DashboardPage() {
             <Tile
               label="Open findings"
               footer={
-                f && f.pending_review > 0 ? (
+                pending > 0 ? (
                   <Link href="/review" className="text-amber hover:underline">
-                    {f.pending_review} waiting for review
+                    {pending} waiting for review
                   </Link>
                 ) : (
                   "nothing waiting for review"
@@ -123,9 +128,9 @@ export default function DashboardPage() {
                 <span className="text-3xl font-semibold">{openTotal}</span>
                 <span className="flex flex-wrap gap-1.5">
                   {(["S1", "S2", "S3", "S4"] as Severity[]).map((s) =>
-                    f && f.by_severity[s] > 0 ? (
+                    bySeverity(s) > 0 ? (
                       <span key={s} className="flex items-center gap-1 text-xs">
-                        <SeverityBadge severity={s} /> {f.by_severity[s]}
+                        <SeverityBadge severity={s} /> {bySeverity(s)}
                       </span>
                     ) : null,
                   )}
@@ -194,11 +199,11 @@ export default function DashboardPage() {
                 Incident feed
               </Link>
             </div>
-            {f && f.items.length === 0 && (
+            {f && findings.length === 0 && (
               <p className="text-sm text-muted-foreground">No findings yet. Run a scan to have the agents look.</p>
             )}
             <ul className="flex flex-col divide-y rounded-xl border bg-card">
-              {f?.items.map((item) => (
+              {findings.map((item) => (
                 <li key={item.id} className="flex items-center gap-3 px-4 py-2.5">
                   <SeverityBadge severity={item.severity} />
                   <span className="min-w-0 flex-1 truncate text-sm">{item.title}</span>

@@ -7,7 +7,14 @@ import { ErrorNote } from "@/components/error-note";
 import { ReportBody, ReportSummary } from "@/components/incident-report";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { reviewPlan, reviewQueue, reviewReport, type IncidentReport, type PausedPlan } from "@/lib/api";
+import {
+  onePerFinding,
+  reviewPlan,
+  reviewQueue,
+  reviewReport,
+  type IncidentReport,
+  type PausedPlan,
+} from "@/lib/api";
 
 function ReportItem({ report, onDone }: { report: IncidentReport; onDone: () => void }) {
   const [note, setNote] = useState("");
@@ -122,7 +129,8 @@ export default function ReviewPage() {
   const load = useCallback(() => {
     reviewQueue()
       .then((q) => {
-        setQueue(q);
+        // one row per finding, even if an older deployment wrote a copy per scan
+        setQueue({ ...q, reports: onePerFinding(q.reports) });
         setError(null);
       })
       .catch((e: Error) => setError(e.message));

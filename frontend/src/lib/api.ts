@@ -138,6 +138,10 @@ export type IncidentReport = {
   status: "pending_review" | "published" | "rejected";
   seen_count?: number;
   last_seen_at?: string | null;
+  /** finding_type:title. Copies of one finding written before the API de-duplicated them
+   * share it; duplicate_of points a copy at the report it repeats. */
+  fingerprint?: string | null;
+  duplicate_of?: string | null;
   repeat?: boolean;
   review_decision?: string | null;
   review_note?: string | null;
@@ -200,6 +204,46 @@ export type Run = {
 export type PausedPlan = Run & {
   plan: { intent: string; specialists: string[]; confidence: number; rationale: string };
 };
+
+/** What makes two reports the same finding: the API's fingerprint, or the pair it is built
+ * from. Reports written before the API de-duplicated them have no fingerprint of their own. */
+type Finding = {
+  finding_type?: string;
+  title: string;
+  status: string;
+  fingerprint?: string | null;
+  seen_count?: number;
+  last_seen_at?: string | null;
+  created_at?: string;
+};
+
+const fingerprintOf = (r: Finding) =>
+  r.fingerprint ?? [r.finding_type, r.title].filter(Boolean).join(":");
+
+const seenAt = (r: Finding) => r.last_seen_at ?? r.created_at ?? "";
+
+/** One row per finding. The API does this itself once it has run migration 0004; until then
+ * (or against an older deployment) copies of the same finding would otherwise fill the feed
+ * and the review queue. Of several copies, keep the one still waiting for a reviewer, else
+ * the one seen most recently, and count every copy as a sighting. */
+export function onePerFinding<T extends Finding>(rows: T[]): T[] {
+  const kept = new Map<string, T>();
+  for (const row of rows) {
+    const key = fingerprintOf(row);
+    const other = kept.get(key);
+    if (!other) {
+      kept.set(key, row);
+      continue;
+    }
+    const wins =
+      other.status === "pending_review"
+        ? false
+        : row.status === "pending_review" || seenAt(row) > seenAt(other);
+    const seen = (other.seen_count ?? 1) + (row.seen_count ?? 1);
+    kept.set(key, { ...(wins ? row : other), seen_count: seen });
+  }
+  return [...kept.values()];
+}
 
 export const listIncidents = (params: { status?: string; severity?: string } = {}) => {
   const q = new URLSearchParams(Object.entries(params).filter(([, v]) => v) as [string, string][]);

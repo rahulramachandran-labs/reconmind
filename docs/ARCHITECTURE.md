@@ -81,6 +81,8 @@ Every node is wrapped by the tracer, and every node receives the same [`AgentDep
 
 **Repeated scans.** A finding's fingerprint is `finding_type:title`, and titles carry the subject and size. A later scan that sees the same finding increments `seen_count` on the existing report instead of creating a new one, and doesn't pause for it again ([ADR 0011](adr/0011-scheduled-scans-and-finding-fingerprints.md)). It also doesn't ask the model again about a finding that already has a model write-up; a template-only one gets the model's write-up once a model is available. A decided finding can be reopened (`POST /incidents/{id}/reopen`); a decision on it is then applied directly, since its run has finished.
 
+The web app folds by the same fingerprint before it renders ([`onePerFinding`](../frontend/src/lib/api.ts)): of several copies of one finding it keeps the one still waiting for a reviewer, else the one seen most recently, and adds their seen counts. It is a plain grouping, not another agent — the comparison is an exact key, so a model would only add cost and make the result vary. The store makes duplicates impossible going forward; this makes sure the feed, the review queue and the dashboard tiles agree even when the API is an older deployment still serving copies written before the fold.
+
 ## MCP tool servers
 
 Both servers are read-only, validate their arguments, and run over stdio (a subprocess per server, the default locally), streamable HTTP (their own containers in docker compose) or in-process (one small container on Render). The agents reach them only through [`MCPToolBox`](../app/tools/mcp_toolbox.py), which records every call as a trace step ([ADR 0008](adr/0008-mcp-over-direct-clients.md)).
