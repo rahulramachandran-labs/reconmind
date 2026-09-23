@@ -40,7 +40,7 @@
 | **Live app** | [reconmind-labs.vercel.app](https://reconmind-labs.vercel.app) |
 | **API** | [/healthz](https://reconmind-labs-api.onrender.com/healthz) · [/docs](https://reconmind-labs-api.onrender.com/docs) |
 | **Project deck** | [PDF](docs/slides/Rahul_Ramachandran_ReconMind-ProjectSubmission.pdf) |
-| **Demo video** | [Two minutes](docs/demo.mp4) |
+| **Demo video** | [Watch it here in the page](#how-it-works) · [MP4, two minutes](https://github.com/rahulramachandran-labs/reconmind/releases/download/v1.1.0/demo.mp4) |
 | **Write-up** | [How I built it](docs/blog/reconmind-writeup.md) |
 | **Docs** | [Getting around](docs/GUIDE.md) · [Decision records](docs/adr/README.md) · [Demo script](docs/DEMO.md) |
 
@@ -161,7 +161,7 @@ I wrote a golden set of 46 questions, each with a reference answer and the passa
 
 ## Screens
 
-Captured at 1440×900 from a freshly seeded local stack with Groq's free tier writing the explanations (`uv run --with playwright python scripts/record_demo.py --screenshots docs/screenshots`). The same walkthrough as a two-minute video with captions: **[docs/demo.mp4](docs/demo.mp4)**.
+Captured at 1440×900 from a freshly seeded local stack with Groq's free tier writing the explanations (`uv run --with playwright python scripts/record_demo.py --screenshots docs/screenshots`). The same walkthrough as a two-minute captioned video: **[demo.mp4](https://github.com/rahulramachandran-labs/reconmind/releases/download/v1.1.0/demo.mp4)** (2.3 MB; GitHub will not play a file that size in the browser, so it downloads. The same run is the animated one under [How it works](#how-it-works)).
 
 <!-- evidence:screens -->
 | Screen | |

@@ -13,7 +13,7 @@ A walkthrough, from five minutes on the live app to a full local run. Every clai
 7. **Docs & runbooks:** search `basket_ref ContractViolation` and switch between Hybrid, Dense and BM25 to see why hybrid search is the default.
 8. **Verify:** each planted anomaly beside the finding it produced, the chaos test that proves it, and the template's and the model's write-ups side by side. Ask it anything and open the trace.
 
-`/healthz` lists the model providers the API has under `llm_providers`, and `/model` names the one answering now. If the free instance is asleep and you'd rather not wait, the same walkthrough is recorded in [demo.mp4](demo.mp4), and the README's screenshots come from the same flow.
+`/healthz` lists the model providers the API has under `llm_providers`, and `/model` names the one answering now. If the free instance is asleep and you'd rather not wait, the same walkthrough is recorded in [demo.mp4](https://github.com/rahulramachandran-labs/reconmind/releases/download/v1.1.0/demo.mp4), and the README's screenshots come from the same flow.
 
 ## Twenty minutes, locally
 
