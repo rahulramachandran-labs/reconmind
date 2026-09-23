@@ -1,8 +1,8 @@
 # ReconMind
 
-**When a data pipeline's numbers go wrong, someone has to work out why: which file, which key, how many rows, and what to do about it. I've spent years doing that by hand. ReconMind hands the investigation to a small team of AI agents.** They read the live pipeline through MCP tools, look up the team's runbooks and past incidents, and hand back an incident report with record counts, a likely root cause, a fix and a confidence score. Anything serious or uncertain waits for a person to sign it off.
+**When a data pipeline's numbers go wrong, someone has to work out why: which file, which key, how many rows, and what to do about it. That work is done by hand, one incident at a time, in most teams that run pipelines. ReconMind gives it to five narrow agents: a Planner, two specialists, an Explorer and a Reporter.** They read the live pipeline through read-only MCP tools, look up the team's runbooks and past incidents, and return an incident report: record counts, a root-cause hypothesis, fix steps and a confidence score. Anything serious or uncertain stops for a person to sign off.
 
-**Catches four failure modes in multi-source data pipelines:**
+**It catches four failure modes in multi-source data pipelines:**
 
 | | |
 |---|---|
@@ -41,7 +41,7 @@
 | **API** | [/healthz](https://reconmind-labs-api.onrender.com/healthz) · [/docs](https://reconmind-labs-api.onrender.com/docs) |
 | **Project deck** | [PDF](docs/slides/Rahul_Ramachandran_ReconMind-ProjectSubmission.pdf) |
 | **Demo video** | [Watch it here in the page](#how-it-works) · [MP4, two minutes](https://github.com/rahulramachandran-labs/reconmind/releases/download/v1.1.0/demo.mp4) |
-| **Write-up** | [How I built it](docs/blog/reconmind-writeup.md) |
+| **Write-up** | [The build, in detail](docs/blog/reconmind-writeup.md) |
 | **Docs** | [Getting around](docs/GUIDE.md) · [Decision records](docs/adr/README.md) · [Demo script](docs/DEMO.md) |
 
 ---
@@ -109,7 +109,7 @@ flowchart LR
 
 | Layer | Tools | Role in ReconMind | Why this |
 |---|---|---|---|
-| Agents | LangGraph (StateGraph, parallel nodes, `interrupt()`, Postgres checkpointer), LangChain, Pydantic | Wires Planner → specialists → Reporter → human review, and holds a paused run until someone decides | A graph I can draw, checkpoint and resume, rather than a conversation between roles ([ADR 0007](docs/adr/0007-langgraph-over-crewai.md)) |
+| Agents | LangGraph (StateGraph, parallel nodes, `interrupt()`, Postgres checkpointer), LangChain, Pydantic | Wires Planner → specialists → Reporter → human review, and holds a paused run until someone decides | A graph that can be drawn, checkpointed and resumed, rather than a conversation between roles ([ADR 0007](docs/adr/0007-langgraph-over-crewai.md)) |
 | Tools | MCP: two read-only servers over stdio, streamable HTTP or in-process | Every fact about the warehouse and the orchestrator arrives as a tool call | One protocol, one place to validate arguments and record every call ([ADR 0008](docs/adr/0008-mcp-over-direct-clients.md)) |
 | Retrieval | BM25 (`rank_bm25`, Snowball), sentence-transformers / fastembed, FAISS or Pinecone, reciprocal rank fusion, cross-encoder reranker | Finds the runbook and the past incident behind each finding | Pipelines are full of identifiers, and BM25 matches them where embeddings blur them ([ADR 0002](docs/adr/0002-hybrid-retrieval-with-rrf.md)); chunks keep their section titles ([ADR 0001](docs/adr/0001-chunk-by-markdown-section.md)); FAISS in process, Pinecone behind `VECTOR_STORE`, ONNX embeddings in the container ([ADR 0003](docs/adr/0003-onnx-embeddings-in-the-container.md)) |
 | Models | OpenAI, Anthropic, Groq, Google Gemini, OpenRouter, Ollama, with a fallback chain and an extractive floor | Write the root cause, the fix and the confidence; the checks own every number | A chain that degrades instead of failing, down to no model at all ([ADR 0005](docs/adr/0005-provider-fallback-chain.md), [ADR 0010](docs/adr/0010-facts-from-checks-language-from-models.md)) |
@@ -145,7 +145,7 @@ Writing the S1 up again with `POST /incidents/{id}/regenerate` returned HTTP 200
 
 ### Retrieval and answer quality
 
-I wrote a golden set of 46 questions, each with a reference answer and the passages that support it, covering every anomaly type and every screen. [RAGAS](evals/run_ragas.py) scores it on every push, and CI fails if a metric drops below [its threshold](evals/thresholds.yaml). Each row says who wrote the answers and who judged them; all of them are in [`evals/history.csv`](evals/history.csv).
+The golden set is 46 questions, each with a reference answer and the passages that support it, covering every anomaly type and every screen. [RAGAS](evals/run_ragas.py) scores it on every push, and CI fails if a metric drops below [its threshold](evals/thresholds.yaml). Each row says who wrote the answers and who judged them; all of them are in [`evals/history.csv`](evals/history.csv).
 
 | Retriever | Answers written by | Judged by | Faithfulness | Answer relevancy | Context precision | Context recall |
 |---|---|---|---|---|---|---|
@@ -157,7 +157,7 @@ I wrote a golden set of 46 questions, each with a reference answer and the passa
 | Hybrid + reranker | `qwen2.5:1.5b`, local, through Ollama | offline | 0.427 | 0.624 | 0.830 | 0.922 |
 | *Threshold* | | | *0.85* | *0.80* | *0.80* | *0.85* |
 
-*Offline* means no language model grades anything: RAGAS's non-LLM context metrics, an NLI cross-encoder for faithfulness and an MS MARCO cross-encoder for relevancy ([ADR 0006](docs/adr/0006-offline-eval-judges.md)). The model rows keep retrieval the same and change who writes the answers. Groq's `gpt-oss-120b` answers well (relevancy 0.943), but the small NLI model credits only 0.566 of its sentences, because it doesn't recognise a paraphrase as support. So I had a different model grade the same model's answers in a second run: Qwen3.8-27B found 0.935 of the claims supported by the passages. Its relevancy (0.720) is RAGAS's embedding measure, not on the cross-encoder's scale. A 1.5-billion-parameter local model gets 0.427. That spread is why CI gates on extractive answers, and why the model-judged runs are a separate job, run by hand and on release tags.
+*Offline* means no language model grades anything: RAGAS's non-LLM context metrics, an NLI cross-encoder for faithfulness and an MS MARCO cross-encoder for relevancy ([ADR 0006](docs/adr/0006-offline-eval-judges.md)). The model rows keep retrieval the same and change who writes the answers. Groq's `gpt-oss-120b` answers well (relevancy 0.943), but the small NLI model credits only 0.566 of its sentences, because it doesn't recognise a paraphrase as support. A second run had a different model grade the same answers: Qwen3.8-27B found 0.935 of the claims supported by the passages. Its relevancy (0.720) is RAGAS's embedding measure, not on the cross-encoder's scale. A 1.5-billion-parameter local model gets 0.427. That spread is why CI gates on extractive answers, and why the model-judged runs are a separate job, run by hand and on release tags.
 
 ## Screens
 
@@ -185,8 +185,8 @@ Captured at 1440×900 from a freshly seeded local stack with Groq's free tier wr
 ## Contents
 
 - [Try it in five minutes](#try-it-in-five-minutes) · [Core concepts](#core-concepts) · [How it works](#how-it-works) · [Architecture](#architecture) · [Tech stack](#tech-stack)
-- [Results](#results) · [Screens](#screens) · [What a run looks like](#what-a-run-looks-like) · [Example incident report](#example-incident-report) · [Why it is built this way](#why-it-is-built-this-way)
-- [Production readiness](#production-readiness) · [Scope and limitations](#scope-and-limitations) · [Reusability and roadmap](#reusability-and-roadmap)
+- [Results](#results) · [Screens](#screens) · [What a run looks like](#what-a-run-looks-like) · [Example incident report](#example-incident-report)
+- [Why this project](#why-this-project) · [Why it is built this way](#why-it-is-built-this-way) · [Production readiness](#production-readiness) · [Scope and limitations](#scope-and-limitations) · [Reusability and roadmap](#reusability-and-roadmap)
 - [Quick start](#quick-start) · [Runbook](#runbook-walk-through-the-whole-flow-locally) · [Reference](#reference) · [Repository layout](#repository-layout) · [Development and testing](#development-and-testing) · [Documentation](#documentation) · [License](#license)
 
 ## What a run looks like
@@ -289,10 +289,16 @@ The key-drift report from the captured scan, exactly as the API returned it:
 Run `9bda1e0c-4add-4ac7-8351-8434ccba88aa`, captured 2026-09-23 06:10:12 UTC · `analysis_by: model` · written by `openai/gpt-oss-120b` (groq) in 8,842 ms (1,205 prompt + 557 completion tokens, $0.00). The problem statement and counts come from the deterministic check; the root cause, fix, confidence and open questions are the model's, with confidence capped at the template's 0.60 plus 0.15. The template's own version is stored beside it, and its hypothesis reads: *"Whole baskets (158) from 4 submitter(s) carry OUT-1071, so the id is set at the register or export profile rather than corrupted row by row; OUT-1071 looks like a transposition of OUT-1017."* Raw JSON: [`docs/evidence/incident-key-drift.json`](docs/evidence/incident-key-drift.json).
 <!-- /evidence:report -->
 
+## Why this project
+
+Most pipeline incidents are not interesting. A number looks wrong, someone opens four tabs (the raw tables, the orchestrator, the dbt project, the runbook wiki), and forty minutes later there is a message in a channel saying what happened and what to do. The reasoning in that message is good. It is also gone by the next week, and the next person starts from scratch. After enough years of being that person, the part worth automating is clear: not the judgement at the end, the forty minutes of fetching that leads to it.
+
+Three earlier attempts set the shape of this one. A dashboard with thresholds said something was off, never why. A chatbot over the runbooks could explain what a `ContractViolation` means, but could not go and check whether one had happened. A single agent holding every tool answered well in a demo and was impossible to debug: a wrong severity could have come from retrieval, from the tool call or from the reasoning, and nothing in the output said which.
+
 ## Why it is built this way
 
 - Facts come from checks, and models only write the words. The counts, severities and evidence are measured, so no model can change them, and the grounding check keeps a model from slipping in numbers of its own. It all still works with no model at all, at no cost.
-- I split the work across narrow agents because my first version was one agent with every job, and when it got something wrong I couldn't tell which part had failed. Here each agent has one job and its own place in the trace.
+- The work is split across narrow agents because the first version was one agent with every job: when it got something wrong, there was no way to tell which part had failed. Here each agent has one job and its own place in the trace.
 - Pipelines are full of identifiers, and embeddings blur `channel_basket_id` and `basket_ref` where BM25 matches them exactly. Fusing the two and reranking raised context precision from 0.66 (dense only) to 0.83.
 - Anything serious waits for a person. S1s and low-confidence findings stop, and the decision goes on the record.
 - The model only chooses its own tools where that's safe: questions no check covers, three read-only calls at most, each one traced ([ADR 0013](docs/adr/0013-bounded-tool-use-for-open-questions.md)).
@@ -306,7 +312,7 @@ Run `9bda1e0c-4add-4ac7-8351-8434ccba88aa`, captured 2026-09-23 06:10:12 UTC · 
 | **Storage** | Postgres 16 through SQLAlchemy 2 and versioned Alembic migrations. The audit ledger is append-only, enforced by a database trigger. Vectors live in FAISS in memory or in managed Pinecone, switched with one setting (`VECTOR_STORE`). The Docker image runs the embedding model on ONNX to fit in 512 MB. | Managed Postgres with backups (the free demo database expires after 30 days) |
 | **Knowledge retrieval** | Live facts are fetched through MCP tools at the moment of each investigation, never from a stale copy. Documents are indexed with BM25 and embeddings, fused, then reranked. The index is fingerprinted and rebuilt automatically when documents change, and `CORPUS_DIR` points it at any folder of markdown. | Ingest from a wiki or docs repo on change; add approved incident reports to the corpus as new precedents |
 | **State management** | LangGraph checkpoints every step in Postgres, so a run paused for review survives restarts and resumes on whichever API instance receives the decision. Runs, reports, decisions and chat memory are in Postgres too, and fingerprints make repeated scans idempotent — in the store, and again in the web app, which folds by the same fingerprint before rendering so a finding is never listed or counted twice. Only rate-limit counters, the provider cooldown and the FAISS copy are per instance. | Redis for global rate limits; Pinecone to share one index |
-| **Reliability and cost** | Model fallback chain: OpenAI → Anthropic → the free tiers of Groq, Gemini and OpenRouter → local Ollama → extractive answers, with a cooldown for failing providers. Outputs are validated by Pydantic and a grounding check, retried, then fall back to a template. `DEMO_MODE` guarantees $0. A chaos suite and a 30-second latency budget run in CI. | Queue-backed scans for long windows |
+| **Reliability and cost** | Model fallback chain: OpenAI → Anthropic → the free tiers of Groq, Gemini and OpenRouter → local Ollama → extractive answers, with a cooldown for failing providers. Outputs are validated by Pydantic and a grounding check, retried, then fall back to a template. `DEMO_MODE` keeps the cost at zero. A chaos suite and a 30-second latency budget run in CI. | Queue-backed scans for long windows |
 | **Observability** | Every agent step, tool call, retrieval and model call is stored with latency, tokens and cost, and mirrored to LangFuse when its keys are set. A model call outside a traced run raises an error instead of going unrecorded. Logs are JSON. | Alerts on failed or slow runs |
 | **Security** | Retrieved text is treated as untrusted: it is delimited, tag-sanitised and covered by a planted prompt-injection test. MCP tools are read-only with validated arguments. Secrets come only from the environment, gitleaks runs in pre-commit and in CI over the full history, and the container runs as non-root. | Secret manager instead of env vars |
 
@@ -319,7 +325,7 @@ Run `9bda1e0c-4add-4ac7-8351-8434ccba88aa`, captured 2026-09-23 06:10:12 UTC · 
 
 ## Reusability and roadmap
 
-The agents never import a business rule, so a second domain is an adapter and a corpus, and one ships with the project. These are the things I would build next:
+The agents never import a business rule, so a second domain is an adapter and a corpus, and one ships with the project. These are the things worth building next:
 
 - Scans run on a schedule rather than when data lands; triggering them from the loader, or a Kafka topic, is the obvious next step.
 - The Reporter proposes fixes but never applies them. Opening a pull request with the fix, gated on approval, would close that loop.
@@ -470,7 +476,7 @@ To read the code in the order a run executes: [`graph.py`](app/agents/graph.py) 
 
 ## Development and testing
 
-CI runs ruff, black and mypy, then the whole suite with an 80% coverage gate, including Postgres, MCP, agent, prompt-injection and chaos tests. It finishes with gitleaks, a production build of the web app and a fresh-clone run of `make bootstrap && make dev`. Make targets, docker compose and the conventions I follow are in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md); the quality bar and the judges are in [docs/EVALUATION.md](docs/EVALUATION.md).
+CI runs ruff, black and mypy, then the whole suite with an 80% coverage gate, including Postgres, MCP, agent, prompt-injection and chaos tests. It finishes with gitleaks, a production build of the web app and a fresh-clone run of `make bootstrap && make dev`. Make targets, docker compose and the conventions this repository follows are in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md); the quality bar and the judges are in [docs/EVALUATION.md](docs/EVALUATION.md).
 
 <!-- evidence:testing -->
 From the last captured run of `make test` ([`docs/evidence/tests.txt`](docs/evidence/tests.txt)): 172 passed, 0 failed, 92.58% coverage.
