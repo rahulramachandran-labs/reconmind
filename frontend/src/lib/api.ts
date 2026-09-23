@@ -66,15 +66,39 @@ export type CorpusDoc = { doc_id: string; title: string; path: string; doc_type:
 export type CorpusDocBody = CorpusDoc & { body: string };
 export type SearchMode = "hybrid" | "dense" | "bm25";
 
+/** An API failure, with the id the API put on the response so it can be quoted. */
+export class ApiError extends Error {
+  readonly status: number;
+  readonly requestId: string | null;
+
+  constructor(status: number, detail: string, requestId: string | null) {
+    super(`API ${status}${detail ? `: ${detail}` : ""}${requestId ? ` (ref ${requestId})` : ""}`);
+    this.status = status;
+    this.requestId = requestId;
+  }
+}
+
+/** The API answers failures as problem+json; older deployments answer with text. */
+async function fail(res: Response): Promise<never> {
+  const body = await res.text().catch(() => "");
+  let detail = body.slice(0, 200);
+  let requestId = res.headers.get("x-request-id");
+  try {
+    const parsed = JSON.parse(body);
+    if (typeof parsed?.detail === "string") detail = parsed.detail.slice(0, 200);
+    if (typeof parsed?.request_id === "string") requestId = parsed.request_id;
+  } catch {
+    // plain text, already in detail
+  }
+  throw new ApiError(res.status, detail, requestId);
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await watched(`${API_URL}${path}`, {
     ...init,
     headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
   });
-  if (!res.ok) {
-    const detail = await res.text().catch(() => "");
-    throw new Error(`API ${res.status}${detail ? `: ${detail.slice(0, 200)}` : ""}`);
-  }
+  if (!res.ok) await fail(res);
   return res.json() as Promise<T>;
 }
 
@@ -266,7 +290,7 @@ async function action<T>(path: string, body?: unknown): Promise<T> {
   });
   if (res.status === 401) throw new SignInRequired();
   if (res.status === 429) throw new Error("Slow down a little: rate limit reached, try again in a minute");
-  if (!res.ok) throw new Error(`API ${res.status}: ${(await res.text().catch(() => "")).slice(0, 200)}`);
+  if (!res.ok) await fail(res);
   return res.json() as Promise<T>;
 }
 
@@ -330,9 +354,8 @@ export async function* chatStream(
     signal,
   });
   if (res.status === 429) throw new Error("Slow down a little: rate limit reached, try again in a minute");
-  if (!res.ok || !res.body) {
-    throw new Error(`API ${res.status}: ${(await res.text().catch(() => "")).slice(0, 200)}`);
-  }
+  if (!res.ok) await fail(res);
+  if (!res.body) throw new ApiError(res.status, "the stream came back empty", res.headers.get("x-request-id"));
   const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
   let buffer = "";
   while (true) {

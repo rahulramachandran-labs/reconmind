@@ -81,6 +81,12 @@ class Settings(BaseSettings):
     rate_limit_regenerate: str = "10/minute"
     rate_limits_enabled: bool = True
 
+    # how many proxies sit in front of the API. The client is the entry that many hops
+    # in from the right of X-Forwarded-For; 0 ignores the header and uses the peer.
+    trusted_proxy_hops: int = 1
+    forwarded_allow_ips: str = "*"  # read by scripts/start.sh when it starts uvicorn
+    sse_heartbeat_s: float = 15.0  # keeps an idle chat stream open through a proxy
+
     cors_origins: list[str] = Field(
         default=["http://localhost:3000", "https://reconmind-labs.vercel.app"]
     )

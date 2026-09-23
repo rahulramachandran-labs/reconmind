@@ -1,0 +1,1 @@
+{"provider":"groq","model":"openai/gpt-oss-120b","chain":["groq","gemini"],"models":{"groq":"openai/gpt-oss-120b","gemini":"gemini-2.5-flash"},"fell_back":null,"last_provider":null,"last_call_at":null}

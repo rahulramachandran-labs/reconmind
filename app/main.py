@@ -10,10 +10,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from app import __version__
 from app.api.agents import router as agents_router
 from app.api.dashboard import router as dashboard_router
+from app.api.errors import install as install_error_handlers
 from app.api.guards import RateLimiter
 from app.api.health import router as health_router
 from app.api.knowledge import router as knowledge_router
+from app.api.middleware import RequestIdMiddleware
 from app.core.config import Settings, get_settings
+from app.core.guard import check_production
 from app.core.logging_setup import configure_logging
 from app.llm.providers import LLMChain
 from app.memory.sessions import MemorySessionStore, SessionStore, SqlSessionStore
@@ -36,6 +39,7 @@ def build_session_store(settings: Settings) -> tuple[SessionStore, bool]:
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
     configure_logging(settings.log_level)
+    check_production(settings)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -44,6 +48,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.llm = LLMChain.from_settings(settings)
         app.state.retrieval = RetrievalService.from_settings(settings)
         app.state.sessions, app.state.db_ok = build_session_store(settings)
+        if app.state.db_ok and settings.database_url:
+            from app.agents.recovery import interrupt_orphans
+            from app.db.session import get_engine
+
+            interrupt_orphans(get_engine(settings.database_url))
         stack = AsyncExitStack()
         app.state.investigations = None
         if settings.agents_enabled:
@@ -84,6 +93,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         version=__version__,
         lifespan=lifespan,
     )
+    app.state.settings = settings  # the handlers below need it before the lifespan runs
+    install_error_handlers(app)
+    app.add_middleware(RequestIdMiddleware)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,

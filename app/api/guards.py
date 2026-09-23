@@ -35,10 +35,16 @@ class RateLimiter:
 
 
 def client_ip(request: Request) -> str:
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-    return request.client.host if request.client else "unknown"
+    """Behind a proxy the peer is the proxy, so the client is the entry
+    TRUSTED_PROXY_HOPS in from the right of X-Forwarded-For: each hop appends the address
+    it saw, so entries a caller sends itself can only sit further left. Taking the first
+    entry instead would let anyone reset their own rate limit with a header."""
+    peer = request.client.host if request.client else "unknown"
+    hops: int = request.app.state.settings.trusted_proxy_hops
+    if hops <= 0:
+        return peer
+    chain = [p.strip() for p in request.headers.get("x-forwarded-for", "").split(",") if p.strip()]
+    return chain[-hops] if len(chain) >= hops else peer
 
 
 def rate_limit(setting: str) -> Callable[[Request], None]:

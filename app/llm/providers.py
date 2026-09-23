@@ -348,6 +348,13 @@ class LLMChain:
             "last_call_at": self.last.at.isoformat() if self.last else None,
         }
 
+    def benched(self) -> dict[str, int]:
+        """Providers sitting out a cooldown, and the seconds each has left."""
+        now = time.monotonic()
+        return {
+            name: int(until - now) + 1 for name, until in self._benched_until.items() if until > now
+        }
+
     @property
     def enabled(self) -> bool:
         return bool(self.providers)

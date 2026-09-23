@@ -97,7 +97,7 @@ async def chat_stream(
         except SessionFull:
             yield {"event": "error", "data": json.dumps({"message": "session is full"})}
 
-    return EventSourceResponse(events(), ping=10)
+    return EventSourceResponse(events(), ping=int(settings.sse_heartbeat_s))
 
 
 @router.post("/scan", status_code=202, dependencies=[Depends(rate_limit("rate_limit_scan"))])

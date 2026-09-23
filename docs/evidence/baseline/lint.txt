@@ -1,0 +1,13 @@
+uv run ruff check .
+All checks passed!
+uv run black --check .
+All done! ✨ 🍰 ✨
+124 files would be left unchanged.
+uv run mypy
+Success: no issues found in 79 source files
+cd frontend && npm run lint
+
+> reconmind-web@1.1.0 lint
+> eslint
+
+lint exit=0
