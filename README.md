@@ -186,7 +186,7 @@ Captured at 1440×900 from a freshly seeded local stack with Groq's free tier wr
 - [Try it in five minutes](#try-it-in-five-minutes) · [Core concepts](#core-concepts) · [How it works](#how-it-works) · [Architecture](#architecture) · [Tech stack](#tech-stack)
 - [Results](#results) · [Screens](#screens) · [What a run looks like](#what-a-run-looks-like) · [Example incident report](#example-incident-report) · [Why it is built this way](#why-it-is-built-this-way)
 - [Production readiness](#production-readiness) · [Scope and limitations](#scope-and-limitations) · [Reusability and roadmap](#reusability-and-roadmap)
-- [Try it](#try-it) · [Runbook](#runbook-walk-through-the-whole-flow-locally) · [Project structure](#project-structure) · [Quality and evaluation](#quality-and-evaluation) · [Documentation](#documentation) · [License](#license)
+- [Quick start](#quick-start) · [Runbook](#runbook-walk-through-the-whole-flow-locally) · [Reference](#reference) · [Repository layout](#repository-layout) · [Development and testing](#development-and-testing) · [Documentation](#documentation) · [License](#license)
 
 ## What a run looks like
 
@@ -325,7 +325,7 @@ The agents never import a business rule, so a second domain is an adapter and a 
 - Confidence thresholds are set by hand, and the approve and reject history is already in the ledger to tune them from.
 - It runs one domain at a time; an adapter registry and multi-tenant auth would let several run side by side.
 
-## Try it
+## Quick start
 
 **Online:** follow *Evaluate this in five minutes* at the top.
 
@@ -390,7 +390,38 @@ uv run python scripts/generate_synthetic_pipeline.py --seed 7 --out /tmp/p --onl
 
 **12. Run the quality gates.** `make test` runs 158 tests at 93% coverage. `make eval` scores retrieval and answers on the 46-question golden set and fails below the thresholds.
 
-## Project structure
+## Reference
+
+<details>
+<summary><b>Deploy</b></summary>
+
+The API runs on Render as a Docker web service with a free Postgres, both declared in [`render.yaml`](render.yaml); the web app runs on Vercel from [`frontend/`](frontend), and forwards writes to the API with a bearer token that never reaches the browser. Scheduled scans, the keep-alive and the reseed are GitHub Actions workflows in [`.github/workflows/`](.github/workflows). Every step, and the environment each side needs: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+
+</details>
+
+<details>
+<summary><b>API</b></summary>
+
+FastAPI, with interactive docs at `/docs` on any running instance ([live](https://reconmind-labs-api.onrender.com/docs)). Reads are open; the calls marked *writer* need a bearer token.
+
+| | |
+|---|---|
+| Agents and review | `POST /chat/stream` · `POST /scan` *writer* · `GET /runs`, `/runs/{id}` · `GET /incidents`, `/incidents/{id}` · `POST /incidents/{id}/regenerate` *writer* · `POST /incidents/{id}/reopen` *writer* · `GET /review` · `POST /review/reports/{id}` *writer* · `POST /review/runs/{id}` *writer* · `GET /dashboard` |
+| Retrieval on its own | `POST /ask` · `GET /search` · `GET /corpus`, `/corpus/{doc_id}` · `GET /sessions/{id}/messages` |
+| Status | `GET /healthz` · `GET /model` |
+
+Every endpoint, and the chat stream's event types: [docs/API.md](docs/API.md).
+
+</details>
+
+<details>
+<summary><b>Configuration</b></summary>
+
+Every setting comes from the environment, and [`.env.example`](.env.example) explains each one in seven groups: basics, database, language models, knowledge retrieval, agents, tracing, and security and limits. Nothing in it is required: with no database it keeps runs and reports in memory, and with no model key the write-ups come from templates and the answers are extractive. The web app has its own, much shorter [`frontend/.env.example`](frontend/.env.example).
+
+</details>
+
+## Repository layout
 
 ```
 app/                     the backend (Python, FastAPI)
@@ -436,11 +467,9 @@ scripts/                 data generator CLI, container entrypoint, demo recordin
 
 To read the code in the order a run executes: [`graph.py`](app/agents/graph.py) → [`planner.py`](app/agents/planner.py) → [`specialists.py`](app/agents/specialists.py) → [`retail_recon/checks.py`](app/domain/retail_recon/checks.py) → [`reporter.py`](app/agents/reporter.py) → [`review.py`](app/agents/review.py).
 
-## Quality and evaluation
+## Development and testing
 
-CI also runs ruff, black and mypy, then 158 tests with an 80% coverage gate (currently 93.17%), including Postgres, MCP, agent, prompt-injection and chaos tests. It finishes with gitleaks and a production build of the web app. Details are in [docs/EVALUATION.md](docs/EVALUATION.md).
-
-### Testing
+CI runs ruff, black and mypy, then the whole suite with an 80% coverage gate, including Postgres, MCP, agent, prompt-injection and chaos tests. It finishes with gitleaks, a production build of the web app and a fresh-clone run of `make bootstrap && make dev`. Make targets, docker compose and the conventions I follow are in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md); the quality bar and the judges are in [docs/EVALUATION.md](docs/EVALUATION.md).
 
 <!-- evidence:testing -->
 From the last captured run of `make test` ([`docs/evidence/tests.txt`](docs/evidence/tests.txt)): 172 passed, 0 failed, 92.58% coverage.
