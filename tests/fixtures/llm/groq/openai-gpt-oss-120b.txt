@@ -1,0 +1,15 @@
+{
+  "root_cause_hypothesis": "The duplicate mapping of LOC-0517 to OUT-1071 originates from a stale join configuration in the location-to-outlet mapping table. A recent bulk load introduced a secondary key (OUT-1071) for a subset of LOC-0517 records without deactivating the previous primary key, causing both identifiers to appear on 251 rows (3% of the dataset). This key drift is likely due to an ETL script that erroneously merged two source feeds and failed to enforce unique constraints on the location identifier column.",
+  "recommended_fix": [
+    "Audit the ETL job that populates the location-outlet mapping table and add a validation step to enforce uniqueness of the location key.",
+    "Backfill the affected 251 rows by removing the incorrect OUT-1071 assignment, retaining the correct LOC-0517 mapping.",
+    "Implement a database constraint (unique index) on the location identifier to prevent future duplicate key insertion.",
+    "Add a monitoring alert that triggers when the drift rate exceeds 0.5% for any key mapping.",
+    "Document the change in the data dictionary and communicate the fix to downstream data consumers."
+  ],
+  "confidence": 0.92,
+  "open_questions": [
+    "Were there any downstream processes that already consumed the incorrect OUT-1071 values?",
+    "Is there a versioned history of the mapping table to trace when the duplicate entries were introduced?"
+  ]
+}

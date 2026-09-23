@@ -26,7 +26,9 @@ class Scripted:
     def __init__(self, name: str, fail: bool = False) -> None:
         self.name, self.model, self.fail, self.calls = name, f"{name}-model", fail, 0
 
-    def complete(self, system: str, messages: list[Message], max_tokens: int) -> Completion:
+    def complete(
+        self, system: str, messages: list[Message], max_tokens: int, json_object: bool = False
+    ) -> Completion:
         self.calls += 1
         if self.fail:
             raise ConnectionError("down")

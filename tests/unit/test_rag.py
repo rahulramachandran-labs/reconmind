@@ -31,7 +31,9 @@ class Echo:
     def __init__(self) -> None:
         self.seen: list[Message] = []
 
-    def complete(self, system: str, messages: list[Message], max_tokens: int) -> Completion:
+    def complete(
+        self, system: str, messages: list[Message], max_tokens: int, json_object: bool = False
+    ) -> Completion:
         self.seen = messages
         return Completion(
             text="Latest file wins [1].",
@@ -46,7 +48,9 @@ class Echo:
 class Down:
     name, model = "openai", "x"
 
-    def complete(self, system: str, messages: list[Message], max_tokens: int) -> Completion:
+    def complete(
+        self, system: str, messages: list[Message], max_tokens: int, json_object: bool = False
+    ) -> Completion:
         raise TimeoutError
 
 

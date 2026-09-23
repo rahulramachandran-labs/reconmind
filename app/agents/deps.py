@@ -37,6 +37,7 @@ class AgentDeps:
     planner_threshold: float = 0.5
     review_threshold: float = 0.6
     retrieval_k: int = 4
+    report_max_tokens: int = 2048
     extra: dict[str, Any] = field(default_factory=dict)
 
 

@@ -151,6 +151,8 @@ export type IncidentReport = {
   template?: WriteUp | null;
   /** What the model wrote from the same facts, with who wrote it and what it cost. */
   model_analysis?: ModelWriteUp | null;
+  /** Why the model's reply was not used, when one was asked for and rejected. */
+  model_error?: string | null;
 };
 
 export type ModelStatus = {

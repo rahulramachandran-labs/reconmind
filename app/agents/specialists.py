@@ -59,6 +59,8 @@ class Analysis:
     template: FindingAnalysis
     sources: list[RetrievedChunk]
     calls: list[Completion] = field(default_factory=list)
+    # why the model's reply was not used, when it was asked and rejected
+    error: str | None = None
 
 
 async def analyse(deps: AgentDeps, finding: Finding) -> Analysis:
@@ -68,6 +70,7 @@ async def analyse(deps: AgentDeps, finding: Finding) -> Analysis:
         "evidence": [e.summary for e in finding.evidence]
     }
     calls: list[Completion] = []
+    notes: list[str] = []
     user = f"Finding:\n{json.dumps(facts, indent=1)}\n\n{format_passages(sources)}"
     shown_to_model = user + " ".join(e.summary for e in finding.evidence)
     shown, by = await structured(
@@ -85,15 +88,17 @@ async def analyse(deps: AgentDeps, finding: Finding) -> Analysis:
         fallback=lambda: template,
         name=f"analyse:{finding.finding_type}",
         prompt_version=PROMPT_VERSION,
+        max_tokens=deps.report_max_tokens,
         calls=calls,
         check=lambda a: ungrounded(a, shown_to_model),
+        notes=notes,
     )
     if by != "template":
         # a model may lower confidence freely but not talk itself far past the calibrated prior
         shown = shown.model_copy(
             update={"confidence": round(min(shown.confidence, template.confidence + 0.15, 0.95), 2)}
         )
-    return Analysis(shown, by, template, sources, calls)
+    return Analysis(shown, by, template, sources, calls, notes[-1] if notes else None)
 
 
 def write_ups(
@@ -128,6 +133,7 @@ def written_item(deps: AgentDeps, f: Finding, a: Analysis) -> dict[str, Any]:
         "prior_confidence": a.template.confidence,
         "template": template.model_dump(mode="json"),
         "model_analysis": model.model_dump(mode="json") if model else None,
+        "model_error": a.error if model is None else None,
         "sources": [SourceRef(**s.model_dump()).model_dump() for s in a.sources],
     }
 

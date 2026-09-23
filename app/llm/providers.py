@@ -52,6 +52,9 @@ class Completion:
     completion_tokens: int = 0
     cost_usd: float = 0.0
     fallbacks: list[str] = field(default_factory=list)
+    # "stop", "length" when the reply was cut off, "tool_calls", or None from a provider
+    # that does not say. A "length" on a reply that failed to parse is the whole story.
+    finish_reason: str | None = None
 
 
 @dataclass
@@ -80,7 +83,9 @@ class Provider(Protocol):
     name: str
     model: str
 
-    def complete(self, system: str, messages: list[Message], max_tokens: int) -> Completion: ...
+    def complete(
+        self, system: str, messages: list[Message], max_tokens: int, json_object: bool = False
+    ) -> Completion: ...
 
 
 class OpenAICompatibleProvider:
@@ -97,10 +102,15 @@ class OpenAICompatibleProvider:
         limit_param: str = "max_completion_tokens",
         extra: dict[str, Any] | None = None,
         free: bool = False,
+        json_model: str | None = None,
+        json_mode: bool = True,
     ) -> None:
         self.name, self.model, self.client = name, model, client
         self.limit_param, self.extra = limit_param, extra or {}
         self.free = free or name == "ollama"  # a local model costs nothing
+        # a model that answers prose well is not always the one that emits clean JSON
+        self.json_model = json_model or model
+        self.json_mode = json_mode
 
     def complete_tools(
         self,
@@ -138,21 +148,38 @@ class OpenAICompatibleProvider:
             prompt_tokens=p_tok,
             completion_tokens=c_tok,
             cost_usd=0.0 if self.free else estimate_cost(self.model, p_tok, c_tok),
+            finish_reason=getattr(resp.choices[0], "finish_reason", None),
             tool_calls=calls,
         )
 
-    def complete(self, system: str, messages: list[Message], max_tokens: int) -> Completion:
+    def complete(
+        self, system: str, messages: list[Message], max_tokens: int, json_object: bool = False
+    ) -> Completion:
         start = time.perf_counter()
-        resp = self.client.chat.completions.create(
-            model=self.model,
-            messages=[{"role": "system", "content": system}]
+        model = self.json_model if json_object else self.model
+        body: dict[str, Any] = {
+            "model": model,
+            "messages": [{"role": "system", "content": system}]
             + [{"role": m.role, "content": m.content} for m in messages],
-            **{self.limit_param: max_tokens},
+            self.limit_param: max_tokens,
             **self.extra,
-        )
+        }
+        if json_object and self.json_mode:
+            body["response_format"] = {"type": "json_object"}
+        try:
+            resp = self.client.chat.completions.create(**body)
+        except Exception as exc:
+            if "response_format" not in body or "response_format" not in str(exc):
+                raise
+            # this provider does not know the parameter; ask plainly from now on
+            self.json_mode = False
+            log.info("provider has no JSON mode", extra={"provider": self.name})
+            body.pop("response_format")
+            resp = self.client.chat.completions.create(**body)
         usage = resp.usage
         p_tok = usage.prompt_tokens if usage else 0
         c_tok = usage.completion_tokens if usage else 0
+        finish = getattr(resp.choices[0], "finish_reason", None)
         text = (resp.choices[0].message.content or "").strip()
         if not text:
             # a reasoning model that spent its whole budget thinking; let the chain move on
@@ -160,11 +187,12 @@ class OpenAICompatibleProvider:
         return Completion(
             text=text,
             provider=self.name,
-            model=self.model,
+            model=model,
             latency_ms=int((time.perf_counter() - start) * 1000),
             prompt_tokens=p_tok,
             completion_tokens=c_tok,
-            cost_usd=0.0 if self.free else estimate_cost(self.model, p_tok, c_tok),
+            cost_usd=0.0 if self.free else estimate_cost(model, p_tok, c_tok),
+            finish_reason=finish,
         )
 
 
@@ -174,7 +202,9 @@ class AnthropicProvider:
     def __init__(self, model: str, client: Any) -> None:
         self.model, self.client = model, client
 
-    def complete(self, system: str, messages: list[Message], max_tokens: int) -> Completion:
+    def complete(
+        self, system: str, messages: list[Message], max_tokens: int, json_object: bool = False
+    ) -> Completion:
         start = time.perf_counter()
         resp = self.client.messages.create(
             model=self.model,
@@ -192,6 +222,9 @@ class AnthropicProvider:
             prompt_tokens=p_tok,
             completion_tokens=c_tok,
             cost_usd=estimate_cost(self.model, p_tok, c_tok),
+            finish_reason={"max_tokens": "length"}.get(
+                getattr(resp, "stop_reason", ""), getattr(resp, "stop_reason", None)
+            ),
         )
 
 
@@ -245,7 +278,12 @@ def build_providers(settings: Settings) -> list[Provider]:
             extra = {"reasoning_effort": "low"} if "gpt-oss" in settings.groq_model else {}
             providers.append(
                 OpenAICompatibleProvider(
-                    "groq", settings.groq_model, client, extra=extra, free=settings.groq_free_tier
+                    "groq",
+                    settings.groq_model,
+                    client,
+                    extra=extra,
+                    free=settings.groq_free_tier,
+                    json_model=settings.groq_structured_model,
                 )
             )
         elif name == "gemini" and settings.gemini_api_key:
@@ -361,10 +399,11 @@ class LLMChain:
         system: str,
         user: str | list[Message],
         max_tokens: int = 700,
+        json_object: bool = False,
     ) -> Completion:
         messages = [Message("user", user)] if isinstance(user, str) else user
         with self._slots:
-            return self._first(lambda p: p.complete(system, messages, max_tokens))
+            return self._first(lambda p: p.complete(system, messages, max_tokens, json_object))
 
     def complete_tools(
         self,

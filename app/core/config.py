@@ -42,6 +42,8 @@ class Settings(BaseSettings):
     # free tiers, all spoken to through the OpenAI-compatible chat API
     groq_api_key: SecretStr | None = None
     groq_model: str = "openai/gpt-oss-120b"
+    # the model asked for JSON; measured against groq_model before changing it (ADR 0014)
+    groq_structured_model: str = "openai/gpt-oss-120b"
     groq_base_url: str = "https://api.groq.com/openai/v1"
     groq_free_tier: bool = True
     gemini_api_key: SecretStr | None = None
@@ -54,6 +56,8 @@ class Settings(BaseSettings):
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "qwen2.5:1.5b"
     llm_timeout_s: float = 60.0
+    # an IncidentReport write-up needs room: problem, root cause, fix steps and questions
+    llm_max_output_tokens_report: int = 2048
     llm_cooldown_s: float = 60.0
     llm_concurrency: int = 2  # model calls at once; free tiers limit tokens per minute
 

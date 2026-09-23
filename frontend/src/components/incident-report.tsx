@@ -126,9 +126,13 @@ function NoModelWriteUp({ report, onWritten }: { report: IncidentReport; onWritt
   return (
     <div className="flex flex-col items-start gap-3 rounded-md border border-dashed px-4 py-3 text-sm text-muted-foreground">
       <p>
-        No model has written this one up yet. The facts and the template write-up come from deterministic checks; a
-        model adds its own reading of the same facts.
+        {report.model_error
+          ? "A model was asked and its reply was not used. The facts and the template write-up come from deterministic checks; the model only adds its own reading of them."
+          : "No model has written this one up yet. The facts and the template write-up come from deterministic checks; a model adds its own reading of the same facts."}
       </p>
+      {report.model_error && (
+        <p className="font-mono text-[11px] break-words text-amber">{report.model_error}</p>
+      )}
       {signedIn ? (
         <Button size="sm" variant="secondary" onClick={write} disabled={busy}>
           {busy ? <Loader2 className="animate-spin" /> : <Sparkles />} Write it up with the model

@@ -4,10 +4,11 @@ repos:
     hooks:
       - id: check-yaml
       - id: check-toml
+      # the llm fixtures are raw replies; tidying them would make them something else
       - id: end-of-file-fixer
-        exclude: ^(data/sample/|docs/slides/.*\.(pptx|pdf|png))
+        exclude: ^(data/sample/|tests/fixtures/llm/|docs/slides/.*\.(pptx|pdf|png))
       - id: trailing-whitespace
-        exclude: ^data/sample/
+        exclude: ^(data/sample/|tests/fixtures/llm/)
       - id: check-added-large-files
         args: ["--maxkb=6000"]
 

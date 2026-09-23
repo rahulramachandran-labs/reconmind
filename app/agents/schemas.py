@@ -82,6 +82,8 @@ class IncidentReport(BaseModel):
     # when there is one ("model" in analysis_by), otherwise the template's
     template: WriteUp | None = None
     model_analysis: ModelWriteUp | None = None
+    # set when a model was asked and its reply was not used, with the reason
+    model_error: str | None = None
 
     @property
     def fingerprint(self) -> str:

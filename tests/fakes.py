@@ -14,17 +14,23 @@ class ScriptedProvider:
     def __init__(self, respond: Responder, name: str = "scripted", model: str = "fake-1") -> None:
         self.name, self.model, self.respond = name, model, respond
         self.calls: list[tuple[str, list[Message]]] = []
+        self.json_asked = False
 
-    def complete(self, system: str, messages: list[Message], max_tokens: int) -> Completion:
+    def complete(
+        self, system: str, messages: list[Message], max_tokens: int, json_object: bool = False
+    ) -> Completion:
         self.calls.append((system, messages))
+        self.json_asked = json_object
+        text = self.respond(system, messages)
         return Completion(
-            text=self.respond(system, messages),
+            text=text,
             provider=self.name,
             model=self.model,
             latency_ms=2,
             prompt_tokens=100,
             completion_tokens=20,
             cost_usd=0.0001,
+            finish_reason="length" if text.count("{") > text.count("}") else "stop",
         )
 
 

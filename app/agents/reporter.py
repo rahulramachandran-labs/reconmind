@@ -89,6 +89,7 @@ async def run(deps: AgentDeps, state: dict[str, Any]) -> dict[str, Any]:
                 model_analysis=(
                     ModelWriteUp(**item["model_analysis"]) if item.get("model_analysis") else None
                 ),
+                model_error=item.get("model_error"),
             )
         )
     # repeats of findings an earlier scan reported come back resolved to that report
@@ -117,6 +118,7 @@ async def run(deps: AgentDeps, state: dict[str, Any]) -> dict[str, Any]:
             schema=RunSummary,
             fallback=lambda: fallback,
             name="reporter:summary",
+            max_tokens=deps.report_max_tokens,
             prompt_version=PROMPT_VERSION,
         )
         if reports

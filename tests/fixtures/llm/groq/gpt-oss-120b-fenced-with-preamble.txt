@@ -1,0 +1,26 @@
+**Thinking**
+
+The finding reports a duplicate submission where a resent file supersedes 88 rows (0.01% of records). This usually happens when a downstream system resubmits a file after an error or when a manual correction is made without proper de‑duplication logic. The root cause is likely a lack of idempotent ingest handling or missing duplicate detection. The fix should include implementing deduplication, versioning, and better monitoring. Confidence is high because the pattern is common.
+
+**JSON Output**
+
+```json
+{
+  "root_cause_hypothesis": "The source system re‑sent the file S1002_20260612_1120_ECOMM.txt after an initial failure or correction, and the ingestion pipeline lacks proper idempotency checks or duplicate‑row detection. As a result, the new file overwrote 88 existing rows, creating a duplicate submission finding.",
+  "recommended_fix": [
+    "Add a unique transaction or batch identifier to each file and enforce idempotent processing in the ingestion pipeline.",
+    "Implement row‑level deduplication logic that checks primary keys or natural keys before upserting records.",
+    "Introduce file versioning or timestamp comparison to retain the latest version while archiving superseded rows.",
+    "Configure monitoring/alerts for duplicate file arrivals and for unexpected row count changes.",
+    "Document the resubmission procedure and require approval before overwriting existing data.",
+    "Run a back‑fill job to reconcile any inconsistencies caused by the duplicate rows."
+  ],
+  "confidence": 0.94,
+  "open_questions": [
+    "What unique identifier(s) are available in the ECOMM data to reliably detect duplicates?",
+    "Was the resend intentional (e.g., correction) or triggered by an automated retry?",
+    "Are there downstream systems that already rely on the overwritten rows and need to be notified?",
+    "What is the current latency tolerance for duplicate detection and correction?"
+  ]
+}
+```

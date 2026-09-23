@@ -1,0 +1,15 @@
+{
+  "root_cause_hypothesis": "A downstream data pipeline incorrectly joins the LOC-0517 source with the OUT-1071 reference table using a non‑unique key, causing a small subset of rows (approximately 3%) to be mis‑attributed. The join logic likely lacks proper deduplication or uses a stale mapping that was not refreshed after a recent schema change, leading to key drift for those 251 records.",
+  "recommended_fix": [
+    "Review and correct the join condition between LOC-0517 and OUT-1071 to ensure it uses a unique, stable identifier.",
+    "Add explicit deduplication steps after the join to remove duplicate mappings.",
+    "Refresh any reference tables or lookup caches that map LOC-0517 to OUT-1071.",
+    "Implement unit tests that validate the mapping consistency for a sample of rows.",
+    "Add monitoring alerts for key drift anomalies exceeding 0.5% of rows."
+  ],
+  "confidence": 0.87,
+  "open_questions": [
+    "Was there a recent schema change to either LOC-0517 or OUT-1071 that could have introduced the drift?",
+    "Are there other downstream systems that rely on the same key mapping and might be impacted?"
+  ]
+}

@@ -83,6 +83,7 @@ async def build_investigations(
         store=store,
         planner_threshold=settings.planner_confidence_threshold,
         review_threshold=settings.review_confidence_threshold,
+        report_max_tokens=settings.llm_max_output_tokens_report,
     )
     langfuse = build_langfuse(
         settings.langfuse_public_key,

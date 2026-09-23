@@ -43,6 +43,8 @@ type Turn = {
   fallbacks?: string[];
   /** Who wrote each incident report in an investigation: a provider, or "template". */
   writtenBy: string[];
+  /** Why a model's write-up was not used, when the report carries a reason. */
+  writeUpError?: string;
   sources: Source[];
   summary?: { headline: string; summary: string };
   paused?: boolean;
@@ -71,7 +73,13 @@ function AnsweredBy({ turn }: { turn: Turn }) {
   if (!turn.writtenBy.length) return null;
   const models = [...new Set(turn.writtenBy.filter((w) => w !== "template"))];
   if (!models.length) {
-    return <p className="text-xs text-amber">These write-ups came from templates: no model answered, or its replies failed validation.</p>;
+    return (
+      <p className="text-xs text-amber">
+        {turn.writeUpError
+          ? `These write-ups came from templates. The model was asked: ${turn.writeUpError}`
+          : "These write-ups came from templates: either no model is configured, or the findings were written up before one was."}
+      </p>
+    );
   }
   return (
     <Badge variant="outline" className="font-mono">
@@ -209,7 +217,8 @@ export function AskPanel({ examples = EXAMPLES, inline = false }: { examples?: s
         else if (event === "report") {
           const m = data.model_analysis as { provider?: string; model?: string } | null | undefined;
           const by = m?.provider ? `${m.provider}${m.model ? ` · ${m.model}` : ""}` : str("analysis_by") === "model" ? "model" : str("analysis_by");
-          patch((t) => ({ ...t, writtenBy: [...t.writtenBy, by] }));
+          const why = str("model_error") || undefined;
+          patch((t) => ({ ...t, writtenBy: [...t.writtenBy, by], writeUpError: t.writeUpError ?? why }));
         } else if (event === "summary") patch((t) => ({ ...t, summary: data as Turn["summary"] }));
         else if (event === "answer")
           patch((t) => ({
