@@ -269,7 +269,7 @@ def results_block(s: dict[str, Any]) -> str:
     ]
     out = [
         f"From the last capture, on {s['captured_at'][:10]}: a freshly seeded local stack with "
-        "Groq's free tier first in the fallback chain, and every scenario a reviewer would try "
+        "Groq's free tier first in the fallback chain, and every scenario in the tour above "
         "([`docs/evidence/`](docs/evidence/README.md)). Planted sizes are from "
         "[`expected_anomalies.json`](data/sample/expected_anomalies.json).",
         "",
@@ -686,7 +686,7 @@ EXTRA_WHERE = {
 
 
 def course_rows(sha: str, prefix: str = "") -> list[str]:
-    rows = ["| Module | Concept demonstrated | Where | Test |", "|---|---|---|---|"]
+    rows = ["| Concept area | How it is used here | Where | Proof |", "|---|---|---|---|"]
     for module, concept, where, tests in COURSE:
         w = [link(sha, p, n, lbl) for p, n, lbl in where]
         w += [x.replace("](", f"]({prefix}") for x in EXTRA_WHERE.get(module, [])]
@@ -698,8 +698,10 @@ def course_rows(sha: str, prefix: str = "") -> list[str]:
 def course_block(sha: str) -> str:
     return "\n".join(
         [
-            f"Links in *Where* and *Test* point at the exact lines, pinned to commit `{sha[:7]}`. "
-            "[docs/COURSE_MAPPING.md](docs/COURSE_MAPPING.md) says more about each.",
+            "Every module the course covered is in here somewhere. Each row links to the code "
+            "that does it and to the test that covers it, pinned to commit "
+            f"`{sha[:7]}`. [docs/COURSE_MAPPING.md](docs/COURSE_MAPPING.md) says more about "
+            "each.",
             "",
             *course_rows(sha),
         ]
