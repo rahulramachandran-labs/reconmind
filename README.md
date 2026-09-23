@@ -45,6 +45,16 @@
 
 ---
 
+## Try it in five minutes
+
+1. Open the [API health check](https://reconmind-labs-api.onrender.com/healthz) first. It runs on a free instance that sleeps when idle, so the first request wakes it and can take up to a minute. Wait for `"status":"ok"`.
+2. Open **[reconmind-labs.vercel.app](https://reconmind-labs.vercel.app)**. The dashboard charts 14 days of volume, and 2026-06-18 is visibly short.
+3. Choose *Sign in*, then **Continue as the demo reviewer**. Reading needs no account; starting a scan or signing a finding off does.
+4. Click **Run a scan**. Four findings come back, one S1 and three S2, and the S1 waits in the **Review queue** with the reason it paused. Add a note and approve it there.
+5. In **Ask ReconMind**, ask *Did the MOBILE file have a schema problem on 2026-06-16?* The Planner sends it to the Data-Quality agent alone and the steps stream in; open that run on **Traces** to see every tool call, retrieval and model call with its latency and cost.
+
+The same walkthrough, narrated: [docs/DEMO.md](docs/DEMO.md).
+
 ## How it works
 
 Four submitters send a retail pipeline a daily file each. Over 21 days of seeded, synthetic data, four things go wrong: a store starts reporting under a second id (**key drift**), a file is resent after the nightly load (**duplicate submission**), a column is renamed (**schema drift**) and one feed arrives 40% light (**volume anomaly**). This is what ReconMind does about them:
