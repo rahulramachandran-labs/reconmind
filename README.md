@@ -73,6 +73,8 @@ Every module the course covered is in here somewhere. Each row links to the code
 
 ## How it works
 
+![A scan finds the four planted incidents with Groq writing the reports, the S1 is signed off, questions are answered, one by the Explorer choosing its own tools, then the trace, hybrid search and the Verify page](docs/demo.gif)
+
 Four submitters send a retail pipeline a daily file each. Over 21 days of seeded, synthetic data, four things go wrong: a store starts reporting under a second id (**key drift**), a file is resent after the nightly load (**duplicate submission**), a column is renamed (**schema drift**) and one feed arrives 40% light (**volume anomaly**). This is what ReconMind does about them:
 
 ```mermaid
@@ -91,12 +93,65 @@ flowchart LR
     H --> OUT
 ```
 
+## Architecture
+
 1. **Something starts a run.** A scan every six hours (GitHub Actions), a click on *Run a scan*, or a question in the chat. *Code:* [`refresh-demo.yml`](.github/workflows/refresh-demo.yml), [`app/api/`](app/api)
 2. **The Planner decides who should look.** A general question ("which file wins when a submitter resends?") is answered straight from the runbooks. A question about a known kind of problem ("did the MOBILE file have a schema problem on 2026-06-16?") goes to the specialist that owns it, and a scan sends both. A plain question about the data that no check covers ("which submitter sent the fewest rows on the 18th?") goes to the Explorer, where the model picks up to three read-only tools itself and answers from what they return. *Code:* [`app/agents/planner.py`](app/agents/planner.py), [`app/agents/explorer.py`](app/agents/explorer.py)
 3. **Specialists investigate in parallel.** *Reconciliation* checks for duplicate submissions and key drift; *Data-Quality* checks every file against the dbt contract and each day's volume against its trailing week. They get their facts by calling tools on two read-only **MCP servers** (a scan makes 30 tool calls), so every number is measured, not generated. *Code:* [`app/agents/specialists.py`](app/agents/specialists.py), [`app/domain/retail_recon/`](app/domain/retail_recon), [`mcp_servers/`](mcp_servers)
 4. **They look up what the team already knows.** Hybrid search (BM25 + embeddings, fused, then reranked) finds the matching runbook and any past incident with the same pattern. A model, or a template when no model is configured, turns facts plus runbooks into a root cause, fix steps and a confidence score. A grounding check sends the write-up back if it states a time, number or id that isn't in the evidence. *Code:* [`app/retrieval/`](app/retrieval), [`app/rag/`](app/rag)
 5. **The Reporter writes it up and decides who signs off.** Each finding becomes a structured incident report. S1 findings and anything below the confidence threshold **pause** the LangGraph run in a review queue; a reviewer approves, rejects or annotates, and the run resumes from its Postgres checkpoint. Every decision goes into an append-only audit ledger. *Code:* [`app/agents/reporter.py`](app/agents/reporter.py), [`app/agents/review.py`](app/agents/review.py)
 6. **Everything is traced.** Every agent step, tool call, retrieval and model call is stored with its latency and cost and shown on the Traces page, and mirrored to LangFuse when its keys are set. *Code:* [`app/observability/`](app/observability)
+
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) has the layer-by-layer view: the graph node by node, both MCP servers, the retrieval pipeline, the data model and where state lives.
+
+## Results
+
+<!-- evidence:results -->
+From the last capture, on 2026-09-19: a freshly seeded local stack with Groq's free tier first in the fallback chain, and every scenario in the tour above ([`docs/evidence/`](docs/evidence/README.md)). Planted sizes are from [`expected_anomalies.json`](data/sample/expected_anomalies.json).
+
+| Planted anomaly | Planted size | Finding produced | Severity | Outcome | Written by |
+|---|---|---|---|---|---|
+| Schema drift | `S1003_20260616_0216_MOBILE.txt` renames `channel_basket_id` to `basket_ref`: 82 rows | S1003_20260616_0216_MOBILE.txt renamed channel_basket_id to basket_ref; 82 records | S1, as expected | held for review | `groq/openai/gpt-oss-120b` |
+| Key drift | `LOC-0517` also reports as `OUT-1071`: 251 of 8,373 rows | LOC-0517 also reporting as OUT-1071 (3.0% of rows); 251 records | S2, as expected | published | `groq/openai/gpt-oss-120b` |
+| Duplicate submission | `S1002_20260612_1120_ECOMM.txt` supersedes 88 rows, 3 with changed values, after the DAG ran | Resent file S1002_20260612_1120_ECOMM.txt supersedes 88 rows; 88 records | S2, as expected | published | `groq/openai/gpt-oss-120b` |
+| Volume anomaly | `S1001_20260618_0638_POSFEED.txt`: 110 rows vs 182.6 trailing, 161 min late | S1001 2026-06-18: 110 rows, 40% below its 7-day average; 73 records | S2, as expected | published | `groq/openai/gpt-oss-120b` |
+
+All four planted anomalies were found, each by the specialist expected to find it and at the expected severity, and nothing else was flagged. The scan took 13.6 s from the request to four written-up findings: 5 agent nodes, 30 MCP tool calls, 4 retrievals and 5 model calls (5,714 prompt and 2,093 completion tokens, $0.00 on the free tier).
+
+Then the questions, each a real run:
+
+- *Did the MOBILE file have a schema problem on 2026-06-16?* went to the Data-Quality agent in 1.6 s, 2 model calls. It said: *“S1: Missing channel_basket_id in S1003_20260616_0216_MOBILE.txt prevents deduplication.”*
+- *Which file wins when a submitter resends the same day?* was answered from the runbooks in 1.9 s, 2 model calls. It said: *“The resend that has the later `YYYYMMDD_HHMM` timestamp in its file name wins.”*
+- *What should we check before reprocessing that day?* was answered from the runbooks in 2.5 s, 2 model calls (asked in the same session, so the Planner saw the question before it). It said: *“Before reprocessing, verify that the corrected (resend) file has a later `HHMM` timestamp in its name so the latest‑file‑wins logic will select it, and then compare the `publish_metrics` output to the file’s trailer counts to confirm they match [2].”*
+- *Show me which submitter sent the fewest rows on 2026-06-18, and when its file landed.* went to the Explorer in 2.6 s, 3 model calls; the model chose `get_table_stats`. It said: *“The submitter with the fewest rows on 2026‑06‑18 was **S1004**, whose file contributed **53 rows**.”*
+
+Writing the S1 up again with `POST /incidents/{id}/regenerate` returned HTTP 200, `analysis_by: model`, from `groq/openai/gpt-oss-120b` in 1,574 ms, with the template's version kept beside it. Approving it with a note resumed its paused run and published it. A second scan took 1.2 s and paused for nothing; the feed still held 4 findings, each counted as seen again (the S1 3 times, counting any question that looked at it). It reused the stored write-ups rather than asking the model again, so its 1 model call went to the summary.
+
+`make test`: 172 passed, 0 failed, 92.58% line and branch coverage ([`tests.txt`](docs/evidence/tests.txt)). The RAGAS gate: pass (faithfulness 0.911, answer relevancy 0.862, context precision 0.830, context recall 0.922). CI: [run 35467705767](https://github.com/rahulramachandran-labs/reconmind/actions/runs/35467705767) on `3c19258`, success.
+<!-- /evidence:results -->
+
+## Screens
+
+Captured at 1440×900 from a freshly seeded local stack with Groq's free tier writing the explanations (`uv run --with playwright python scripts/record_demo.py --screenshots docs/screenshots`). The same walkthrough as a two-minute video with captions: **[docs/demo.mp4](docs/demo.mp4)**.
+
+<!-- evidence:screens -->
+| Screen | |
+|---|---|
+| **Dashboard**<br><br>Latest business date against its trailing week, open findings by severity with the S1 waiting for review, the last DAG run, and today's model calls, tokens and cost. The chart flags POSFEED's light day. | <img src="docs/screenshots/dashboard.png" width="560" alt="Dashboard"> |
+| **Incident feed**<br><br>One row per finding, with who wrote it up and how many scans have seen it. | <img src="docs/screenshots/incidents.png" width="560" alt="Incident feed"> |
+| **Incident detail: model analysis**<br><br>The key-drift report as the model wrote it. The chip names the model, its latency, tokens and cost. | <img src="docs/screenshots/incident-detail.png" width="560" alt="Incident detail: model analysis"> |
+| **Incident detail: deterministic checks**<br><br>The template the model's answer is held against: the same problem and counts, and a calibrated confidence. *Side by side* shows both at once. | <img src="docs/screenshots/incident-template.png" width="560" alt="Incident detail: deterministic checks"> |
+| **Review queue**<br><br>The S1 waits for a person, with the reason it paused. | <img src="docs/screenshots/review.png" width="560" alt="Review queue"> |
+| **Ask ReconMind: an investigation**<br><br>The MOBILE question goes to Data-Quality only, and the steps stream in. From the captured run, the first two sentences of the answer, written by `groq/openai/gpt-oss-120b`: *“S1: Missing channel_basket_id in S1003_20260616_0216_MOBILE.txt prevents deduplication. The file S1003_20260616_0216_MOBILE.txt (dated 2026-06-16) does not conform to the raw.transactions contract: the required field 'channel_basket_id' is missing and an unexpected field 'basket_ref' appears.”* | <img src="docs/screenshots/ask.png" width="560" alt="Ask ReconMind: an investigation"> |
+| **Ask ReconMind: a runbook question**<br><br>Answered from the runbooks with numbered citations, and the footer names the model that answered. | <img src="docs/screenshots/ask-runbook.png" width="560" alt="Ask ReconMind: a runbook question"> |
+| **Ask ReconMind: a fact no check covers**<br><br>The Planner sends it to the Explorer, which picks the read-only tools itself (at most three), then answers from what they returned. | <img src="docs/screenshots/ask-explore.png" width="560" alt="Ask ReconMind: a fact no check covers"> |
+| **Traces**<br><br>The scan's trace: each agent, then its MCP tool calls, retrievals and model calls with their latency. The headline and summary at the top are the model's. | <img src="docs/screenshots/trace.png" width="560" alt="Traces"> |
+| **Docs & runbooks, hybrid**<br><br>`basket_ref ContractViolation` with hybrid search: the schema-drift runbook and incident INC-0438 come first. The badges show each hit's dense and BM25 rank; INC-0438 is 10th on meaning alone and 1st on keywords. | <img src="docs/screenshots/docs-hybrid.png" width="560" alt="Docs & runbooks, hybrid"> |
+| **Docs & runbooks, dense only**<br><br>The same query with embeddings only: docs and dbt models for the transactions table fill the top four, the runbook is 5th and the incident isn't in the top five. | <img src="docs/screenshots/docs-dense.png" width="560" alt="Docs & runbooks, dense only"> |
+| **Verify**<br><br>Each planted anomaly beside the finding this deployment produced, the chaos test that proves it, and the template's and the model's root causes side by side. | <img src="docs/screenshots/verify.png" width="560" alt="Verify"> |
+<!-- /evidence:screens -->
+
+---
 
 ### What a run looks like
 
@@ -207,55 +262,6 @@ Run `78b3d94d-58f0-4d68-a38b-599efb8f2e0a`, captured 2026-09-19 20:33:30 UTC · 
 - Anything serious waits for a person. S1s and low-confidence findings stop, and the decision goes on the record.
 - The model only chooses its own tools where that's safe: questions no check covers, three read-only calls at most, each one traced ([ADR 0013](docs/adr/0013-bounded-tool-use-for-open-questions.md)).
 - Every retail rule sits behind a `DomainAdapter`, and a second, small domain (support-ticket triage) runs on the same agent graph in every CI run, so the reuse is tested, not just claimed.
-
-## Results
-
-<!-- evidence:results -->
-From the last capture, on 2026-09-19: a freshly seeded local stack with Groq's free tier first in the fallback chain, and every scenario in the tour above ([`docs/evidence/`](docs/evidence/README.md)). Planted sizes are from [`expected_anomalies.json`](data/sample/expected_anomalies.json).
-
-| Planted anomaly | Planted size | Finding produced | Severity | Outcome | Written by |
-|---|---|---|---|---|---|
-| Schema drift | `S1003_20260616_0216_MOBILE.txt` renames `channel_basket_id` to `basket_ref`: 82 rows | S1003_20260616_0216_MOBILE.txt renamed channel_basket_id to basket_ref; 82 records | S1, as expected | held for review | `groq/openai/gpt-oss-120b` |
-| Key drift | `LOC-0517` also reports as `OUT-1071`: 251 of 8,373 rows | LOC-0517 also reporting as OUT-1071 (3.0% of rows); 251 records | S2, as expected | published | `groq/openai/gpt-oss-120b` |
-| Duplicate submission | `S1002_20260612_1120_ECOMM.txt` supersedes 88 rows, 3 with changed values, after the DAG ran | Resent file S1002_20260612_1120_ECOMM.txt supersedes 88 rows; 88 records | S2, as expected | published | `groq/openai/gpt-oss-120b` |
-| Volume anomaly | `S1001_20260618_0638_POSFEED.txt`: 110 rows vs 182.6 trailing, 161 min late | S1001 2026-06-18: 110 rows, 40% below its 7-day average; 73 records | S2, as expected | published | `groq/openai/gpt-oss-120b` |
-
-All four planted anomalies were found, each by the specialist expected to find it and at the expected severity, and nothing else was flagged. The scan took 13.6 s from the request to four written-up findings: 5 agent nodes, 30 MCP tool calls, 4 retrievals and 5 model calls (5,714 prompt and 2,093 completion tokens, $0.00 on the free tier).
-
-Then the questions, each a real run:
-
-- *Did the MOBILE file have a schema problem on 2026-06-16?* went to the Data-Quality agent in 1.6 s, 2 model calls. It said: *“S1: Missing channel_basket_id in S1003_20260616_0216_MOBILE.txt prevents deduplication.”*
-- *Which file wins when a submitter resends the same day?* was answered from the runbooks in 1.9 s, 2 model calls. It said: *“The resend that has the later `YYYYMMDD_HHMM` timestamp in its file name wins.”*
-- *What should we check before reprocessing that day?* was answered from the runbooks in 2.5 s, 2 model calls (asked in the same session, so the Planner saw the question before it). It said: *“Before reprocessing, verify that the corrected (resend) file has a later `HHMM` timestamp in its name so the latest‑file‑wins logic will select it, and then compare the `publish_metrics` output to the file’s trailer counts to confirm they match [2].”*
-- *Show me which submitter sent the fewest rows on 2026-06-18, and when its file landed.* went to the Explorer in 2.6 s, 3 model calls; the model chose `get_table_stats`. It said: *“The submitter with the fewest rows on 2026‑06‑18 was **S1004**, whose file contributed **53 rows**.”*
-
-Writing the S1 up again with `POST /incidents/{id}/regenerate` returned HTTP 200, `analysis_by: model`, from `groq/openai/gpt-oss-120b` in 1,574 ms, with the template's version kept beside it. Approving it with a note resumed its paused run and published it. A second scan took 1.2 s and paused for nothing; the feed still held 4 findings, each counted as seen again (the S1 3 times, counting any question that looked at it). It reused the stored write-ups rather than asking the model again, so its 1 model call went to the summary.
-
-`make test`: 172 passed, 0 failed, 92.58% line and branch coverage ([`tests.txt`](docs/evidence/tests.txt)). The RAGAS gate: pass (faithfulness 0.911, answer relevancy 0.862, context precision 0.830, context recall 0.922). CI: [run 35467705767](https://github.com/rahulramachandran-labs/reconmind/actions/runs/35467705767) on `3c19258`, success.
-<!-- /evidence:results -->
-
-## Screens
-
-Captured at 1440×900 from a freshly seeded local stack with Groq's free tier writing the explanations (`uv run --with playwright python scripts/record_demo.py --screenshots docs/screenshots`). The same walkthrough as a two-minute video with captions: **[docs/demo.mp4](docs/demo.mp4)**.
-
-<!-- evidence:screens -->
-| Screen | |
-|---|---|
-| **Dashboard**<br><br>Latest business date against its trailing week, open findings by severity with the S1 waiting for review, the last DAG run, and today's model calls, tokens and cost. The chart flags POSFEED's light day. | <img src="docs/screenshots/dashboard.png" width="560" alt="Dashboard"> |
-| **Incident feed**<br><br>One row per finding, with who wrote it up and how many scans have seen it. | <img src="docs/screenshots/incidents.png" width="560" alt="Incident feed"> |
-| **Incident detail: model analysis**<br><br>The key-drift report as the model wrote it. The chip names the model, its latency, tokens and cost. | <img src="docs/screenshots/incident-detail.png" width="560" alt="Incident detail: model analysis"> |
-| **Incident detail: deterministic checks**<br><br>The template the model's answer is held against: the same problem and counts, and a calibrated confidence. *Side by side* shows both at once. | <img src="docs/screenshots/incident-template.png" width="560" alt="Incident detail: deterministic checks"> |
-| **Review queue**<br><br>The S1 waits for a person, with the reason it paused. | <img src="docs/screenshots/review.png" width="560" alt="Review queue"> |
-| **Ask ReconMind: an investigation**<br><br>The MOBILE question goes to Data-Quality only, and the steps stream in. From the captured run, the first two sentences of the answer, written by `groq/openai/gpt-oss-120b`: *“S1: Missing channel_basket_id in S1003_20260616_0216_MOBILE.txt prevents deduplication. The file S1003_20260616_0216_MOBILE.txt (dated 2026-06-16) does not conform to the raw.transactions contract: the required field 'channel_basket_id' is missing and an unexpected field 'basket_ref' appears.”* | <img src="docs/screenshots/ask.png" width="560" alt="Ask ReconMind: an investigation"> |
-| **Ask ReconMind: a runbook question**<br><br>Answered from the runbooks with numbered citations, and the footer names the model that answered. | <img src="docs/screenshots/ask-runbook.png" width="560" alt="Ask ReconMind: a runbook question"> |
-| **Ask ReconMind: a fact no check covers**<br><br>The Planner sends it to the Explorer, which picks the read-only tools itself (at most three), then answers from what they returned. | <img src="docs/screenshots/ask-explore.png" width="560" alt="Ask ReconMind: a fact no check covers"> |
-| **Traces**<br><br>The scan's trace: each agent, then its MCP tool calls, retrievals and model calls with their latency. The headline and summary at the top are the model's. | <img src="docs/screenshots/trace.png" width="560" alt="Traces"> |
-| **Docs & runbooks, hybrid**<br><br>`basket_ref ContractViolation` with hybrid search: the schema-drift runbook and incident INC-0438 come first. The badges show each hit's dense and BM25 rank; INC-0438 is 10th on meaning alone and 1st on keywords. | <img src="docs/screenshots/docs-hybrid.png" width="560" alt="Docs & runbooks, hybrid"> |
-| **Docs & runbooks, dense only**<br><br>The same query with embeddings only: docs and dbt models for the transactions table fill the top four, the runbook is 5th and the incident isn't in the top five. | <img src="docs/screenshots/docs-dense.png" width="560" alt="Docs & runbooks, dense only"> |
-| **Verify**<br><br>Each planted anomaly beside the finding this deployment produced, the chaos test that proves it, and the template's and the model's root causes side by side. | <img src="docs/screenshots/verify.png" width="560" alt="Verify"> |
-<!-- /evidence:screens -->
-
----
 
 ## Try it
 
