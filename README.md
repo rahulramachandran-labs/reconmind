@@ -291,9 +291,9 @@ Run `9bda1e0c-4add-4ac7-8351-8434ccba88aa`, captured 2026-09-23 06:10:12 UTC · 
 
 ## Why this project
 
-Most pipeline incidents are not interesting. A number looks wrong, someone opens four tabs (the raw tables, the orchestrator, the dbt project, the runbook wiki), and forty minutes later there is a message in a channel saying what happened and what to do. The reasoning in that message is good. It is also gone by the next week, and the next person starts from scratch. After enough years of being that person, the part worth automating is clear: not the judgement at the end, the forty minutes of fetching that leads to it.
+Most pipeline incidents are not interesting. A number looks wrong, someone opens four tabs (the raw tables, the orchestrator, the dbt project, the runbook wiki), and forty minutes later there is a message in a channel saying what happened and what to do. The reasoning is good. It is also gone by the next week, and the next person starts from scratch. After years of being that person, the part worth automating is clear: not the judgement at the end, but the forty minutes of fetching that leads to it.
 
-Three earlier attempts set the shape of this one. A dashboard with thresholds said something was off, never why. A chatbot over the runbooks could explain what a `ContractViolation` means, but could not go and check whether one had happened. A single agent holding every tool answered well in a demo and was impossible to debug: a wrong severity could have come from retrieval, from the tool call or from the reasoning, and nothing in the output said which.
+Three earlier attempts set the shape of this one. A dashboard with thresholds said something was off, never why. A chatbot over the runbooks could explain what a `ContractViolation` means, but could not go and check whether one had happened. A single agent holding every tool answered well in a demo and was impossible to debug: a wrong severity could have come from retrieval, from the tool call or from the reasoning, and nothing in the output said which. What each attempt taught is in the [write-up](docs/blog/reconmind-writeup.md).
 
 ## Why it is built this way
 
@@ -302,7 +302,7 @@ Three earlier attempts set the shape of this one. A dashboard with thresholds sa
 - Pipelines are full of identifiers, and embeddings blur `channel_basket_id` and `basket_ref` where BM25 matches them exactly. Fusing the two and reranking raised context precision from 0.66 (dense only) to 0.83.
 - Anything serious waits for a person. S1s and low-confidence findings stop, and the decision goes on the record.
 - The model only chooses its own tools where that's safe: questions no check covers, three read-only calls at most, each one traced ([ADR 0013](docs/adr/0013-bounded-tool-use-for-open-questions.md)).
-- Every retail rule sits behind a `DomainAdapter`, and a second, small domain (support-ticket triage) runs on the same agent graph in every CI run, so the reuse is tested, not just claimed.
+- Every retail rule sits behind a `DomainAdapter`, and a second, small domain (support-ticket triage) runs on the same agent graph in every CI run. Another test parses the source under `app/agents/` and fails if any module there imports a domain.
 
 ## Production readiness
 
