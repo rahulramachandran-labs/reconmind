@@ -181,7 +181,14 @@ Captured at 1440×900 from a freshly seeded local stack with Groq's free tier wr
 
 ---
 
-### What a run looks like
+## Contents
+
+- [Try it in five minutes](#try-it-in-five-minutes) · [Core concepts](#core-concepts) · [How it works](#how-it-works) · [Architecture](#architecture) · [Tech stack](#tech-stack)
+- [Results](#results) · [Screens](#screens) · [What a run looks like](#what-a-run-looks-like) · [Example incident report](#example-incident-report) · [Why it is built this way](#why-it-is-built-this-way)
+- [Production readiness](#production-readiness) · [Scope and limitations](#scope-and-limitations) · [Reusability and roadmap](#reusability-and-roadmap)
+- [Try it](#try-it) · [Runbook](#runbook-walk-through-the-whole-flow-locally) · [Project structure](#project-structure) · [Quality and evaluation](#quality-and-evaluation) · [Documentation](#documentation) · [License](#license)
+
+## What a run looks like
 
 <!-- evidence:trace -->
 An excerpt from the trace of one captured run, the question *Did the MOBILE file have a schema problem on 2026-06-16?*, answered in 2.8 s by `groq/openai/gpt-oss-120b`:
@@ -257,7 +264,7 @@ class IncidentReport(BaseModel):
 </details>
 <!-- /evidence:schema -->
 
-### One report, as a reviewer sees it
+## Example incident report
 
 <!-- evidence:report -->
 The key-drift report from the captured scan, exactly as the API returned it:
@@ -281,7 +288,7 @@ The key-drift report from the captured scan, exactly as the API returned it:
 Run `9bda1e0c-4add-4ac7-8351-8434ccba88aa`, captured 2026-09-23 06:10:12 UTC · `analysis_by: model` · written by `openai/gpt-oss-120b` (groq) in 8,842 ms (1,205 prompt + 557 completion tokens, $0.00). The problem statement and counts come from the deterministic check; the root cause, fix, confidence and open questions are the model's, with confidence capped at the template's 0.60 plus 0.15. The template's own version is stored beside it, and its hypothesis reads: *"Whole baskets (158) from 4 submitter(s) carry OUT-1071, so the id is set at the register or export profile rather than corrupted row by row; OUT-1071 looks like a transposition of OUT-1017."* Raw JSON: [`docs/evidence/incident-key-drift.json`](docs/evidence/incident-key-drift.json).
 <!-- /evidence:report -->
 
-### Why it is built this way
+## Why it is built this way
 
 - Facts come from checks, and models only write the words. The counts, severities and evidence are measured, so no model can change them, and the grounding check keeps a model from slipping in numbers of its own. It all still works with no model at all, at no cost.
 - I split the work across narrow agents because my first version was one agent with every job, and when it got something wrong I couldn't tell which part had failed. Here each agent has one job and its own place in the trace.
@@ -289,6 +296,34 @@ Run `9bda1e0c-4add-4ac7-8351-8434ccba88aa`, captured 2026-09-23 06:10:12 UTC · 
 - Anything serious waits for a person. S1s and low-confidence findings stop, and the decision goes on the record.
 - The model only chooses its own tools where that's safe: questions no check covers, three read-only calls at most, each one traced ([ADR 0013](docs/adr/0013-bounded-tool-use-for-open-questions.md)).
 - Every retail rule sits behind a `DomainAdapter`, and a second, small domain (support-ticket triage) runs on the same agent graph in every CI run, so the reuse is tested, not just claimed.
+
+## Production readiness
+
+| Area | In place | Next step |
+|---|---|---|
+| **Authentication** | Anyone can read. Scans and review decisions need a signed-in reviewer: Auth.js with GitHub OAuth and an allow-list, or a shared demo reviewer on the public demo. The web server forwards writes with a bearer token (`WRITE_TOKEN`, compared in constant time), so the browser never sees it. Reviewer names go into the audit ledger. There are per-client rate limits and a CORS allow-list. | Roles (viewer, reviewer, admin), OIDC single sign-on, per-user tokens |
+| **Storage** | Postgres 16 through SQLAlchemy 2 and versioned Alembic migrations. The audit ledger is append-only, enforced by a database trigger. Vectors live in FAISS in memory or in managed Pinecone, switched with one setting (`VECTOR_STORE`). The Docker image runs the embedding model on ONNX to fit in 512 MB. | Managed Postgres with backups (the free demo database expires after 30 days) |
+| **Knowledge retrieval** | Live facts are fetched through MCP tools at the moment of each investigation, never from a stale copy. Documents are indexed with BM25 and embeddings, fused, then reranked. The index is fingerprinted and rebuilt automatically when documents change, and `CORPUS_DIR` points it at any folder of markdown. | Ingest from a wiki or docs repo on change; add approved incident reports to the corpus as new precedents |
+| **State management** | LangGraph checkpoints every step in Postgres, so a run paused for review survives restarts and resumes on whichever API instance receives the decision. Runs, reports, decisions and chat memory are in Postgres too, and fingerprints make repeated scans idempotent — in the store, and again in the web app, which folds by the same fingerprint before rendering so a finding is never listed or counted twice. Only rate-limit counters, the provider cooldown and the FAISS copy are per instance. | Redis for global rate limits; Pinecone to share one index |
+| **Reliability and cost** | Model fallback chain: OpenAI → Anthropic → the free tiers of Groq, Gemini and OpenRouter → local Ollama → extractive answers, with a cooldown for failing providers. Outputs are validated by Pydantic and a grounding check, retried, then fall back to a template. `DEMO_MODE` guarantees $0. A chaos suite and a 30-second latency budget run in CI. | Queue-backed scans for long windows |
+| **Observability** | Every agent step, tool call, retrieval and model call is stored with latency, tokens and cost, and mirrored to LangFuse when its keys are set. A model call outside a traced run raises an error instead of going unrecorded. Logs are JSON. | Alerts on failed or slow runs |
+| **Security** | Retrieved text is treated as untrusted: it is delimited, tag-sanitised and covered by a planted prompt-injection test. MCP tools are read-only with validated arguments. Secrets come only from the environment, gitleaks runs in pre-commit and in CI over the full history, and the container runs as non-root. | Secret manager instead of env vars |
+
+## Scope and limitations
+
+- The hosted demo writes with Groq's free tier, which allows about 8,000 tokens a minute. A burst of scans and questions can run past it; calls then fall through to the next provider and, last, to the template, and every report says which wrote it.
+- The hosted API sleeps after 15 idle minutes, and the first request after that takes up to a minute. It also runs without the reranker to fit in 512 MB, so its search rankings differ a little from the local ones shown here.
+- The demo's free Postgres expires around 2026-10-19. Applying the Render blueprint again recreates it, and the **Reseed the demo** workflow reloads the sample, scans and writes the findings up again ([docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)).
+- With no model key at all, nothing breaks: the write-ups come from the domain's templates and the answers are extractive, and every report and every answer says which wrote it.
+
+## Reusability and roadmap
+
+The agents never import a business rule, so a second domain is an adapter and a corpus, and one ships with the project. These are the things I would build next:
+
+- Scans run on a schedule rather than when data lands; triggering them from the loader, or a Kafka topic, is the obvious next step.
+- The Reporter proposes fixes but never applies them. Opening a pull request with the fix, gated on approval, would close that loop.
+- Confidence thresholds are set by hand, and the approve and reject history is already in the ledger to tune them from.
+- It runs one domain at a time; an adapter registry and multi-tenant auth would let several run side by side.
 
 ## Try it
 
@@ -401,18 +436,6 @@ scripts/                 data generator CLI, container entrypoint, demo recordin
 
 To read the code in the order a run executes: [`graph.py`](app/agents/graph.py) → [`planner.py`](app/agents/planner.py) → [`specialists.py`](app/agents/specialists.py) → [`retail_recon/checks.py`](app/domain/retail_recon/checks.py) → [`reporter.py`](app/agents/reporter.py) → [`review.py`](app/agents/review.py).
 
-## Production readiness
-
-| Area | In place | Next step |
-|---|---|---|
-| **Authentication** | Anyone can read. Scans and review decisions need a signed-in reviewer: Auth.js with GitHub OAuth and an allow-list, or a shared demo reviewer on the public demo. The web server forwards writes with a bearer token (`WRITE_TOKEN`, compared in constant time), so the browser never sees it. Reviewer names go into the audit ledger. There are per-client rate limits and a CORS allow-list. | Roles (viewer, reviewer, admin), OIDC single sign-on, per-user tokens |
-| **Storage** | Postgres 16 through SQLAlchemy 2 and versioned Alembic migrations. The audit ledger is append-only, enforced by a database trigger. Vectors live in FAISS in memory or in managed Pinecone, switched with one setting (`VECTOR_STORE`). The Docker image runs the embedding model on ONNX to fit in 512 MB. | Managed Postgres with backups (the free demo database expires after 30 days) |
-| **Knowledge retrieval** | Live facts are fetched through MCP tools at the moment of each investigation, never from a stale copy. Documents are indexed with BM25 and embeddings, fused, then reranked. The index is fingerprinted and rebuilt automatically when documents change, and `CORPUS_DIR` points it at any folder of markdown. | Ingest from a wiki or docs repo on change; add approved incident reports to the corpus as new precedents |
-| **State management** | LangGraph checkpoints every step in Postgres, so a run paused for review survives restarts and resumes on whichever API instance receives the decision. Runs, reports, decisions and chat memory are in Postgres too, and fingerprints make repeated scans idempotent — in the store, and again in the web app, which folds by the same fingerprint before rendering so a finding is never listed or counted twice. Only rate-limit counters, the provider cooldown and the FAISS copy are per instance. | Redis for global rate limits; Pinecone to share one index |
-| **Reliability and cost** | Model fallback chain: OpenAI → Anthropic → the free tiers of Groq, Gemini and OpenRouter → local Ollama → extractive answers, with a cooldown for failing providers. Outputs are validated by Pydantic and a grounding check, retried, then fall back to a template. `DEMO_MODE` guarantees $0. A chaos suite and a 30-second latency budget run in CI. | Queue-backed scans for long windows |
-| **Observability** | Every agent step, tool call, retrieval and model call is stored with latency, tokens and cost, and mirrored to LangFuse when its keys are set. A model call outside a traced run raises an error instead of going unrecorded. Logs are JSON. | Alerts on failed or slow runs |
-| **Security** | Retrieved text is treated as untrusted: it is delimited, tag-sanitised and covered by a planted prompt-injection test. MCP tools are read-only with validated arguments. Secrets come only from the environment, gitleaks runs in pre-commit and in CI over the full history, and the container runs as non-root. | Secret manager instead of env vars |
-
 ## Quality and evaluation
 
 CI also runs ruff, black and mypy, then 158 tests with an 80% coverage gate (currently 93.17%), including Postgres, MCP, agent, prompt-injection and chaos tests. It finishes with gitleaks and a production build of the web app. Details are in [docs/EVALUATION.md](docs/EVALUATION.md).
@@ -446,16 +469,6 @@ From the last captured run of `make test` ([`docs/evidence/tests.txt`](docs/evid
 | [Decision records](docs/adr/README.md) | Why LangGraph, why MCP, why hybrid search, and the rest |
 | [Getting around ReconMind](docs/GUIDE.md) | A walkthrough of the live app and a local run, with where to check each claim |
 | [Captured evidence](docs/evidence/README.md) | The raw API responses and test output behind this README's numbers |
-
-## Limitations and next steps
-
-- The hosted demo writes with Groq's free tier, which allows about 8,000 tokens a minute. A burst of scans and questions can run past it; calls then fall through to the next provider and, last, to the template, and every report says which wrote it.
-- The hosted API sleeps after 15 idle minutes, and the first request after that takes up to a minute. It also runs without the reranker to fit in 512 MB, so its search rankings differ a little from the local ones shown here.
-- The demo's free Postgres expires around 2026-10-19. Applying the Render blueprint again recreates it, and the **Reseed the demo** workflow reloads the sample, scans and writes the findings up again ([docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)).
-- Scans run on a schedule rather than when data lands; triggering them from the loader, or a Kafka topic, is the obvious next step.
-- The Reporter proposes fixes but never applies them. Opening a pull request with the fix, gated on approval, would close that loop.
-- Confidence thresholds are set by hand, and the approve and reject history is already in the ledger to tune them from.
-- It runs one domain at a time; an adapter registry and multi-tenant auth would let several run side by side.
 
 ## License
 
