@@ -1,13 +1,13 @@
-# Reviewer guide
+# Getting around ReconMind
 
-A checklist for evaluating ReconMind, from five minutes on the live app to a full local run. Every claim in the README has something here you can open or run to check it.
+A walkthrough, from five minutes on the live app to a full local run. Every claim in the README has something here you can open or run for yourself.
 
 ## Five minutes, in the browser
 
 1. Open the [API health check](https://reconmind-labs-api.onrender.com/healthz). The free instance sleeps when idle, so the first request can take up to a minute. Wait for `"status":"ok"` and `"database":true`.
 2. Open [reconmind-labs.vercel.app](https://reconmind-labs.vercel.app), choose **Sign in**, then **Continue as the demo reviewer**.
 3. **Dashboard:** the chart shows 14 days of volume, with 2026-06-18 visibly short. Click **Run a scan**. The *Open findings* tile shows four findings, one S1 and three S2.
-4. **Review queue:** the S1 schema-drift finding is waiting, with the reason it paused. Add a note and approve it. The decision is recorded under the demo reviewer's name. (Every six hours the refresh workflow reopens it, so the next reviewer can try this too.)
+4. **Review queue:** the S1 schema-drift finding is waiting, with the reason it paused. Add a note and approve it. The decision is recorded under the demo reviewer's name. (Every six hours the refresh workflow reopens it, so the sign-off is always there to try.)
 5. **Ask ReconMind:** ask *Did the MOBILE file have a schema problem on 2026-06-16?* and watch the Planner route it to the Data-Quality agent only. Then ask *Show me which submitter sent the fewest rows on 2026-06-18, and when its file landed.*: it goes to the Explorer, which picks the tools itself.
 6. **Traces:** open that run to see every agent step, MCP tool call, retrieval and model call, with latency, tokens and cost.
 7. **Docs & runbooks:** search `basket_ref ContractViolation` and switch between Hybrid, Dense and BM25 to see why hybrid search is the default.

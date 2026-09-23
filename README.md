@@ -1,24 +1,47 @@
 # ReconMind
 
-[![CI](https://github.com/rahulramachandran-labs/reconmind/actions/workflows/ci.yml/badge.svg)](https://github.com/rahulramachandran-labs/reconmind/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Python 3.12](https://img.shields.io/badge/python-3.12-3776AB.svg)](pyproject.toml)
-[![Next.js](https://img.shields.io/badge/next.js-16-black.svg)](frontend/package.json)
-
 **When a data pipeline's numbers go wrong, someone has to work out why: which file, which key, how many rows, and what to do about it. I've spent years doing that by hand. ReconMind hands the investigation to a small team of AI agents.** They read the live pipeline through MCP tools, look up the team's runbooks and past incidents, and hand back an incident report with record counts, a likely root cause, a fix and a confidence score. Anything serious or uncertain waits for a person to sign it off.
 
-> **Evaluate this in five minutes**
-> 1. Open the [API health check](https://reconmind-labs-api.onrender.com/healthz) first: the free tier can take up to a minute to wake.
-> 2. Open **[reconmind-labs.vercel.app](https://reconmind-labs.vercel.app)**, choose *Sign in* → *Continue as the demo reviewer*, and click **Run a scan**. The dashboard counts four open findings, one of them an S1 waiting in the **Review queue**: sign it off there.
-> 3. In **Incidents**, open the key-drift finding. The chip names the model that wrote it, with its latency and tokens, and *Side by side* shows the template it was checked against.
-> 4. In **Ask ReconMind**, ask *Did the MOBILE file have a schema problem on 2026-06-16?*, then *Show me which submitter sent the fewest rows on 2026-06-18, and when its file landed.* Open either run on **Traces**.
-> 5. Short on time, or the API asleep? The same walkthrough is a [two-minute video](docs/demo.mp4). [VERIFY.md](docs/VERIFY.md) lines up every planted problem with its finding and test, and [REVIEWER_GUIDE.md](docs/REVIEWER_GUIDE.md) is the full checklist.
+**Catches four failure modes in multi-source data pipelines:**
 
-**[Live app](https://reconmind-labs.vercel.app)** · [Two-minute video](docs/demo.mp4) · [Project deck (PDF)](docs/slides/Rahul_Ramachandran_ReconMind-ProjectSubmission.pdf) · [Demo script](docs/DEMO.md) · [Write-up](docs/blog/reconmind-writeup.md)
+| | | | |
+|---|---|---|---|
+| **[Key drift](#results)**<br>a store starts reporting under a second id | **[Duplicate submission](#results)**<br>a file is resent after the nightly load | **[Schema drift](#results)**<br>a column is renamed | **[Volume anomaly](#results)**<br>one feed arrives 40% light |
 
-Final project for the IIT Patna Generative AI & Agentic AI for Developers program, by Rahul Ramachandran, submitted September 2026. All data is synthetic.
+[![CI](https://github.com/rahulramachandran-labs/reconmind/actions/workflows/ci.yml/badge.svg)](https://github.com/rahulramachandran-labs/reconmind/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/rahulramachandran-labs/reconmind?color=green&label=release)](https://github.com/rahulramachandran-labs/reconmind/releases/latest)
 
-![A scan finds the four planted incidents with Groq writing the reports, the S1 is signed off, questions are answered, one by the Explorer choosing its own tools, then the trace, hybrid search and the Verify page](docs/demo.gif)
+[![Python 3.12](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](pyproject.toml)
+[![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)](app/api)
+[![LangGraph](https://img.shields.io/badge/LangGraph-1C3C3C?logo=langgraph&logoColor=white)](app/agents/graph.py)
+[![LangChain](https://img.shields.io/badge/LangChain-1C3C3C?logo=langchain&logoColor=white)](app/retrieval/hybrid.py)
+[![MCP](https://img.shields.io/badge/MCP-000000?logo=modelcontextprotocol&logoColor=white)](mcp_servers)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)](docker-compose.yml)
+[![FAISS](https://img.shields.io/badge/FAISS-0467DF?logo=meta&logoColor=white)](app/retrieval/dense.py)
+[![sentence-transformers](https://img.shields.io/badge/sentence--transformers-FFD21E?logo=huggingface&logoColor=black)](app/retrieval/embeddings.py)
+[![RAGAS](https://img.shields.io/badge/RAGAS-6E40C9)](evals/run_ragas.py)
+[![LangFuse](https://img.shields.io/badge/LangFuse-0A0A0A?logo=langfuse&logoColor=white)](app/observability/tracer.py)
+[![Next.js](https://img.shields.io/badge/Next.js-16-000000?logo=nextdotjs&logoColor=white)](frontend/package.json)
+[![shadcn/ui](https://img.shields.io/badge/shadcn%2Fui-000000?logo=shadcnui&logoColor=white)](frontend/components.json)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind-06B6D4?logo=tailwindcss&logoColor=white)](frontend/package.json)
+[![Docker](https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white)](docker-compose.yml)
+[![Vercel](https://img.shields.io/badge/Vercel-000000?logo=vercel&logoColor=white)](frontend/vercel.json)
+[![Render](https://img.shields.io/badge/Render-46E3B7?logo=render&logoColor=black)](render.yaml)
+[![GitHub Actions](https://img.shields.io/badge/GitHub%20Actions-2088FF?logo=githubactions&logoColor=white)](.github/workflows/ci.yml)
+[![Ollama](https://img.shields.io/badge/Ollama-000000?logo=ollama&logoColor=white)](app/llm/providers.py)
+[![OpenAI](https://img.shields.io/badge/OpenAI-412991?logo=openai&logoColor=white)](app/llm/providers.py)
+
+| | |
+|---|---|
+| **Program** | Final project for the IIT Patna Generative AI & Agentic AI for Developers program, by Rahul Ramachandran, submitted September 2026. All data is synthetic. |
+| **Author** | Rahul Ramachandran |
+| **Live app** | [reconmind-labs.vercel.app](https://reconmind-labs.vercel.app) |
+| **API** | [reconmind-labs-api.onrender.com/healthz](https://reconmind-labs-api.onrender.com/healthz) |
+| **Project deck** | [PDF](docs/slides/Rahul_Ramachandran_ReconMind-ProjectSubmission.pdf) |
+| **Demo video** | [Two minutes, captioned](docs/demo.mp4) |
+| **Write-up** | [How I built it](docs/blog/reconmind-writeup.md) |
+| **Docs** | [Getting around](docs/GUIDE.md) · [Decision records](docs/adr/README.md) · [Demo script](docs/DEMO.md) |
 
 ---
 
@@ -404,7 +427,7 @@ Links in *Where* and *Test* point at the exact lines, pinned to commit `3c19258`
 | [Verify it yourself](docs/VERIFY.md) | Each planted anomaly, the finding it produced, the test that proves it, both write-ups |
 | [Course mapping](docs/COURSE_MAPPING.md) | Each course module, the code and lines that show it, and the test that covers it |
 | [Decision records](docs/adr/README.md) | Why LangGraph, why MCP, why hybrid search, and the rest |
-| [Reviewer guide](docs/REVIEWER_GUIDE.md) | A checklist for evaluating the project, with where to check each claim |
+| [Getting around ReconMind](docs/GUIDE.md) | A walkthrough of the live app and a local run, with where to check each claim |
 | [Captured evidence](docs/evidence/README.md) | The raw API responses and test output behind this README's numbers |
 
 ## Limitations and next steps
