@@ -4,9 +4,10 @@
 
 **Catches four failure modes in multi-source data pipelines:**
 
-| | | | |
-|---|---|---|---|
-| **[Key drift](#key-drift)**<br>a store starts reporting under a second id | **[Duplicate submission](#duplicate-submission)**<br>a file is resent after the nightly load | **[Schema drift](#schema-drift)**<br>a column is renamed | **[Volume anomaly](#volume-anomaly)**<br>one feed arrives 40% light |
+| | |
+|---|---|
+| **[Key drift](#key-drift)**<br>a store starts reporting under a second id | **[Duplicate submission](#duplicate-submission)**<br>a file is resent after the nightly load |
+| **[Schema drift](#schema-drift)**<br>a column is renamed | **[Volume anomaly](#volume-anomaly)**<br>one feed arrives 40% light |
 
 [![CI](https://github.com/rahulramachandran-labs/reconmind/actions/workflows/ci.yml/badge.svg)](https://github.com/rahulramachandran-labs/reconmind/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
@@ -37,9 +38,9 @@
 | **Program** | Final project for the IIT Patna Generative AI & Agentic AI for Developers program, by Rahul Ramachandran, submitted September 2026. All data is synthetic. |
 | **Author** | Rahul Ramachandran |
 | **Live app** | [reconmind-labs.vercel.app](https://reconmind-labs.vercel.app) |
-| **API** | [reconmind-labs-api.onrender.com/healthz](https://reconmind-labs-api.onrender.com/healthz) |
+| **API** | [/healthz](https://reconmind-labs-api.onrender.com/healthz) · [/docs](https://reconmind-labs-api.onrender.com/docs) |
 | **Project deck** | [PDF](docs/slides/Rahul_Ramachandran_ReconMind-ProjectSubmission.pdf) |
-| **Demo video** | [Two minutes, captioned](docs/demo.mp4) |
+| **Demo video** | [Two minutes](docs/demo.mp4) |
 | **Write-up** | [How I built it](docs/blog/reconmind-writeup.md) |
 | **Docs** | [Getting around](docs/GUIDE.md) · [Decision records](docs/adr/README.md) · [Demo script](docs/DEMO.md) |
 
@@ -47,11 +48,11 @@
 
 ## Try it in five minutes
 
-1. Open the [API health check](https://reconmind-labs-api.onrender.com/healthz) first. It runs on a free instance that sleeps when idle, so the first request wakes it and can take up to a minute. Wait for `"status":"ok"`.
+1. Open the [API health check](https://reconmind-labs-api.onrender.com/healthz) first: it runs on a free instance that sleeps when idle, so the first request wakes it and can take a minute.
 2. Open **[reconmind-labs.vercel.app](https://reconmind-labs.vercel.app)**. The dashboard charts 14 days of volume, and 2026-06-18 is visibly short.
-3. Choose *Sign in*, then **Continue as the demo reviewer**. Reading needs no account; starting a scan or signing a finding off does.
-4. Click **Run a scan**. Four findings come back, one S1 and three S2, and the S1 waits in the **Review queue** with the reason it paused. Add a note and approve it there.
-5. In **Ask ReconMind**, ask *Did the MOBILE file have a schema problem on 2026-06-16?* The Planner sends it to the Data-Quality agent alone and the steps stream in; open that run on **Traces** to see every tool call, retrieval and model call with its latency and cost.
+3. Choose *Sign in*, then **Continue as the demo reviewer**. Reading needs no account; scanning and signing off do.
+4. Click **Run a scan**. Four findings come back, one S1 and three S2. The S1 waits in the **Review queue**, with the reason it paused: add a note and approve it.
+5. In **Ask ReconMind**, ask *Did the MOBILE file have a schema problem on 2026-06-16?* The Planner sends it to Data-Quality alone. Open that run on **Traces** for every tool call, retrieval and model call, with latency and cost.
 
 The same walkthrough, narrated: [docs/DEMO.md](docs/DEMO.md).
 
@@ -327,7 +328,7 @@ The agents never import a business rule, so a second domain is an adapter and a 
 
 ## Quick start
 
-**Online:** follow *Evaluate this in five minutes* at the top.
+**Online:** follow [Try it in five minutes](#try-it-in-five-minutes) at the top.
 
 **On your machine:** you need Python 3.12 with [uv](https://docs.astral.sh/uv/), Node 20+ and Docker. [Ollama](https://ollama.com) is optional.
 
@@ -388,7 +389,7 @@ uv run pytest -m chaos -v    # plants each anomaly with the generator; checks th
 uv run python scripts/generate_synthetic_pipeline.py --seed 7 --out /tmp/p --only key_drift   # a fresh dataset with one planted problem
 ```
 
-**12. Run the quality gates.** `make test` runs 158 tests at 93% coverage. `make eval` scores retrieval and answers on the 46-question golden set and fails below the thresholds.
+**12. Run the quality gates.** `make test` runs 172 tests at 93% coverage. `make eval` scores retrieval and answers on the 46-question golden set and fails below the thresholds.
 
 ## Reference
 
@@ -460,7 +461,7 @@ frontend/                Next.js web app (App Router, shadcn/ui, Auth.js)
 migrations/              Alembic migrations, including the append-only ledger trigger
 tests/                   unit, integration (Postgres, MCP, agents, prompt injection), chaos
 docs/                    architecture, API, deployment, evaluation, ADRs, deck, demo script,
-                         reviewer guide, captured evidence and screenshots
+                         the walkthrough, captured evidence and screenshots
 scripts/                 data generator CLI, container entrypoint, demo recording and screenshots,
                          evidence capture for the README
 ```
