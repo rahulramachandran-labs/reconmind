@@ -104,6 +104,18 @@ flowchart LR
 
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) has the layer-by-layer view: the graph node by node, both MCP servers, the retrieval pipeline, the data model and where state lives.
 
+## Tech stack
+
+| Layer | Tools | Role in ReconMind | Why this |
+|---|---|---|---|
+| Agents | LangGraph (StateGraph, parallel nodes, `interrupt()`, Postgres checkpointer), LangChain, Pydantic | Wires Planner → specialists → Reporter → human review, and holds a paused run until someone decides | A graph I can draw, checkpoint and resume, rather than a conversation between roles ([ADR 0007](docs/adr/0007-langgraph-over-crewai.md)) |
+| Tools | MCP: two read-only servers over stdio, streamable HTTP or in-process | Every fact about the warehouse and the orchestrator arrives as a tool call | One protocol, one place to validate arguments and record every call ([ADR 0008](docs/adr/0008-mcp-over-direct-clients.md)) |
+| Retrieval | BM25 (`rank_bm25`, Snowball), sentence-transformers / fastembed, FAISS or Pinecone, reciprocal rank fusion, cross-encoder reranker | Finds the runbook and the past incident behind each finding | Pipelines are full of identifiers, and BM25 matches them where embeddings blur them ([ADR 0002](docs/adr/0002-hybrid-retrieval-with-rrf.md)); chunks keep their section titles ([ADR 0001](docs/adr/0001-chunk-by-markdown-section.md)); FAISS in process, Pinecone behind `VECTOR_STORE`, ONNX embeddings in the container ([ADR 0003](docs/adr/0003-onnx-embeddings-in-the-container.md)) |
+| Models | OpenAI, Anthropic, Groq, Google Gemini, OpenRouter, Ollama, with a fallback chain and an extractive floor | Write the root cause, the fix and the confidence; the checks own every number | A chain that degrades instead of failing, down to no model at all ([ADR 0005](docs/adr/0005-provider-fallback-chain.md), [ADR 0010](docs/adr/0010-facts-from-checks-language-from-models.md)) |
+| Backend | FastAPI, uvicorn, SQLAlchemy 2, Alembic, psycopg, Postgres 16, sse-starlette, APScheduler | REST and the chat's server-sent events, migrations, runs and reports, the optional in-process scan timer | The audit ledger is kept append-only by the database itself, not by application code ([ADR 0004](docs/adr/0004-append-only-ledger-in-postgres.md)) |
+| Frontend | Next.js 16 (App Router), React 19, shadcn/ui on Radix, Tailwind CSS, Auth.js, react-markdown | Dashboard, incidents, review queue, chat, docs and traces | Writes go through the app's own route handlers, so the API's write token stays on the server and never reaches the browser |
+| Quality and ops | RAGAS, pytest, ruff, black, mypy, LangFuse, Docker, GitHub Actions, gitleaks, pre-commit, Render, Vercel | Gates every push, traces every run, deploys both halves | Offline judges keep the gate deterministic and free ([ADR 0006](docs/adr/0006-offline-eval-judges.md)); traces land in Postgres first and LangFuse second, so a missing key loses nothing ([ADR 0009](docs/adr/0009-tracing-langfuse-and-postgres.md)) |
+
 ## Results
 
 <!-- evidence:results -->
@@ -417,18 +429,6 @@ From the last captured run of `make test` ([`docs/evidence/tests.txt`](docs/evid
 | of which domain-agnostic proof | 2 | The same graph runs on the support-triage domain, and no agent module imports a domain ([test](tests/integration/test_domain_agnostic.py)) |
 | Chaos | 6 | Each anomaly planted on its own is caught by the right agent at the right severity, a clean pipeline raises nothing, and a scan fits the 30-second budget ([tests](tests/chaos/test_injected_anomalies.py)) |
 <!-- /evidence:testing -->
-
-## Tech stack
-
-| Area | Tools |
-|---|---|
-| Agents | LangGraph (StateGraph, parallel nodes, `interrupt()`, Postgres checkpointer), LangChain, Pydantic |
-| Tools | MCP: two servers over stdio, streamable HTTP or in-process |
-| Retrieval | BM25 (`rank_bm25`), sentence-transformers / fastembed, FAISS or Pinecone, reciprocal rank fusion, cross-encoder reranker |
-| Models | OpenAI, Anthropic, Groq, Google Gemini, OpenRouter, Ollama, with a fallback chain and an extractive floor |
-| Backend | FastAPI (REST and server-sent events), SQLAlchemy 2, Alembic, Postgres 16 |
-| Frontend | Next.js 16 (App Router), shadcn/ui, Tailwind CSS, Auth.js |
-| Quality and ops | RAGAS, pytest, LangFuse, Docker, GitHub Actions, gitleaks, pre-commit, Render, Vercel |
 
 ## Documentation
 
