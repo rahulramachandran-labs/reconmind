@@ -4,21 +4,21 @@ Raw responses from a local ReconMind stack, captured by [`scripts/capture_readme
 
 | | |
 |---|---|
-| Captured | 2026-09-19T20:33:20Z |
-| Commit | `3c19258` |
+| Captured | 2026-09-23T06:09:54Z |
+| Commit | `1bf31ac` |
 | API | 1.1.0, providers `groq, gemini, ollama` |
 | Model calls went to | groq/openai/gpt-oss-120b |
-| Scan run | `78b3d94d-58f0-4d68-a38b-599efb8f2e0a` (paused_review) |
-| Scan wall time | 13.6 s |
+| Scan run | `9bda1e0c-4add-4ac7-8351-8434ccba88aa` (paused_review) |
+| Scan wall time | 27.2 s |
 | Scan steps | 5 agent nodes, 30 MCP tool calls, 4 retrievals, 5 model calls |
-| Scan cost | $0.0000 (5714 prompt + 2093 completion tokens) |
-| ask-mobile run | `0caa0531-6ded-4557-8d32-9471e4d6620b` (completed): Did the MOBILE file have a schema problem on 2026-06-16? |
-| ask-runbook run | `26d664d6-562c-421e-b2e3-aac0dad43e9d` (completed): Which file wins when a submitter resends the same day? |
-| ask-follow-up run | `215045bc-36a2-4d55-bde5-b7a02d8894fa` (completed): What should we check before reprocessing that day? |
-| ask-explore run | `c81a28a9-8b01-438c-a76c-95fee33b330b` (completed): Show me which submitter sent the fewest rows on 2026-06-18, and when its file landed. |
-| S1 written up again | HTTP 200, `analysis_by: model`, groq/openai/gpt-oss-120b, 1574 ms |
+| Scan cost | $0.0000 (5714 prompt + 2283 completion tokens) |
+| ask-mobile run | `0c4e7eea-10a4-446c-9eff-f2655f564386` (completed): Did the MOBILE file have a schema problem on 2026-06-16? |
+| ask-runbook run | `1853377d-56f0-43f4-8866-ff297b3358b2` (completed): Which file wins when a submitter resends the same day? |
+| ask-follow-up run | `571f7a08-f5b4-41b8-9ea9-9b0288455bb6` (completed): What should we check before reprocessing that day? |
+| ask-explore run | `1799b95e-a9aa-4a96-aa6c-af9f32c1c95d` (completed): Show me which submitter sent the fewest rows on 2026-06-18, and when its file landed. |
+| S1 written up again | HTTP 200, `analysis_by: model`, groq/openai/gpt-oss-120b, 1403 ms |
 | S1 signed off | run resumed: approve -> published |
-| Second scan | `a57b1822-06aa-4822-87a0-7b4394aa71ea` (completed): S1: Missing channel_basket_id in S1003 file breaks deduplication |
+| Second scan | `c7feabd0-fd54-43f7-b2ba-821aee4ba713` (completed): S1: Missing channel_basket_id in S1003_20260616_0216_MOBILE.txt blocks dedup |
 | Tests | 172 passed, 0 failed, 92.58% coverage |
 
 | Severity | Finding | Status | Written by |

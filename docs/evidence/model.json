@@ -11,7 +11,7 @@
     "gemini": "gemini-3.6-flash",
     "ollama": "qwen2.5:1.5b"
   },
-  "fell_back": null,
-  "last_provider": null,
-  "last_call_at": null
+  "fell_back": false,
+  "last_provider": "groq",
+  "last_call_at": "2026-09-23T06:09:48.632453+00:00"
 }

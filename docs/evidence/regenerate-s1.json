@@ -1,10 +1,10 @@
 {
   "status_code": 200,
   "body": {
-    "id": "f2067395-d123-40cf-96db-f39a1c0e7b26",
+    "id": "53b2f5c8-07e2-4540-b5b0-404ceed08441",
     "title": "S1003_20260616_0216_MOBILE.txt renamed channel_basket_id to basket_ref",
     "repeat": false,
-    "run_id": "78b3d94d-58f0-4d68-a38b-599efb8f2e0a",
+    "run_id": "9bda1e0c-4add-4ac7-8351-8434ccba88aa",
     "status": "pending_review",
     "sources": [
       {
@@ -94,44 +94,42 @@
     "review_reason": "S1 findings always get a human sign-off",
     "model_analysis": {
       "problem_statement": "S1003_20260616_0216_MOBILE.txt (2026-06-16) does not match the raw.transactions contract: missing ['channel_basket_id'], unexpected ['basket_ref']. 82 rows landed with the missing column null; that column is part of the dedup key, so dedup cannot run for this batch.",
-      "root_cause_hypothesis": "The mobile export pipeline introduced a schema change by renaming the dedup\u2011key column `channel_basket_id` to `basket_ref`. The rename propagated to the daily file S1003_20260616_0216_MOBILE.txt, causing `validate_schema` to flag a missing column and an unexpected column. Because the value profile (BSK\u2011 prefixed IDs) matches, this is a rename rather than a drop, similar to the root cause documented in incident INC\u20110438.",
+      "root_cause_hypothesis": "The mobile team deployed a new export library that changed the column name from `channel_basket_id` to `basket_ref` in the daily mobile file. Because the values still carry the `BSK-` prefix, the schema\u2011drift detector classifies this as a rename rather than a drop, but the `validate_schema` task still fails because the contract still expects `channel_basket_id`. The rename also broke the deduplication key, causing nulls for the missing column in the raw `transactions` table.",
       "recommended_fix": [
-        "Update the dbt contract for the `transactions` raw table to replace `channel_basket_id` with `basket_ref` (or add `basket_ref` as an alias).",
-        "Add a column mapping rule in the ingestion loader to map `basket_ref` to the internal `channel_basket_id` field until downstream consumers are updated.",
-        "Backfill the 82 affected rows: copy the `basket_ref` values into `channel_basket_id` for the 2026\u201106\u201116 batch.",
-        "Communicate the schema change to downstream data consumers and update any deduplication logic that relies on the original column name.",
-        "Add a regression test in the schema\u2011drift detection suite to verify future renames of this column are caught and auto\u2011handled.",
-        "Document the change in the schema\u2011drift runbook and create a versioned changelog entry."
+        "Update the dbt contract for the `transactions` raw table to replace `channel_basket_id` with `basket_ref` (or add an alias mapping).",
+        "Deploy a schema\u2011migration step in the `retail_txn_daily` DAG that maps `basket_ref` \u2192 `channel_basket_id` for backward compatibility until downstream models are updated.",
+        "Backfill the 82 affected rows: copy the `basket_ref` values into the `channel_basket_id` column in the raw table.",
+        "Modify the deduplication logic to use the new column name or the alias, ensuring the dedup key is recomputed for the affected batch.",
+        "Run `validate_schema` manually on a test run to confirm the contract now passes.",
+        "Communicate the column rename to all downstream consumers and update any documentation or dashboards that reference `channel_basket_id`."
       ],
       "open_questions": [
-        "Has the mobile team issued a formal schema change announcement and version bump for the export library?",
-        "Are there any other files from the same submitter (S1003) that may have received the rename earlier or later than 2026\u201106\u201116?",
-        "Will downstream pipelines that use `channel_basket_id` as a dedup key need additional code changes beyond the alias mapping?",
-        "Is the `basket_ref` name intended to be permanent, or will future releases revert or further rename the column?"
+        "Are there other mobile files (e.g., prior dates) that already contain `basket_ref` and need the same contract update?",
+        "Has the mobile team version\u2011controlled the export library change, and can we enforce a schema version bump to avoid silent renames?",
+        "Do any downstream analytics models reference `channel_basket_id` directly, and what is the impact of the rename on those models?"
       ],
       "confidence": 0.94,
       "provider": "groq",
       "model": "openai/gpt-oss-120b",
-      "latency_ms": 1574,
+      "latency_ms": 1403,
       "prompt_tokens": 1256,
-      "completion_tokens": 504,
+      "completion_tokens": 492,
       "cost_usd": 0.0,
       "prompt_version": "specialist-analysis@4",
-      "generated_at": "2026-09-19T20:37:46.345779Z"
+      "generated_at": "2026-09-23T06:12:05.818374Z"
     },
     "open_questions": [
-      "Has the mobile team issued a formal schema change announcement and version bump for the export library?",
-      "Are there any other files from the same submitter (S1003) that may have received the rename earlier or later than 2026\u201106\u201116?",
-      "Will downstream pipelines that use `channel_basket_id` as a dedup key need additional code changes beyond the alias mapping?",
-      "Is the `basket_ref` name intended to be permanent, or will future releases revert or further rename the column?"
+      "Are there other mobile files (e.g., prior dates) that already contain `basket_ref` and need the same contract update?",
+      "Has the mobile team version\u2011controlled the export library change, and can we enforce a schema version bump to avoid silent renames?",
+      "Do any downstream analytics models reference `channel_basket_id` directly, and what is the impact of the rename on those models?"
     ],
     "recommended_fix": [
-      "Update the dbt contract for the `transactions` raw table to replace `channel_basket_id` with `basket_ref` (or add `basket_ref` as an alias).",
-      "Add a column mapping rule in the ingestion loader to map `basket_ref` to the internal `channel_basket_id` field until downstream consumers are updated.",
-      "Backfill the 82 affected rows: copy the `basket_ref` values into `channel_basket_id` for the 2026\u201106\u201116 batch.",
-      "Communicate the schema change to downstream data consumers and update any deduplication logic that relies on the original column name.",
-      "Add a regression test in the schema\u2011drift detection suite to verify future renames of this column are caught and auto\u2011handled.",
-      "Document the change in the schema\u2011drift runbook and create a versioned changelog entry."
+      "Update the dbt contract for the `transactions` raw table to replace `channel_basket_id` with `basket_ref` (or add an alias mapping).",
+      "Deploy a schema\u2011migration step in the `retail_txn_daily` DAG that maps `basket_ref` \u2192 `channel_basket_id` for backward compatibility until downstream models are updated.",
+      "Backfill the 82 affected rows: copy the `basket_ref` values into the `channel_basket_id` column in the raw table.",
+      "Modify the deduplication logic to use the new column name or the alias, ensuring the dedup key is recomputed for the affected batch.",
+      "Run `validate_schema` manually on a test run to confirm the contract now passes.",
+      "Communicate the column rename to all downstream consumers and update any documentation or dashboards that reference `channel_basket_id`."
     ],
     "affected_records": {
       "rate": null,
@@ -140,13 +138,13 @@
     },
     "confidence_label": "high",
     "problem_statement": "S1003_20260616_0216_MOBILE.txt (2026-06-16) does not match the raw.transactions contract: missing ['channel_basket_id'], unexpected ['basket_ref']. 82 rows landed with the missing column null; that column is part of the dedup key, so dedup cannot run for this batch.",
-    "root_cause_hypothesis": "The mobile export pipeline introduced a schema change by renaming the dedup\u2011key column `channel_basket_id` to `basket_ref`. The rename propagated to the daily file S1003_20260616_0216_MOBILE.txt, causing `validate_schema` to flag a missing column and an unexpected column. Because the value profile (BSK\u2011 prefixed IDs) matches, this is a rename rather than a drop, similar to the root cause documented in incident INC\u20110438.",
+    "root_cause_hypothesis": "The mobile team deployed a new export library that changed the column name from `channel_basket_id` to `basket_ref` in the daily mobile file. Because the values still carry the `BSK-` prefix, the schema\u2011drift detector classifies this as a rename rather than a drop, but the `validate_schema` task still fails because the contract still expects `channel_basket_id`. The rename also broke the deduplication key, causing nulls for the missing column in the raw `transactions` table.",
     "fingerprint": "schema_drift:S1003_20260616_0216_MOBILE.txt renamed channel_basket_id to basket_ref",
     "duplicate_of": null,
-    "last_seen_at": "2026-09-19T20:34:15.011231+00:00",
+    "last_seen_at": "2026-09-23T06:10:40.518238+00:00",
     "review_decision": null,
     "reviewed_by": null,
     "reviewed_at": null,
-    "created_at": "2026-09-19T20:33:30.976627+00:00"
+    "created_at": "2026-09-23T06:10:12.174021+00:00"
   }
 }

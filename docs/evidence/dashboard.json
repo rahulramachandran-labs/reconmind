@@ -157,22 +157,22 @@
     }
   },
   "usage": {
-    "day": "2026-09-19",
-    "runs": 1,
-    "llm_calls": 5,
-    "tokens": 7807,
+    "day": "2026-09-23",
+    "runs": 2,
+    "llm_calls": 9,
+    "tokens": 12401,
     "cost_usd": 0.0,
     "providers": [
       {
         "provider": "groq",
         "model": "openai/gpt-oss-120b",
-        "calls": 5,
-        "tokens": 7807,
+        "calls": 9,
+        "tokens": 12401,
         "cost_usd": 0.0
       }
     ],
     "last_scan": {
-      "id": "78b3d94d-58f0-4d68-a38b-599efb8f2e0a",
+      "id": "9bda1e0c-4add-4ac7-8351-8434ccba88aa",
       "trigger": "scan",
       "question": null,
       "adapter": "retail_recon",
@@ -192,19 +192,19 @@
         ],
         "needs_review": false
       },
-      "summary": "S1: Missing channel_basket_id in S1003 file prevents deduplication\n\nThe S1003_20260616_0216_MOBILE.txt file (2026-06-16) is missing the required 'channel_basket_id' column and instead includes an unexpected 'basket_ref' column. This caused 82 rows to land with a null dedup key, blocking deduplication for the batch. Additionally, two S2 issues were found: LOC-0517 sales are split across OUT-1017 and OUT-1071 affecting 251 of 8,373 deduplicated rows (3.0%) between 2026-06-01 and 2026-06-21, and a resend of S1002_20260612_1120_ECOMM.txt duplicated 88 rows (3 with different qty/amount) after the DAG run, inserting superseded rows into fct_daily_sales. Finally, S1001_20260618_0638_POSFEED.txt had only 110 rows, 40% below its 7\u2011day average of 182.6, and arrived 161 minutes past the submitter SLA.",
+      "summary": "S1: Missing channel_basket_id in S1003 file breaks deduplication for 82 rows\n\nThe S1003_20260616_0216_MOBILE.txt file renamed channel_basket_id to basket_ref, causing it to violate the raw.transactions contract: the required column channel_basket_id is missing and an unexpected column basket_ref appears. As a result, 82 rows landed with a null dedup key, preventing deduplication for this batch. Additionally, LOC-0517 reports sales under two outlet IDs (OUT-1017 and OUT-1071), affecting 251 of 8,373 deduplicated rows (3.0%) between 2026-06-01 and 2026-06-21. A resend of S1002_20260612_1120_ECOMM.txt superseded 88 rows, with 3 rows having differing qty or amount, and these changes reached fct_daily_sales. Finally, S1001_20260618_0638_POSFEED.txt delivered only 110 rows\u201440% below its 7\u2011day average of 182.6\u2014and arrived 161 minutes after the submitter SLA.",
       "error": null,
       "trace_url": null,
       "prompt_tokens": 5714,
-      "completion_tokens": 2093,
+      "completion_tokens": 2283,
       "cost_usd": 0.0,
-      "latency_ms": 11534,
-      "started_at": "2026-09-19T20:33:20.475521+00:00",
-      "finished_at": "2026-09-19T20:33:32.030102+00:00"
+      "latency_ms": 26770,
+      "started_at": "2026-09-23T06:09:54.799074+00:00",
+      "finished_at": "2026-09-23T06:10:21.645763+00:00"
     }
   },
   "findings": {
-    "since": "2026-09-19T20:33:20.475521+00:00",
+    "since": "2026-09-23T06:09:54.799074+00:00",
     "by_severity": {
       "S1": 1,
       "S2": 3,
@@ -214,28 +214,28 @@
     "pending_review": 1,
     "items": [
       {
-        "id": "f2067395-d123-40cf-96db-f39a1c0e7b26",
+        "id": "53b2f5c8-07e2-4540-b5b0-404ceed08441",
         "severity": "S1",
         "title": "S1003_20260616_0216_MOBILE.txt renamed channel_basket_id to basket_ref",
         "status": "pending_review",
         "seen_count": 1
       },
       {
-        "id": "5564310c-b53b-4a8b-82bd-ca423be9ca48",
+        "id": "fb84529d-f79f-4294-8103-ebbba3413943",
         "severity": "S2",
         "title": "LOC-0517 also reporting as OUT-1071 (3.0% of rows)",
         "status": "published",
         "seen_count": 1
       },
       {
-        "id": "220372b4-dfcb-40d6-8097-a923a838d1e5",
+        "id": "28e5e27f-ed44-4b36-9662-0eb67b2c6cdc",
         "severity": "S2",
         "title": "Resent file S1002_20260612_1120_ECOMM.txt supersedes 88 rows",
         "status": "published",
         "seen_count": 1
       },
       {
-        "id": "628b4a47-3945-474d-95f0-9d9dd7a491e4",
+        "id": "2d1de128-2bbb-48a6-8b3f-8cce5314ccde",
         "severity": "S2",
         "title": "S1001 2026-06-18: 110 rows, 40% below its 7-day average",
         "status": "published",

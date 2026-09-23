@@ -1,8 +1,8 @@
 {
-  "id": "5564310c-b53b-4a8b-82bd-ca423be9ca48",
+  "id": "fb84529d-f79f-4294-8103-ebbba3413943",
   "title": "LOC-0517 also reporting as OUT-1071 (3.0% of rows)",
   "repeat": false,
-  "run_id": "78b3d94d-58f0-4d68-a38b-599efb8f2e0a",
+  "run_id": "9bda1e0c-4add-4ac7-8351-8434ccba88aa",
   "status": "published",
   "sources": [
     {
@@ -76,39 +76,41 @@
     "cost_usd": 0.0,
     "provider": "groq",
     "confidence": 0.75,
-    "latency_ms": 1307,
-    "generated_at": "2026-09-19T20:33:30.951685Z",
+    "latency_ms": 8842,
+    "generated_at": "2026-09-23T06:10:12.158305Z",
     "prompt_tokens": 1205,
     "open_questions": [
-      "What caused the incorrect outlet_id to be emitted at the source (e.g., config change, manual entry error)?",
-      "Why did 4 separate submitters report the same drift\u2014are they independent pipelines or shared ingestion points?",
-      "Is there a monitoring gap that allowed the drift to persist for 21 days before detection?",
-      "Will the alias addition impact any other locations that may have used OUT-1071 historically?",
-      "Do we need to adjust the detection window or alert thresholds to surface similar drifts earlier?"
+      "Were there any recent changes to the source system\u2019s mapping logic or file generation process around 2026-06-01?",
+      "Is OUT-1071 used legitimately for any other location, or is it a stray identifier?",
+      "What is the exact process the four submitters follow to generate the header \u2013 could manual entry be a factor?",
+      "Do any other locations show similar drift patterns in the same window that were not flagged due to a lower row count?"
     ],
     "prompt_version": "specialist-analysis@4",
     "recommended_fix": [
-      "Confirm with the 4 submitters which outlet_id (OUT-1017 or OUT-1071) is correct for LOC-0517.",
-      "Add OUT-1071 as an alias in the outlet_alias table with appropriate valid_from/valid_to timestamps so the staging model can remap it.",
-      "Rebuild the stg_transactions and fct_daily_sales models for the affected dates (2026-06-01 to 2026-06-21) following the backfill runbook.",
-      "Instruct the source system owner to correct the header/outlet_id at source and document the ticket number in the incident write\u2011up."
+      "Contact the four submitters who sent the files between 2026-06-01 and 2026-06-21 and confirm which outlet_id (OUT-1017 or OUT-1071) is correct for LOC-0517.",
+      "Add OUT-1071 as an alias for OUT-1017 in the outlet_alias table with appropriate valid_from / valid_to dates so the staging model can remap the drifted rows.",
+      "Trigger a backfill of stg_transactions and fct_daily_sales for the affected dates (2026-06-01 to 2026-06-21) following the backfill runbook.",
+      "Instruct the source team to correct the outlet_id in the file header for future uploads and record the ticket number in this incident write\u2011up.",
+      "Run the detection query (see runbook section \u201cDetection\u201d) after the backfill to verify that no rows now show multiple outlet_ids for LOC-0517.",
+      "Update monitoring alerts to flag any future occurrence of multiple outlet_ids for a single location within the same business day."
     ],
-    "completion_tokens": 443,
+    "completion_tokens": 557,
     "problem_statement": "Location LOC-0517 is reporting sales under two outlet ids: its canonical OUT-1017 and OUT-1071, which outlet_location_map does not map to it. 251 of 8373 deduplicated rows (3.0%) between 2026-06-01 and 2026-06-21 are affected, so store-level numbers for this location are split.",
-    "root_cause_hypothesis": "The source system that generates the transaction feed for location LOC-0517 emitted an incorrect outlet_id (OUT-1071) in its header for a subset of records. This id is not present in the authoritative outlet_location_map (canonical OUT-1017), causing key drift. The drift persisted from first_seen 2026-06-01 to last_seen 2026-06-21 and was reported by 4 submitters, indicating a mis\u2011configuration or data\u2011entry error at the source rather than a downstream processing bug."
+    "root_cause_hypothesis": "The source system that uploads transaction files for location LOC-0517 emitted an incorrect outlet_id (OUT-1071) in the header for a subset of rows. Because OUT-1071 is not present in the authoritative outlet_location_map (canonical OUT-1017), the transactions were ingested with a drifted key, causing key\u2011drift between location_id and outlet_id for 251 rows (0.03% of the window). This is a classic source\u2011header mismatch rather than a processing bug, as the raw layer is immutable and the drift was only detected by the deterministic key\u2011drift detection query."
   },
   "open_questions": [
-    "What caused the incorrect outlet_id to be emitted at the source (e.g., config change, manual entry error)?",
-    "Why did 4 separate submitters report the same drift\u2014are they independent pipelines or shared ingestion points?",
-    "Is there a monitoring gap that allowed the drift to persist for 21 days before detection?",
-    "Will the alias addition impact any other locations that may have used OUT-1071 historically?",
-    "Do we need to adjust the detection window or alert thresholds to surface similar drifts earlier?"
+    "Were there any recent changes to the source system\u2019s mapping logic or file generation process around 2026-06-01?",
+    "Is OUT-1071 used legitimately for any other location, or is it a stray identifier?",
+    "What is the exact process the four submitters follow to generate the header \u2013 could manual entry be a factor?",
+    "Do any other locations show similar drift patterns in the same window that were not flagged due to a lower row count?"
   ],
   "recommended_fix": [
-    "Confirm with the 4 submitters which outlet_id (OUT-1017 or OUT-1071) is correct for LOC-0517.",
-    "Add OUT-1071 as an alias in the outlet_alias table with appropriate valid_from/valid_to timestamps so the staging model can remap it.",
-    "Rebuild the stg_transactions and fct_daily_sales models for the affected dates (2026-06-01 to 2026-06-21) following the backfill runbook.",
-    "Instruct the source system owner to correct the header/outlet_id at source and document the ticket number in the incident write\u2011up."
+    "Contact the four submitters who sent the files between 2026-06-01 and 2026-06-21 and confirm which outlet_id (OUT-1017 or OUT-1071) is correct for LOC-0517.",
+    "Add OUT-1071 as an alias for OUT-1017 in the outlet_alias table with appropriate valid_from / valid_to dates so the staging model can remap the drifted rows.",
+    "Trigger a backfill of stg_transactions and fct_daily_sales for the affected dates (2026-06-01 to 2026-06-21) following the backfill runbook.",
+    "Instruct the source team to correct the outlet_id in the file header for future uploads and record the ticket number in this incident write\u2011up.",
+    "Run the detection query (see runbook section \u201cDetection\u201d) after the backfill to verify that no rows now show multiple outlet_ids for LOC-0517.",
+    "Update monitoring alerts to flag any future occurrence of multiple outlet_ids for a single location within the same business day."
   ],
   "affected_records": {
     "rate": 0.03,
@@ -117,12 +119,12 @@
   },
   "confidence_label": "high",
   "problem_statement": "Location LOC-0517 is reporting sales under two outlet ids: its canonical OUT-1017 and OUT-1071, which outlet_location_map does not map to it. 251 of 8373 deduplicated rows (3.0%) between 2026-06-01 and 2026-06-21 are affected, so store-level numbers for this location are split.",
-  "root_cause_hypothesis": "The source system that generates the transaction feed for location LOC-0517 emitted an incorrect outlet_id (OUT-1071) in its header for a subset of records. This id is not present in the authoritative outlet_location_map (canonical OUT-1017), causing key drift. The drift persisted from first_seen 2026-06-01 to last_seen 2026-06-21 and was reported by 4 submitters, indicating a mis\u2011configuration or data\u2011entry error at the source rather than a downstream processing bug.",
+  "root_cause_hypothesis": "The source system that uploads transaction files for location LOC-0517 emitted an incorrect outlet_id (OUT-1071) in the header for a subset of rows. Because OUT-1071 is not present in the authoritative outlet_location_map (canonical OUT-1017), the transactions were ingested with a drifted key, causing key\u2011drift between location_id and outlet_id for 251 rows (0.03% of the window). This is a classic source\u2011header mismatch rather than a processing bug, as the raw layer is immutable and the drift was only detected by the deterministic key\u2011drift detection query.",
   "fingerprint": "key_drift:LOC-0517 also reporting as OUT-1071 (3.0% of rows)",
   "duplicate_of": null,
-  "last_seen_at": "2026-09-19T20:33:30.975347+00:00",
+  "last_seen_at": "2026-09-23T06:10:12.195287+00:00",
   "review_decision": null,
   "reviewed_by": null,
   "reviewed_at": null,
-  "created_at": "2026-09-19T20:33:30.976627+00:00"
+  "created_at": "2026-09-23T06:10:12.174021+00:00"
 }

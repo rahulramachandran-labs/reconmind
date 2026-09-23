@@ -1,6 +1,6 @@
 {
-  "captured_at": "2026-09-19T20:33:20Z",
-  "commit": "3c19258",
+  "captured_at": "2026-09-23T06:09:54Z",
+  "commit": "1bf31ac",
   "api_version": "1.1.0",
   "llm_providers": [
     "groq",
@@ -20,15 +20,15 @@
       "gemini": "gemini-3.6-flash",
       "ollama": "qwen2.5:1.5b"
     },
-    "fell_back": null,
-    "last_provider": null,
-    "last_call_at": null
+    "fell_back": false,
+    "last_provider": "groq",
+    "last_call_at": "2026-09-23T06:09:48.632453+00:00"
   },
   "scan": {
-    "run_id": "78b3d94d-58f0-4d68-a38b-599efb8f2e0a",
+    "run_id": "9bda1e0c-4add-4ac7-8351-8434ccba88aa",
     "status": "paused_review",
-    "wall_seconds": 13.6,
-    "graph_latency_ms": 11534,
+    "wall_seconds": 27.2,
+    "graph_latency_ms": 26770,
     "steps": 44,
     "nodes": 5,
     "tool_calls": 30,
@@ -36,7 +36,7 @@
     "llm_calls": 5,
     "llm_calls_failed": 0,
     "prompt_tokens": 5714,
-    "completion_tokens": 2093,
+    "completion_tokens": 2283,
     "cost_usd": 0,
     "models": [
       "groq/openai/gpt-oss-120b"
@@ -133,16 +133,16 @@
   "questions": {
     "ask-mobile": {
       "question": "Did the MOBILE file have a schema problem on 2026-06-16?",
-      "run_id": "0caa0531-6ded-4557-8d32-9471e4d6620b",
+      "run_id": "0c4e7eea-10a4-446c-9eff-f2655f564386",
       "status": "completed",
       "intent": "investigate",
       "specialists": [
         "data_quality"
       ],
       "planned_by": "groq",
-      "reply": "S1: Missing channel_basket_id in S1003_20260616_0216_MOBILE.txt prevents deduplication",
+      "reply": "S1: 82 rows missing channel_basket_id, dedup blocked",
       "tools_used": [],
-      "latency_ms": 1628,
+      "latency_ms": 2804,
       "steps": 19,
       "nodes": 4,
       "tool_calls": 13,
@@ -150,7 +150,7 @@
       "llm_calls": 2,
       "llm_calls_failed": 0,
       "prompt_tokens": 863,
-      "completion_tokens": 318,
+      "completion_tokens": 326,
       "cost_usd": 0,
       "models": [
         "groq/openai/gpt-oss-120b"
@@ -158,14 +158,14 @@
     },
     "ask-runbook": {
       "question": "Which file wins when a submitter resends the same day?",
-      "run_id": "26d664d6-562c-421e-b2e3-aac0dad43e9d",
+      "run_id": "1853377d-56f0-43f4-8866-ff297b3358b2",
       "status": "completed",
       "intent": "answer",
       "specialists": [],
       "planned_by": "groq",
-      "reply": "The resend that has the later `YYYYMMDD_HHMM` timestamp in its file name wins. The loader parses the timestamp from the name (`SUBMITTERID_YYYYMMDD_HHMM_NAME.txt`) and orders files descending; the row from the **latest submitter file** is kept\u202f[4]. If timestamps are identical, the lexically greater file name would win\u202f[4].",
+      "reply": "The resend with the later timestamp in the file name wins. Parse the `YYYYMMDD_HHMM` part of the name and order descending; the file with the highest `HHMM` for that business date is the one that supersedes earlier copies (and if timestamps tie, use the lexically greater name)\u30104\u3011.",
       "tools_used": [],
-      "latency_ms": 1943,
+      "latency_ms": 2180,
       "steps": 7,
       "nodes": 3,
       "tool_calls": 1,
@@ -173,7 +173,7 @@
       "llm_calls": 2,
       "llm_calls_failed": 0,
       "prompt_tokens": 1357,
-      "completion_tokens": 216,
+      "completion_tokens": 200,
       "cost_usd": 0,
       "models": [
         "groq/openai/gpt-oss-120b"
@@ -181,22 +181,22 @@
     },
     "ask-follow-up": {
       "question": "What should we check before reprocessing that day?",
-      "run_id": "215045bc-36a2-4d55-bde5-b7a02d8894fa",
+      "run_id": "571f7a08-f5b4-41b8-9ea9-9b0288455bb6",
       "status": "completed",
       "intent": "answer",
       "specialists": [],
       "planned_by": "groq",
-      "reply": "Before reprocessing, verify that the corrected (resend) file has a later\u202f`HHMM` timestamp in its name so the\u202flatest\u2011file\u2011wins\u202flogic will select it, and then compare the `publish_metrics` output to the file\u2019s trailer counts to confirm they match\u202f[2].",
+      "reply": "Before reprocessing, first confirm that the corrected (resend) file has been landed with a later\u202f`HHMM` in its name, then run the reprocess and **compare the `publish_metrics` output to the file\u2011trailer counts** to verify the data matches the expected totals\u30102\u3011.",
       "tools_used": [],
-      "latency_ms": 2534,
+      "latency_ms": 2086,
       "steps": 7,
       "nodes": 3,
       "tool_calls": 1,
       "retrievals": 1,
       "llm_calls": 2,
       "llm_calls_failed": 0,
-      "prompt_tokens": 1308,
-      "completion_tokens": 189,
+      "prompt_tokens": 1280,
+      "completion_tokens": 231,
       "cost_usd": 0,
       "models": [
         "groq/openai/gpt-oss-120b"
@@ -204,16 +204,16 @@
     },
     "ask-explore": {
       "question": "Show me which submitter sent the fewest rows on 2026-06-18, and when its file landed.",
-      "run_id": "c81a28a9-8b01-438c-a76c-95fee33b330b",
+      "run_id": "1799b95e-a9aa-4a96-aa6c-af9f32c1c95d",
       "status": "completed",
       "intent": "explore",
       "specialists": [],
       "planned_by": "groq",
-      "reply": "The submitter with the fewest rows on\u202f2026\u201106\u201118 was **S1004**, whose file contributed **53 rows**. Its file landed at **2026\u201106\u201119T04:13:00+00:00** (shown in the `transactions` table stats for that date).",
+      "reply": "The submitter with the fewest rows on\u202f2026\u201106\u201118 was **S1004**, whose file contained **53 rows** and landed at **2026\u201106\u201119T04:13:00+00:00**. This information comes from the `warehouse__get_table_stats` call for the\u202ftransactions\u202ftable on\u202f2026\u201106\u201118.",
       "tools_used": [
         "warehouse-metadata/get_table_stats"
       ],
-      "latency_ms": 2554,
+      "latency_ms": 2009,
       "steps": 8,
       "nodes": 3,
       "tool_calls": 2,
@@ -221,7 +221,7 @@
       "llm_calls": 3,
       "llm_calls_failed": 0,
       "prompt_tokens": 2923,
-      "completion_tokens": 370,
+      "completion_tokens": 362,
       "cost_usd": 0,
       "models": [
         "groq/openai/gpt-oss-120b"
@@ -234,28 +234,28 @@
     "model_analysis": {
       "provider": "groq",
       "model": "openai/gpt-oss-120b",
-      "latency_ms": 1574,
+      "latency_ms": 1403,
       "prompt_tokens": 1256,
-      "completion_tokens": 504
+      "completion_tokens": 492
     }
   },
   "review_s1": {
     "status": "resumed",
-    "run_id": "78b3d94d-58f0-4d68-a38b-599efb8f2e0a",
+    "run_id": "9bda1e0c-4add-4ac7-8351-8434ccba88aa",
     "outcome": [
       {
-        "id": "f2067395-d123-40cf-96db-f39a1c0e7b26",
+        "id": "53b2f5c8-07e2-4540-b5b0-404ceed08441",
         "status": "published",
         "decision": "approve"
       }
     ]
   },
   "rescan": {
-    "run_id": "a57b1822-06aa-4822-87a0-7b4394aa71ea",
+    "run_id": "c7feabd0-fd54-43f7-b2ba-821aee4ba713",
     "status": "completed",
-    "latency_ms": 1202,
+    "latency_ms": 1327,
     "fallbacks": [],
-    "summary": "S1: Missing channel_basket_id in S1003 file breaks deduplication",
+    "summary": "S1: Missing channel_basket_id in S1003_20260616_0216_MOBILE.txt blocks dedup",
     "steps": 36,
     "nodes": 5,
     "tool_calls": 30,
@@ -263,7 +263,7 @@
     "llm_calls": 1,
     "llm_calls_failed": 0,
     "prompt_tokens": 750,
-    "completion_tokens": 244,
+    "completion_tokens": 236,
     "cost_usd": 0,
     "models": [
       "groq/openai/gpt-oss-120b"
@@ -368,10 +368,10 @@
   ],
   "ci": {
     "conclusion": "success",
-    "createdAt": "2026-09-19T20:32:38Z",
-    "databaseId": 35467705767,
-    "headSha": "3c192583a4961a8e63dddcb7f8bcfff6538add2c",
-    "url": "https://github.com/rahulramachandran-labs/reconmind/actions/runs/35467705767"
+    "createdAt": "2026-09-23T05:58:02Z",
+    "databaseId": 35824610838,
+    "headSha": "1bf31accf5405378d0664355fed17ce8d0a0f096",
+    "url": "https://github.com/rahulramachandran-labs/reconmind/actions/runs/35824610838"
   },
   "tests": {
     "command": "make test",

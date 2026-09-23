@@ -48,4 +48,4 @@ TOTAL                                            3285    190    664     75    93
 
 34 files skipped due to complete coverage.
 Required test coverage of 80.0% reached. Total coverage: 92.58%
-172 passed in 153.55s (0:02:33)
+172 passed in 206.84s (0:03:26)

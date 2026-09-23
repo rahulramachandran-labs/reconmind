@@ -3,7 +3,7 @@
     make dev                                            # in another terminal
     uv run python scripts/capture_readme_evidence.py
 
-Plays the scenarios a reviewer would try against the API: a scan, an
+Plays the scenarios in the README's tour against the API: a scan, an
 investigation question, a runbook question and a follow-up in the same session,
 the S1 written up again by the model and signed off by a person, and a second
 scan that must not duplicate anything. Saves what came back to docs/evidence/,

@@ -282,7 +282,8 @@ def results_block(s: dict[str, Any]) -> str:
         sev = x["severity"] + (", as expected" if x["severity"] == expected else f" ({expected})")
         outcome = "held for review" if x["status"] == "pending_review" else x["status"]
         out.append(
-            f"| {name} | {size} | {x['title']}; {x['affected_records']} records | {sev} | "
+            f'| <a id="{key.replace("_", "-")}"></a>{name} | {size} | '
+            f"{x['title']}; {x['affected_records']} records | {sev} | "
             f"{outcome} | `{x.get('written_by', x['analysis_by'])}` |"
         )
     caught = len(sc["findings"]) == 4 and all(
